@@ -1,0 +1,256 @@
+import os
+import glob
+from sqlalchemy import create_engine, Column, Integer, String, BigInteger, ForeignKey, Text, inspect, text
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+
+# --- CẤU HÌNH ---
+# Get absolute path to Database folder
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SOURCE_FOLDER = os.path.join(SCRIPT_DIR, "new_db_from_kaggle")  # Nơi chứa file db tải từ Kaggle
+MASTER_DB_FOLDER = os.path.join(SCRIPT_DIR, "master_db")
+MASTER_DB_PATH = f"sqlite:///{os.path.join(MASTER_DB_FOLDER, 'master.db')}" # Database tổng
+
+os.makedirs(MASTER_DB_FOLDER, exist_ok=True)
+os.makedirs(SOURCE_FOLDER, exist_ok=True)
+
+print(f"📁 Script directory: {SCRIPT_DIR}")
+print(f"📁 Source folder: {SOURCE_FOLDER}")
+print(f"📁 Master DB: {MASTER_DB_PATH}")
+print()
+
+# --- KHAI BÁO SCHEMA (Phải khớp 100% với Kaggle) ---
+Base = declarative_base()
+
+class Company(Base):
+    __tablename__ = 'companies'
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String(10), unique=True, nullable=False)
+    name = Column(String(255))
+    industry = Column(String(100))
+    shares_outstanding = Column(BigInteger)
+    balance_sheets = relationship("BalanceSheet", back_populates="company")
+    income_statements = relationship("IncomeStatement", back_populates="company")
+    cash_flows = relationship("CashFlow", back_populates="company")
+
+class BalanceSheet(Base):
+    __tablename__ = 'balance_sheets'
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey('companies.id'))
+    period_year = Column(Integer)
+    period_quarter = Column(Integer) # 🌟 MỚI: Cột phân biệt Quý
+    period_type = Column(String(20))
+    raw_data = Column(Text)          # 🌟 MỚI: Cột JSON thô
+    
+    total_assets = Column(BigInteger)
+    current_assets = Column(BigInteger)
+    cash_and_equivalents = Column(BigInteger)
+    short_term_investments = Column(BigInteger)
+    accounts_receivable = Column(BigInteger)
+    inventories = Column(BigInteger)
+    non_current_assets = Column(BigInteger)
+    fixed_assets = Column(BigInteger)
+    total_liabilities = Column(BigInteger)
+    current_liabilities = Column(BigInteger)
+    short_term_debt = Column(BigInteger)
+    non_current_liabilities = Column(BigInteger)
+    long_term_debt = Column(BigInteger)
+    total_equity = Column(BigInteger)
+    retained_earnings = Column(BigInteger)
+    
+    company = relationship("Company", back_populates="balance_sheets")
+
+class IncomeStatement(Base):
+    __tablename__ = 'income_statements'
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey('companies.id'))
+    period_year = Column(Integer)
+    period_quarter = Column(Integer)
+    period_type = Column(String(20))
+    raw_data = Column(Text)
+    
+    revenue = Column(BigInteger)
+    gross_profit = Column(BigInteger)
+    operating_income = Column(BigInteger)
+    ebit = Column(BigInteger)
+    ebitda = Column(BigInteger)
+    profit_before_tax = Column(BigInteger)
+    profit_after_tax = Column(BigInteger)
+    net_profit = Column(BigInteger)
+    eps = Column(Integer)
+    dividend_per_share = Column(Integer)
+    
+    company = relationship("Company", back_populates="income_statements")
+
+class CashFlow(Base):
+    __tablename__ = 'cash_flows'
+    id = Column(Integer, primary_key=True)
+    company_id = Column(Integer, ForeignKey('companies.id'))
+    period_year = Column(Integer)
+    period_quarter = Column(Integer)
+    period_type = Column(String(20))
+    raw_data = Column(Text)
+    
+    operating_cash_flow = Column(BigInteger)
+    investing_cash_flow = Column(BigInteger)
+    financing_cash_flow = Column(BigInteger)
+    net_cash_flow = Column(BigInteger)
+    beginning_cash = Column(BigInteger)
+    ending_cash = Column(BigInteger)
+    free_cash_flow = Column(BigInteger)
+    capex = Column(BigInteger)
+    
+    company = relationship("Company", back_populates="cash_flows")
+
+# --- HÀM CHÍNH: GỘP DATABASE ---
+def merge_databases():
+    print("=" * 60)
+    print("CÔNG CỤ GỘP DATABASE TỪ NHIỀU NGUỒN VÀO MASTER DATABASE")
+    print("=" * 60)
+
+    # 1. Tạo master database
+    engine_master = create_engine(MASTER_DB_PATH)
+    Base.metadata.create_all(engine_master)
+    SessionMaster = sessionmaker(bind=engine_master)
+    session_master = SessionMaster()
+
+    # 2. Tìm file DB trong thư mục nguồn
+    db_files = glob.glob(os.path.join(SOURCE_FOLDER, "*.db"))
+    if not db_files:
+        print(f"❌ Không tìm thấy file .db nào trong thư mục: {SOURCE_FOLDER}")
+        print(f"   Vui lòng đặt file database vào thư mục này!")
+        return
+
+    print(f"📂 Tìm thấy {len(db_files)} file database cần gộp:")
+    for f in db_files:
+        print(f"   - {os.path.basename(f)}")
+    print()
+
+    for db_file in db_files:
+        print(f"\n🔄 Đang xử lý: {os.path.basename(db_file)}...")
+        
+        try:
+            engine_source = create_engine(f"sqlite:///{db_file}")
+            
+            # Kiểm tra schema của source database
+            inspector = inspect(engine_source)
+            
+            # Kiểm tra xem có bảng companies không
+            if 'companies' not in inspector.get_table_names():
+                print(f"   ⚠️  Bỏ qua: Không tìm thấy bảng 'companies' trong database")
+                continue
+            
+            # Lấy danh sách cột thực tế
+            company_columns = {col['name'] for col in inspector.get_columns('companies')}
+            print(f"   📋 Schema companies: {', '.join(sorted(company_columns))}")
+            
+            # Sử dụng raw SQL để query dữ liệu
+            with engine_source.connect() as conn:
+                # Query companies
+                companies_result = conn.execute(text("SELECT * FROM companies")).fetchall()
+                
+                if not companies_result:
+                    print(f"   ⚠️  Bỏ qua: Không có dữ liệu trong bảng companies")
+                    continue
+                
+                for comp_row in companies_result:
+                    comp_data = dict(comp_row._mapping)
+                    ticker = comp_data.get('ticker')
+                    
+                    if not ticker:
+                        print(f"   ⚠️  Bỏ qua 1 company: Không có mã ticker")
+                        continue
+                    
+                    # A. Đồng bộ Công Ty
+                    comp_master = session_master.query(Company).filter_by(ticker=ticker).first()
+                    if not comp_master:
+                        print(f"   + Thêm mới: {ticker}")
+                        
+                        # Tạo dict với các field có trong master schema
+                        company_data = {'ticker': ticker}
+                        
+                        # Thêm các field optional nếu có
+                        if 'name' in comp_data and comp_data['name']:
+                            company_data['name'] = comp_data['name']
+                        if 'industry' in comp_data and comp_data['industry']:
+                            company_data['industry'] = comp_data['industry']
+                        if 'shares_outstanding' in comp_data and comp_data['shares_outstanding']:
+                            company_data['shares_outstanding'] = comp_data['shares_outstanding']
+                        
+                        comp_master = Company(**company_data)
+                        session_master.add(comp_master)
+                        session_master.flush()
+                    else:
+                        print(f"   . Cập nhật: {ticker}")
+                        # Cập nhật các field có sẵn
+                        if 'name' in comp_data and comp_data['name']:
+                            comp_master.name = comp_data['name']
+                        if 'industry' in comp_data and comp_data['industry']:
+                            comp_master.industry = comp_data['industry']
+                        if 'shares_outstanding' in comp_data and comp_data['shares_outstanding']:
+                            comp_master.shares_outstanding = comp_data['shares_outstanding']
+                    
+                    company_id = comp_data.get('id')
+                    
+                    # B. Đồng bộ Báo Cáo
+                    def sync_reports_raw(table_name, ModelClass):
+                        # Kiểm tra xem bảng có tồn tại không
+                        if table_name not in inspector.get_table_names():
+                            return 0
+                        
+                        count = 0
+                        reports_result = conn.execute(
+                            text(f"SELECT * FROM {table_name} WHERE company_id = :company_id"),
+                            {"company_id": company_id}
+                        ).fetchall()
+                        
+                        for report_row in reports_result:
+                            report_data = dict(report_row._mapping)
+                            
+                            # Xóa bản ghi cũ (nếu có) - match theo year, quarter, type
+                            period_year = report_data.get('period_year')
+                            period_quarter = report_data.get('period_quarter')
+                            period_type = report_data.get('period_type')
+                            
+                            if period_year:
+                                session_master.query(ModelClass).filter_by(
+                                    company_id=comp_master.id,
+                                    period_year=period_year,
+                                    period_quarter=period_quarter,
+                                    period_type=period_type
+                                ).delete()
+                            
+                            # Lấy danh sách cột của model
+                            model_columns = {c.name for c in ModelClass.__table__.columns}
+                            
+                            # Tạo dict mới, chỉ lấy các cột có trong model
+                            new_data = {k: v for k, v in report_data.items() 
+                                       if k in model_columns and k not in ['id', 'company_id']}
+                            new_data['company_id'] = comp_master.id
+                            
+                            new_record = ModelClass(**new_data)
+                            session_master.add(new_record)
+                            count += 1
+                        return count
+                    
+                    n_bs = sync_reports_raw('balance_sheets', BalanceSheet)
+                    n_is = sync_reports_raw('income_statements', IncomeStatement)
+                    n_cf = sync_reports_raw('cash_flows', CashFlow)
+                    
+                    print(f"     -> Gộp: {n_bs} BS, {n_is} IS, {n_cf} CF")
+
+            session_master.commit()
+            print("✅ Gộp thành công!")
+            
+        except Exception as e:
+            session_master.rollback()
+            print(f"❌ Lỗi: {e}")
+            import traceback
+            traceback.print_exc()
+
+    session_master.close()
+    print("\n" + "=" * 60)
+    print("🎉 HOÀN TẤT! Dữ liệu đã được gộp vào master.db")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    merge_databases()
