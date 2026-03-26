@@ -4,128 +4,176 @@ import time
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+import unicodedata
 
-# ==============================================================================
-# KHU VỰC TÙY CHỈNH NÂNG CAO
-# ==============================================================================
-STOCK_CODES_TO_DOWNLOAD = ["VHM", "VIC", "TCB"]
-START_YEAR = 2020  # Chỉ tải báo cáo từ năm 2020 trở đi
-
-# Mỗi bộ lọc là một danh sách các từ khóa PHẢI CÙNG XUẤT HIỆN
-# Ví dụ: ["bctc", "cong ty me"] nghĩa là tiêu đề phải chứa cả "bctc" VÀ "cong ty me"
-KEYWORD_SETS = [
-    ["bctc", "công ty mẹ"],
-    ["bctc", "hợp nhất", "quý"],
-    ["Báo cáo tài chính"] # Lọc báo cáo thường niên
+# ======================================================================
+# DANH SÁCH ~200 MÃ PHỔ BIẾN (HOSE + HNX + UPCOM chọn lọc)
+# ======================================================================
+STOCK_CODES_TO_DOWNLOAD = [
+    "VCB","BID","CTG","TCB","VPB","MBB","ACB","HDB","STB","TPB",
+    "VIC","VHM","VRE","NVL","PDR","KDH","DXG","DIG","CEO","SCR",
+    "HPG","HSG","NKG","GAS","PLX","POW","REE","PC1","PVS","PVD",
+    "FPT","CMG","ELC","SAM","DGW","MWG","PNJ","FRT","VGI","CTR",
+    "VNM","MSN","SAB","KDC","QNS","BAF","DBC","HAG","HNG","PAN",
+    "VJC","HVN","VTP","GMD","HAH","VSC","SCS","TMS","ACV","AST",
+    "SSI","VND","HCM","VCI","MBS","SHS","FTS","BVS","VDS","CTS",
+    "DGC","DCM","DPM","CSV","LAS","BFC","PHR","TRC","DPR","GVR",
+    "NT2","PPC","HND","QTP","GEG","REE","POW","NTC","SZC","IDC",
+    "BMP","NTP","AAA","APH","TNG","STK","GIL","MSH","VGT","ADS",
+    "HBC","CTD","CII","FCN","LCG","HHV","KSB","HT1","BCC","BTS",
+    "VHC","ANV","IDI","CMX","FMC","ACL","ABT","AGF","TS4","SEA",
+    "BVH","BMI","PVI","BIC","VNR","MIG","PTI","ABI","AIC","PGI",
+    "DHG","DMC","IMP","TRA","OPC","PMC","DBD","DP3","TW3","DVN",
+    "SBT","LSS","KTS","QNS","MIA","HSL","NAF","AFX","VOC","VSF",
+    "VIB","EIB","OCB","MSB","LPB","NAB","BAB","BVB","SSB","KLB",
+    "VIX","APS","ORS","AGR","TVS","TVB","APG","AAS","EVS","IVS",
+    "KBC","ITA","SZL","TIP","IDC","BCM","KHG","NLG","IJC","HDG",
+    "FOX","VGI","CTR","TTN","SGT","CMG","ELC","ONE","ICT","SMT",
+    "HUT","C4G","HHV","LCG","DHA","VLB","KSB","BMC","YBM","HGM",
+    "PVT","VIP","VOS","VNA","MVN","SGN","ACV","NCT","TCL","SCS",
+    "VSH","CHP","TBC","SJD","TMP","DRL","SBH","HJS","TTE","VPD",
+    "AAA","APH","NHH","DPR","DRC","CSM","SRC","PAC","SVC","TMT"
 ]
-# ==============================================================================
+
+START_YEAR = 2023
+
+KEYWORD_SETS = [
+    ["bctc", "hop nhat", "quy"],
+    ["bao cao tai chinh", "hop nhat", "quy"],
+]
+
+EXCLUDE_KEYWORDS = ["rieng le", "cong ty me", "cong ty con"]
+
+# ======================================================================
+
+def normalize_text(text):
+    if not text:
+        return ""
+    normalized = unicodedata.normalize('NFD', text)
+    without_accents = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    return ' '.join(without_accents.lower().split())
 
 def sanitize_filename(filename):
-    return "".join([c for c in filename if c.isalpha() or c.isdigit() or c in (' ', '_', '-')]).rstrip()
+    return "".join([c for c in filename if c.isalnum() or c in (' ', '_', '-')]).rstrip()
 
 def extract_year_from_title(title):
-    """Trích xuất năm từ tiêu đề báo cáo"""
-    # Tìm các pattern năm: "năm 2020", "2020", "Năm 2021"
-    patterns = [
-        r'năm\s+(\d{4})',  # "năm 2020"
-        r'(\d{4})',         # "2020"
-    ]
+    patterns = [r'năm\s+(\d{4})', r'(\d{4})']
     for pattern in patterns:
         match = re.search(pattern, title.lower())
         if match:
             year = int(match.group(1))
-            if 2000 <= year <= datetime.now().year:  # Kiểm tra năm hợp lệ
+            if 2000 <= year <= datetime.now().year:
                 return year
     return None
 
-def download_reports_final_api(download_dir, stock_code, keyword_sets):
+# ======================================================================
+
+def download_reports(download_dir, stock_code, keyword_sets):
     target_dir = os.path.join(download_dir, stock_code)
     os.makedirs(target_dir, exist_ok=True)
-    print(f"--- Bắt đầu xử lý mã {stock_code} qua API ---")
+
+    print(f"\n--- {stock_code} ---")
 
     session = requests.Session()
     session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     })
 
     try:
-        main_page_url = f"https://finance.vietstock.vn/{stock_code}/tai-tai-lieu.htm"
-        print(f"Đang truy cập trang chính để lấy token...")
-        main_page_response = session.get(main_page_url, timeout=30)
-        main_page_response.raise_for_status()
+        main_url = f"https://finance.vietstock.vn/{stock_code}/tai-tai-lieu.htm"
+        res = session.get(main_url, timeout=30)
+        res.raise_for_status()
 
-        soup = BeautifulSoup(main_page_response.text, 'lxml')
+        soup = BeautifulSoup(res.text, 'lxml')
         token = soup.find('input', {'name': '__RequestVerificationToken'}).get('value')
-        print("✔️ Lấy token thành công!")
 
         api_url = "https://finance.vietstock.vn/data/getdocument"
         page = 1
         total_downloaded = 0
+
         while True:
-            payload = {"code": stock_code, "page": page, "type": 1, "__RequestVerificationToken": token}
-            print(f"\nĐang yêu cầu dữ liệu trang {page}...")
-            api_response = session.post(api_url, data=payload, timeout=30)
-            api_response.raise_for_status()
-            
-            reports = api_response.json()
+            payload = {
+                "code": stock_code,
+                "page": page,
+                "type": 1,
+                "__RequestVerificationToken": token
+            }
+
+            api_res = session.post(api_url, data=payload, timeout=30)
+            api_res.raise_for_status()
+            reports = api_res.json()
+
             if not reports:
-                print("Không còn báo cáo nào. Kết thúc.")
                 break
 
             for report in reports:
-                report_title = report.get('Title', '').strip()
-                pdf_url = report.get('Url', '').strip()
-                if not report_title or not pdf_url: continue
-                
-                # --- KIỂM TRA NĂM ---
-                report_year = extract_year_from_title(report_title)
-                if report_year and report_year < START_YEAR:
-                    print(f"⏭️ Bỏ qua (năm {report_year} < {START_YEAR}): '{report_title}'")
-                    continue
-                
-                # --- LOGIC LỌC NÂNG CAO ---
-                normalized_title = report_title.lower()
-                matched_set = None
-                for keyword_set in keyword_sets:
-                    # all() sẽ kiểm tra xem TẤT CẢ các từ khóa trong bộ có nằm trong tiêu đề không
-                    if all(keyword.lower() in normalized_title for keyword in keyword_set):
-                        matched_set = keyword_set
-                        break 
-                
-                if not matched_set:
-                    continue # Bỏ qua nếu không khớp với bộ lọc nào
+                title = report.get('Title', '').strip()
+                url = report.get('Url', '').strip()
 
-                year_info = f" (năm {report_year})" if report_year else ""
-                print(f"✔️ Khớp bộ lọc {matched_set}{year_info}: '{report_title}'")
-                safe_filename = sanitize_filename(report_title) + ".pdf"
-                dest_path = os.path.join(target_dir, safe_filename)
-
-                if os.path.exists(dest_path):
-                    print("  -> Đã tồn tại, bỏ qua.")
+                if not title or not url:
                     continue
-                
-                print("  -> Đang tải...")
+
+                # ❌ BỎ QUA nếu không phải PDF trực tiếp
+                if not url.lower().endswith(".pdf"):
+                    print(f"⏭️ Bỏ qua (không phải PDF): {title}")
+                    continue
+
+                # lọc năm
+                year = extract_year_from_title(title)
+                if year and year < START_YEAR:
+                    continue
+
+                normalized = normalize_text(title)
+
+                if any(k in normalized for k in EXCLUDE_KEYWORDS):
+                    continue
+
+                matched = False
+                for kw_set in keyword_sets:
+                    if all(normalize_text(k) in normalized for k in kw_set):
+                        matched = True
+                        break
+
+                if not matched:
+                    continue
+
+                filename = sanitize_filename(title) + ".pdf"
+                path = os.path.join(target_dir, filename)
+
+                if os.path.exists(path):
+                    continue
+
+                print(f"⬇️ {title}")
+
                 try:
-                    file_res = session.get(pdf_url, stream=True, timeout=60)
+                    file_res = session.get(url, stream=True, timeout=60)
                     file_res.raise_for_status()
-                    with open(dest_path, 'wb') as f:
-                        for chunk in file_res.iter_content(chunk_size=8192): f.write(chunk)
-                    print(f"  -> Đã lưu thành công: {safe_filename}")
+
+                    with open(path, 'wb') as f:
+                        for chunk in file_res.iter_content(8192):
+                            f.write(chunk)
+
                     total_downloaded += 1
-                except requests.exceptions.RequestException as e:
-                    print(f"  -> Lỗi khi tải file PDF: {e}")
-            
+
+                except Exception as e:
+                    print(f"Lỗi tải: {e}")
+
             page += 1
             time.sleep(1)
 
+        print(f"✔️ Tổng tải: {total_downloaded}")
+
     except Exception as e:
-        print(f"Lỗi nghiêm trọng khi xử lý mã {stock_code}: {e}")
-    print(f"\nTổng cộng đã tải về {total_downloaded} báo cáo mới cho mã {stock_code}.")
+        print(f"Lỗi: {e}")
+
+# ======================================================================
 
 if __name__ == "__main__":
-    DOWNLOAD_DIRECTORY = "./downloads_vietstock_final"
-    os.makedirs(DOWNLOAD_DIRECTORY, exist_ok=True)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    DOWNLOAD_DIR = os.path.join(base_dir, "downloads")
+
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
     for code in STOCK_CODES_TO_DOWNLOAD:
-        download_reports_final_api(DOWNLOAD_DIRECTORY, code, KEYWORD_SETS)
-        print(f"==================== Hoàn thành mã {code} ====================")
-        time.sleep(3)
+        download_reports(DOWNLOAD_DIR, code, KEYWORD_SETS)
+        time.sleep(2)
