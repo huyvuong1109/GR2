@@ -18,3 +18,15 @@ python-dateutil>=2.8.0
 python-multipart>=0.0.6
 
 # CORS (for React frontend)
+pymupdf
+sqlalchemy
+python-dotenv
+langchain-core
+langchain-openai
+pydantic>=2.0
+docling[tesserocr]
+marker-pdf
+surya-ocr
+numpy
+pillow
+requests
