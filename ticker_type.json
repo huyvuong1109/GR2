@@ -1,0 +1,23 @@
+{
+  "_comment": "Mapping ticker -> company_type. Moi ma khong co trong bank/securities/insurance mac dinh la 'corporate'",
+
+  "bank": [
+    "VCB", "BID", "CTG", "TCB", "VPB", "MBB", "ACB", "HDB", "STB", "TPB",
+    "VIB", "EIB", "OCB", "MSB", "LPB", "NAB", "BAB", "BVB", "SSB", "KLB",
+    "ABB", "PGB", "SGB", "VAB", "VBB", "BDB", "CBB", "COB", "GPB", "IVB",
+    "KienLongBank", "NamABank", "NCB", "OceanBank", "PVcomBank", "SCB",
+    "SHB", "VietABank", "VietBank", "VietCapitalBank"
+  ],
+
+  "securities": [
+    "SSI", "VND", "HCM", "VCI", "MBS", "SHS", "FTS", "BVS", "VDS", "CTS",
+    "VIX", "APS", "ORS", "AGR", "TVS", "TVB", "APG", "AAS", "EVS", "IVS",
+    "BSI", "VCSC", "FPTS", "KIS", "MASC", "MBKE", "MSBS", "PISC", "SHBS",
+    "TCBS", "VCBS", "VDSC", "VISE", "VNDS", "VPBS"
+  ],
+
+  "insurance": [
+    "BVH", "BMI", "PVI", "BIC", "VNR", "MIG", "PTI", "ABI", "AIC", "PGI",
+    "BHN", "MBB-INS", "PBC", "PRE", "PJICO", "PTI", "QBE", "UIC"
+  ]
+}
