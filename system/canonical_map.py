@@ -6,11 +6,6 @@ Su dung:
     from canonical_map import map_to_canonical
     slug = map_to_canonical("Doanh thu thuan ve ban hang", company_type="corporate")
     # -> "doanh_thu_thuan"
-
-Cai tien so voi phien ban cu:
-- Them _preprocess(): bo so la ma, ngoac, ky hieu % truoc khi lookup
-- Them alias pho bien tu LLM (ten ngan, viet tat, tieng Anh)
-- Thu lai voi ten goc neu pre-process khong match
 """
 
 import re
@@ -30,23 +25,51 @@ def _norm(text: str) -> str:
 
 def _preprocess(name: str) -> str:
     """
-    Lam sach ten chi tieu truoc khi lookup:
-    - Bo so la ma dau dong:  "100. Tong tai san" -> "Tong tai san"
-    - Bo ngoac chua ma so:   "Tong tai san (100)" -> "Tong tai san"
-    - Bo don vi tien te:     "Doanh thu (trieu dong)" -> "Doanh thu"
-    - Bo ky hieu %:          "Tang truong (%)" -> "Tang truong"
+    Lam sach ten chi tieu truoc khi lookup.
+    - Bo ky tu OCR rac dau dong: |, &#124;, Ì, Í, §, s. (bi nham so)
+    - Bo so thu tu dau dong:     "1. ", "10. ", "I. ", "II. ", "IV. "
+    - Bo ngoac chua ma so/don vi
+    - Bo ky hieu %
     - Bo "Thuyet minh so X"
+    - Bo cong thuc trong ngoac nhon: {30=20+...}
     """
     t = name.strip()
-    t = re.sub(r"^[0-9IVXABCivxabc]{1,4}[\.\)\-\s]+", "", t).strip()
+
+    # Bo ky tu OCR rac o dau: |, &#124;, unicode table border
+    t = re.sub(r"^[\|\s&#;0-9a-zA-Z]*124[;\s]*", "", t).strip()  # &#124;
+    t = re.sub(r"^[|Ì Í§]+\s*", "", t).strip()
+
+    # Bo so thu tu + dau phan cach (1. / 10. / 1) / A. / I. / II. / IV. / V. ...)
+    # Xu ly ca so La Ma nhieu ky tu: VIII, IX, ...
+    t = re.sub(
+        r"^(?:[0-9]{1,3}|I{1,3}V?|VI{0,3}|IX|XI{0,3}|IV|VIII?|[A-Da-d])"
+        r"[\.\)\-\s]+",
+        "", t,
+    ).strip()
+
+    # Lap lai mot lan nua de xu ly truong hop long (vd: "s. Đầu tư..." -> "Đầu tư...")
+    t = re.sub(r"^[a-zA-Z]{1,2}[\.\)\-]\s+", "", t).strip()
+
+    # Bo ngoac chua ma so
     t = re.sub(r"\(\s*\d+\s*\)", "", t)
+
+    # Bo cong thuc: {30=20+(21-22)-...}
+    t = re.sub(r"\{[^}]+\}", "", t)
+
+    # Bo don vi tien te trong ngoac
     t = re.sub(
         r"\(\s*(?:trieu|ty|nghin|dong|vnd|usd)\s*(?:dong)?\s*\)",
         "", t, flags=re.IGNORECASE,
     )
+
+    # Bo ky hieu %
     t = re.sub(r"\s*\(%\)\s*$", "", t)
     t = re.sub(r"\s*\(trieu dong\)\s*$", "", t, flags=re.IGNORECASE)
+
+    # Bo "thuyet minh so X"
     t = re.sub(r"thuyet\s*minh\s*\d*", "", t, flags=re.IGNORECASE)
+
+    # Chuan hoa khoang trang
     return re.sub(r"\s+", " ", t).strip()
 
 
@@ -65,31 +88,58 @@ CORPORATE_MAP = {
     "dau_tu_tai_chinh_ngan_han": [
         "dau tu tai chinh ngan han", "chung khoan kinh doanh ngan han",
         "short term investments", "dau tu ngan han",
+        "cac khoan dau tu tai chinh ngan han",
+        "dau tu nam giu den ngay dao han ngan han",
     ],
     "phai_thu_ngan_han_khach_hang": [
         "phai thu ngan han cua khach hang", "phai thu khach hang",
         "accounts receivable", "phai thu ngan han khach",
         "phai thu khach hang ngan han", "cac khoan phai thu ngan han",
     ],
-    "phai_thu_ngan_han_khac":      ["phai thu ngan han khac", "other receivables"],
-    "hang_ton_kho":                ["hang ton kho", "inventories", "ton kho"],
-    "tai_san_ngan_han_khac":       ["tai san ngan han khac", "other current assets"],
+    "phai_thu_ngan_han_khac":      ["phai thu ngan han khac", "other receivables",
+                                    "cac khoan phai thu khac", "thue gtgt duoc khau tru",
+                                    "thue va cac khoan khac phai thu nha nuoc"],
+    "hang_ton_kho":                ["hang ton kho", "inventories", "ton kho",
+                                    "chi phi san xuat kinh doanh do dang"],
+    "tai_san_ngan_han_khac":       ["tai san ngan han khac", "other current assets",
+                                    "chi phi tra truoc ngan han",
+                                    "chi phi tra truoc ngan han",
+                                    "tai san thieu cho xu ly"],
     "tong_tai_san_ngan_han": [
         "tong tai san ngan han", "total current assets", "a tong cong",
         "tai san ngan han", "a tong tai san ngan han",
     ],
-    "phai_thu_dai_han":            ["phai thu dai han", "long term receivables"],
+    "phai_thu_dai_han":            ["phai thu dai han", "long term receivables",
+                                    "tra truoc cho nguoi ban",
+                                    "tra truoc cho nguoi ban dai han"],
     "tai_san_co_dinh_huu_hinh": [
         "tai san co dinh huu hinh", "property plant equipment",
         "tai san co dinh net", "tscd huu hinh",
+        "tai san co dinh",
     ],
-    "tai_san_co_dinh_vo_hinh":     ["tai san co dinh vo hinh", "intangible assets"],
-    "bat_dong_san_dau_tu":         ["bat dong san dau tu", "investment properties"],
+    "tai_san_co_dinh_vo_hinh":     ["tai san co dinh vo hinh", "intangible assets",
+                                    "loi the thuong mai"],
+    "bat_dong_san_dau_tu":         ["bat dong san dau tu", "investment properties",
+                                    "ii bat dong san dau tu"],
+    "tai_san_co_dinh_xay_dung_do_dang": [
+        "tai san xay dung co ban do dang", "construction in progress",
+        "tai san do dang dai han", "chi phi xay dung co ban do dang",
+        "xay dung co ban do dang",
+    ],
     "dau_tu_tai_chinh_dai_han": [
         "dau tu tai chinh dai han", "long term investments",
         "dau tu vao cong ty con", "dau tu vao cong ty lien ket",
+        "cac khoan dau tu tai chinh dai han",
+        "dau tu vao cong ty lien doanh lien ket",
+        "dau tu dai han khac",
+        "dau tu nam giu den ngay dao han",
+        "du phong giam gia dau tu tai chinh dai han",
     ],
-    "tai_san_dai_han_khac":        ["tai san dai han khac", "other non current assets"],
+    "tai_san_thue_thu_nhap_hoan_lai": [
+        "tai san thue thu nhap hoan lai", "deferred tax asset",
+    ],
+    "tai_san_dai_han_khac":        ["tai san dai han khac", "other non current assets",
+                                    "chi phi tra truoc dai han"],
     "tong_tai_san_dai_han": [
         "tong tai san dai han", "total non current assets", "b tong cong",
         "tai san dai han", "b tong tai san dai han",
@@ -104,6 +154,7 @@ CORPORATE_MAP = {
     ],
     "phai_tra_nguoi_ban_ngan_han": [
         "phai tra nguoi ban ngan han", "accounts payable", "phai tra nha cung cap",
+        "phai tra nguoi ban",
     ],
     "nguoi_mua_tra_tien_truoc_ngan_han": [
         "nguoi mua tra tien truoc ngan han", "advance from customers",
@@ -111,13 +162,21 @@ CORPORATE_MAP = {
     "thue_va_cac_khoan_phai_nop": [
         "thue va cac khoan phai nop nha nuoc", "taxes payable",
     ],
+    "phai_tra_nguoi_lao_dong":     ["phai tra nguoi lao dong", "payables to employees"],
+    "chi_phi_phai_tra_ngan_han":   ["chi phi phai tra ngan han", "accrued liabilities"],
+    "du_phong_phai_tra_ngan_han":  ["du phong phai tra ngan han"],
     "phai_tra_ngan_han_khac":      ["phai tra ngan han khac", "other current liabilities"],
     "tong_no_ngan_han": [
         "tong no ngan han", "total current liabilities", "no ngan han",
     ],
     "vay_dai_han": [
         "vay va no thue tai chinh dai han", "vay dai han", "long term borrowings",
+        "phai tra nguoi ban dai han",
     ],
+    "thue_thu_nhap_hoan_lai_phai_tra": [
+        "thue thu nhap hoan lai phai tra", "deferred tax liability",
+    ],
+    "du_phong_phai_tra_dai_han":   ["du phong phai tra dai han"],
     "phai_tra_dai_han_khac":       ["phai tra dai han khac", "other non current liabilities"],
     "tong_no_dai_han": [
         "tong no dai han", "total non current liabilities", "no dai han",
@@ -129,11 +188,23 @@ CORPORATE_MAP = {
     "von_gop_cua_chu_so_huu": [
         "von gop cua chu so huu", "von dieu le", "charter capital",
         "share capital", "co phan pho thong",
+        "von dau tu cua chu so huu",
     ],
-    "thang_du_von_co_phan":        ["thang du von co phan", "share premium"],
+    "thang_du_von_co_phan":        ["thang du von co phan", "share premium",
+                                    "von khac cua chu so huu"],
+    "co_phieu_quy":                ["co phieu quy", "treasury shares"],
+    "quy_dau_tu_phat_trien":       ["quy dau tu phat trien", "development fund"],
+    "quy_khen_thuong_phuc_loi":    ["quy khen thuong phuc loi", "bonus welfare fund"],
+    "loi_ich_co_dong_khong_kiem_soat": [
+        "loi ich cua co dong khong kiem soat",
+        "loi ich cua co dong thieu so",
+        "non controlling interest", "minority interest",
+        "loi ich co dong thieu so",
+    ],
     "loi_nhuan_sau_thue_chua_phan_phoi": [
         "loi nhuan sau thue chua phan phoi", "retained earnings",
         "loi nhuan chua phan phoi",
+        "lnst chua phan phoi luy ke den cuoi ky",
     ],
     "tong_von_chu_so_huu": [
         "tong von chu so huu", "total equity", "von chu so huu", "vcsh",
@@ -166,6 +237,11 @@ CORPORATE_MAP = {
     "chi_phi_tai_chinh": [
         "chi phi tai chinh", "financial expenses", "chi phi lai vay",
     ],
+    "phan_lai_lo_trong_cong_ty_lien_doanh": [
+        "phan lai lo trong cong ty lien doanh lien ket",
+        "share of profit loss in associates",
+        "phan lai lo trong cong ty lien doanh",
+    ],
     "chi_phi_ban_hang": [
         "chi phi ban hang", "selling expenses", "chi phi ban hang va quan ly",
     ],
@@ -175,6 +251,7 @@ CORPORATE_MAP = {
     "loi_nhuan_thuan_hdkd": [
         "loi nhuan thuan tu hoat dong kinh doanh", "operating profit",
         "loi nhuan hoat dong", "ebit",
+        "loi nhuan tu hoat dong kinh doanh",
     ],
     "thu_nhap_khac":               ["thu nhap khac", "other income"],
     "chi_phi_khac":                ["chi phi khac", "other expenses"],
@@ -183,12 +260,27 @@ CORPORATE_MAP = {
         "tong loi nhuan ke toan truoc thue", "profit before tax",
         "loi nhuan truoc thue", "earnings before tax", "ebt",
     ],
+    "chi_phi_thue_tndn_hien_hanh": [
+        "chi phi thue thu nhap doanh nghiep hien hanh",
+        "chi phi thue tndn hien hanh",
+        "current income tax expense",
+    ],
+    "chi_phi_thue_tndn_hoan_lai": [
+        "chi phi thue thu nhap doanh nghiep hoan lai",
+        "chi phi thue tndn hoan lai",
+        "deferred income tax expense",
+    ],
     "chi_phi_thue_tndn": [
         "chi phi thue thu nhap doanh nghiep", "income tax expense",
     ],
     "loi_nhuan_sau_thue": [
         "loi nhuan sau thue thu nhap doanh nghiep", "profit after tax",
         "net profit", "loi nhuan sau thue", "net income",
+    ],
+    "loi_nhuan_cua_co_dong_khong_kiem_soat": [
+        "loi ich cua co dong khong kiem soat kqkd",
+        "loi nhuan cua co dong thieu so",
+        "minority interest profit",
     ],
     "loi_nhuan_cua_co_dong_ct_me": [
         "loi nhuan cua co dong cong ty me", "profit attributable to parent",
@@ -204,6 +296,11 @@ CORPORATE_MAP = {
     ],
     "thay_doi_hang_ton_kho":       ["tang giam hang ton kho", "change in inventories"],
     "thay_doi_khoan_phai_tra":     ["tang giam cac khoan phai tra", "change in payables"],
+    "anh_huong_ty_gia_hoi_doai": [
+        "anh huong cua thay doi ty gia hoi doai quy doi ngoai te",
+        "effect of exchange rate changes",
+        "anh huong thay doi ty gia",
+    ],
     "lctt_thuan_hdkd": [
         "luu chuyen tien thuan tu hoat dong kinh doanh",
         "net cash from operating activities",
@@ -226,6 +323,7 @@ CORPORATE_MAP = {
     "tien_tra_no_vay":             ["tien tra no goc vay", "repayment of borrowings"],
     "co_tuc_da_tra": [
         "co tuc loi nhuan da tra cho chu so huu", "dividends paid",
+        "co tuc loi nhuan da tra",
     ],
     "lctt_thuan_hdtc": [
         "luu chuyen tien thuan tu hoat dong tai chinh",
