@@ -1,0 +1,23 @@
+{
+  "_comment": "Chinh sua danh sach ticker theo ma ban co PDF. Moi nhom se thanh 1 Kaggle dataset rieng.",
+  "group_01": ["VCB", "BID", "CTG", "TCB", "VPB", "MBB", "ACB", "HDB", "STB", "TPB"],
+  "group_02": ["VIB", "EIB", "OCB", "MSB", "LPB", "NAB", "BAB", "BVB", "SSB", "KLB"],
+  "group_03": ["VIC", "VHM", "VRE", "NVL", "PDR", "KDH", "DXG", "DIG", "CEO", "SCR"],
+  "group_04": ["HPG", "HSG", "NKG", "GAS", "PLX", "POW", "REE", "PC1", "PVS", "PVD"],
+  "group_05": ["FPT", "CMG", "ELC", "SAM", "DGW", "MWG", "PNJ", "FRT", "VGI", "CTR"],
+  "group_06": ["VNM", "MSN", "SAB", "KDC", "QNS", "BAF", "DBC", "HAG", "HNG", "PAN"],
+  "group_07": ["VJC", "HVN", "VTP", "GMD", "HAH", "VSC", "SCS", "TMS", "ACV", "AST"],
+  "group_08": ["SSI", "VND", "HCM", "VCI", "MBS", "SHS", "FTS", "BVS", "VDS", "CTS"],
+  "group_09": ["DGC", "DCM", "DPM", "CSV", "LAS", "BFC", "PHR", "TRC", "DPR", "GVR"],
+  "group_10": ["NT2", "PPC", "HND", "QTP", "GEG", "POW", "NTC", "SZC", "IDC", "VSH"],
+  "group_11": ["BMP", "NTP", "AAA", "APH", "TNG", "STK", "GIL", "MSH", "VGT", "ADS"],
+  "group_12": ["HBC", "CTD", "CII", "FCN", "LCG", "HHV", "KSB", "HT1", "BCC", "BTS"],
+  "group_13": ["VHC", "ANV", "IDI", "CMX", "FMC", "ACL", "ABT", "AGF", "TS4", "SEA"],
+  "group_14": ["BVH", "BMI", "PVI", "BIC", "VNR", "MIG", "PTI", "ABI", "AIC", "PGI"],
+  "group_15": ["DHG", "DMC", "IMP", "TRA", "OPC", "PMC", "DBD", "DVN", "NCT", "TCL"],
+  "group_16": ["CHP", "TBC", "SJD", "TMP", "DRL", "SBH", "HJS", "TTE", "VPD", "NHH"],
+  "group_17": ["DRC", "CSM", "SRC", "PAC", "SVC", "TMT", "ABB", "ACB", "VIX", "APS"],
+  "group_18": ["KBC", "ITA", "SZL", "TIP", "BCM", "KHG", "NLG", "IJC", "HDG", "FOX"],
+  "group_19": ["HUT", "C4G", "DHA", "VLB", "BMC", "YBM", "HGM", "PVT", "VIP", "VOS"],
+  "group_20": ["VNA", "MVN", "SGN", "QNS", "LSS", "KTS", "MIA", "HSL", "NAF", "AFX"]
+}
