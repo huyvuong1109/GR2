@@ -37,7 +37,7 @@ from pathlib import Path
 # CAU HINH MAC DINH — sua cho phu hop
 # ==============================================================================
 
-DEFAULT_PDF_ROOT    = r"D:\X1G8\GR2\FinancialApp\system\pdf"
+DEFAULT_PDF_ROOT    = r"D:\X1G8\GR2\FinancialApp\system\downloads"
 DEFAULT_GROUPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ticker_groups.json")
 
 
@@ -102,7 +102,7 @@ def zip_ticker(pdf_root: Path, ticker: str, out_zip: Path) -> int:
 
 
 def dataset_exists(kaggle_user: str, slug: str) -> bool:
-    r = _run(["kaggle", "datasets", "list", "-u", kaggle_user, "--csv"], check=False)
+    r = _run(["kaggle", "datasets", "list", kaggle_user, "--csv"], check=False)
     return slug in r.stdout
 
 
@@ -124,7 +124,7 @@ def upload_group(
     group_name: str,
 ) -> None:
     """Zip va upload 1 nhom ticker len 1 dataset rieng."""
-    slug  = f"bctc-{group_name}"
+    slug  = f"bctc-{group_name}".replace("_", "-")
     title = f"BCTC Vietnam - {group_name.upper()}"
 
     print(f"\n{'='*55}")

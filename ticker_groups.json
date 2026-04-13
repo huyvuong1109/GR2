@@ -1,6 +1,6 @@
 {
   "_comment": "Chinh sua danh sach ticker theo ma ban co PDF. Moi nhom se thanh 1 Kaggle dataset rieng.",
-  "group_01": ["VCB", "BID", "CTG", "TCB", "VPB", "MBB", "ACB", "HDB", "STB", "TPB"],
+  "group_01": ["VCB", "BID", "CTG"],
   "group_02": ["VIB", "EIB", "OCB", "MSB", "LPB", "NAB", "BAB", "BVB", "SSB", "KLB"],
   "group_03": ["VIC", "VHM", "VRE", "NVL", "PDR", "KDH", "DXG", "DIG", "CEO", "SCR"],
   "group_04": ["HPG", "HSG", "NKG", "GAS", "PLX", "POW", "REE", "PC1", "PVS", "PVD"],
