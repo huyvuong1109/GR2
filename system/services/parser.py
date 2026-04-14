@@ -225,7 +225,11 @@ class AggregatedParser:
                     json_str = m.group(0)
 
                 items_data = json.loads(json_str)
-                items = [FinancialItem(**i) for i in items_data]
+                items = [
+                    FinancialItem(**i)
+                    for i in items_data
+                    if i.get("item_name") and i.get("value") is not None
+                ]
                 logger.info(f"{section_name}: {len(items)} items parsed")
                 return items
 
