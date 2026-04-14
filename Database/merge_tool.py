@@ -1,362 +1,488 @@
+# -*- coding: utf-8 -*-
 """
-merge_tool.py - v6: Schema financial_data (ticker, quarter, year, report_type, item_name, value)
-Hỗ trợ merge:
-  - DB mới từ pipeline V3 (bảng financial_data)
-  - DB cũ long-format V2 (bảng financial_items)
-  - DB cũ wide-format V1 (income_statements / balance_sheets / cash_flows)
-  - financial_system.db (bảng financial_data — copy thẳng)
+merge_tool.py
+=============
+Gop cac DB tu nhieu batch Kaggle vao 2 master DB.
+
+Cau truc thu muc (dat script nay o FinancialApp/Database/):
+
+  Database/
+  ├── merge_tool.py          <- script nay
+  ├── master_db/
+  │   ├── master_raw.db      <- DB tong hop raw (tu cac raw.db)
+  │   └── master_analytics.db <- DB tong hop analytics (tu cac analytics.db)
+  ├── incoming_raw/          <- bo cac raw.db tu Kaggle vao day
+  │   ├── raw_group01.db
+  │   ├── raw_group02.db
+  │   └── ...
+  └── incoming_analytics/    <- bo cac analytics.db tu Kaggle vao day
+      ├── analytics_group01.db
+      ├── analytics_group02.db
+      └── ...
+
+Cach dung:
+  python merge_tool.py            # gop tat ca
+  python merge_tool.py --raw      # chi gop raw DB
+  python merge_tool.py --analytics # chi gop analytics DB
+  python merge_tool.py --preview  # xem tong ket khong gop
+
+Luu y:
+  - Upsert: neu da co (ticker, quarter, year, report_type, item_name)
+    thi ghi de gia tri moi. Khong tao ban ghi trung.
+  - Sau khi merge xong, co the xoa file trong incoming_*/ de gon.
 """
-import os
+
+import argparse
 import glob
+import os
 import traceback
+from pathlib import Path
+
 from sqlalchemy import create_engine, inspect, text
 
-# --- CẤU HÌNH ---
+# ==============================================================================
+# DUONG DAN
+# ==============================================================================
+
 try:
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    _HERE = Path(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
-    SCRIPT_DIR = os.path.abspath(os.getcwd())
+    _HERE = Path(os.path.abspath(os.getcwd()))
 
-SOURCE_FOLDER    = os.path.join(SCRIPT_DIR, "new_db_from_kaggle")
-MASTER_DB_FOLDER = os.path.join(SCRIPT_DIR, "master_db")
-MASTER_DB_PATH   = os.path.join(MASTER_DB_FOLDER, "master.db")
+MASTER_DIR          = _HERE / "master_db"
+INCOMING_RAW_DIR    = _HERE / "incoming_raw"
+INCOMING_ANA_DIR    = _HERE / "incoming_analytics"
+MASTER_RAW_PATH     = MASTER_DIR / "master_raw.db"
+MASTER_ANA_PATH     = MASTER_DIR / "master_analytics.db"
 
-os.makedirs(MASTER_DB_FOLDER, exist_ok=True)
-os.makedirs(SOURCE_FOLDER,    exist_ok=True)
-
-print(f"📁 SCRIPT_DIR    : {SCRIPT_DIR}")
-print(f"📁 SOURCE_FOLDER : {SOURCE_FOLDER}")
-print(f"📁 MASTER_DB_PATH: {MASTER_DB_PATH}")
-_found = glob.glob(os.path.join(SOURCE_FOLDER, "*.db"))
-print(f"🔍 DB files: {_found}\n")
+for _d in [MASTER_DIR, INCOMING_RAW_DIR, INCOMING_ANA_DIR]:
+    _d.mkdir(parents=True, exist_ok=True)
 
 
 # ==============================================================================
-# MASTER SCHEMA — khớp 100% financial_system.db
+# SCHEMA MASTER RAW DB
 # ==============================================================================
-MASTER_DDL = """
-CREATE TABLE IF NOT EXISTS financial_data (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    ticker      TEXT    NOT NULL,
-    quarter     INTEGER NOT NULL,
-    year        INTEGER NOT NULL,
-    report_type TEXT    NOT NULL,
-    item_name   TEXT    NOT NULL,
-    value       REAL    DEFAULT 0,
-    UNIQUE (ticker, quarter, year, report_type, item_name)
-)
-"""
 
-def ensure_master_schema(engine_master):
-    with engine_master.connect() as c:
-        c.execute(text(MASTER_DDL))
-        c.execute(text("CREATE INDEX IF NOT EXISTS idx_fd_ticker      ON financial_data (ticker)"))
-        c.execute(text("CREATE INDEX IF NOT EXISTS idx_fd_year        ON financial_data (year, quarter)"))
-        c.execute(text("CREATE INDEX IF NOT EXISTS idx_fd_report_type ON financial_data (report_type)"))
+RAW_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS companies (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticker       TEXT NOT NULL UNIQUE,
+        name         TEXT NOT NULL,
+        company_type TEXT NOT NULL DEFAULT 'corporate',
+        industry     TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS report_periods (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id      INTEGER NOT NULL REFERENCES companies(id),
+        quarter         INTEGER NOT NULL,
+        year            INTEGER NOT NULL,
+        report_kind     TEXT    DEFAULT 'consolidated',
+        unit            TEXT    DEFAULT 'VND',
+        unit_multiplier REAL    DEFAULT 1.0,
+        is_ytd          INTEGER DEFAULT 0,
+        pdf_filename    TEXT,
+        ocr_chars       INTEGER,
+        UNIQUE (company_id, quarter, year, report_kind)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS report_items (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        period_id   INTEGER NOT NULL REFERENCES report_periods(id),
+        statement   TEXT    NOT NULL,
+        item_order  INTEGER NOT NULL,
+        item_code   TEXT,
+        item_name   TEXT    NOT NULL,
+        notes_ref   TEXT,
+        value       INTEGER,
+        slug        TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_ri_period   ON report_items (period_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ri_slug     ON report_items (slug)",
+    "CREATE INDEX IF NOT EXISTS idx_rp_ticker   ON report_periods (company_id, year, quarter)",
+]
+
+# ==============================================================================
+# SCHEMA MASTER ANALYTICS DB
+# ==============================================================================
+
+ANA_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS companies (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticker       TEXT NOT NULL UNIQUE,
+        name         TEXT NOT NULL,
+        company_type TEXT NOT NULL DEFAULT 'corporate',
+        industry     TEXT
+    )
+    """,
+]
+
+# Wide tables duoc tao dong khi gap cot moi tu source
+
+
+# ==============================================================================
+# UPSERT HELPERS
+# ==============================================================================
+
+def _exec(conn, sql: str, params: dict | None = None) -> None:
+    if params:
+        conn.execute(text(sql), params)
+    else:
+        conn.execute(text(sql))
+
+
+def _upsert_company_raw(conn, ticker: str, name: str, company_type: str) -> int:
+    """Upsert company, tra ve company_id."""
+    conn.execute(text("""
+        INSERT INTO companies (ticker, name, company_type)
+        VALUES (:t, :n, :ct)
+        ON CONFLICT(ticker) DO UPDATE SET
+            name         = COALESCE(excluded.name, companies.name),
+            company_type = COALESCE(excluded.company_type, companies.company_type)
+    """), {"t": ticker, "n": name or ticker, "ct": company_type or "corporate"})
+
+    row = conn.execute(
+        text("SELECT id FROM companies WHERE ticker = :t"), {"t": ticker}
+    ).fetchone()
+    return row[0]
+
+
+def _upsert_company_ana(conn, ticker: str, name: str, company_type: str) -> None:
+    conn.execute(text("""
+        INSERT INTO companies (ticker, name, company_type)
+        VALUES (:t, :n, :ct)
+        ON CONFLICT(ticker) DO UPDATE SET
+            name         = COALESCE(excluded.name, companies.name),
+            company_type = COALESCE(excluded.company_type, companies.company_type)
+    """), {"t": ticker, "n": name or ticker, "ct": company_type or "corporate"})
+
+
+# ==============================================================================
+# MERGE RAW DB
+# ==============================================================================
+
+def _ensure_raw_schema(engine) -> None:
+    with engine.connect() as c:
+        for ddl in RAW_DDL:
+            c.execute(text(ddl))
         c.commit()
-    print("✅ Master schema (financial_data) sẵn sàng\n")
 
 
-# ==============================================================================
-# DETECT SCHEMA
-# ==============================================================================
-def detect_schema(inspector) -> str:
-    tables = set(inspector.get_table_names())
-    if "financial_data"    in tables: return "financial_data"   # V3 / system
-    if "financial_items"   in tables: return "financial_items"  # V2
-    if "income_statements" in tables: return "wide"             # V1
-    if "balance_sheets"    in tables: return "wide"
-    return "unknown"
+def merge_one_raw(engine_master, db_path: str) -> int:
+    """Gop 1 raw.db vao master_raw.db. Tra ve so items da ghi."""
+    engine_src = create_engine(f"sqlite:///{db_path}")
+    insp       = inspect(engine_src)
+    tables     = set(insp.get_table_names())
 
-
-# ==============================================================================
-# UPSERT helper
-# ==============================================================================
-_UPSERT_SQL = text("""
-    INSERT INTO financial_data (ticker, quarter, year, report_type, item_name, value)
-    VALUES (:ticker, :quarter, :year, :report_type, :item_name, :value)
-    ON CONFLICT(ticker, quarter, year, report_type, item_name)
-    DO UPDATE SET value = excluded.value
-""")
-
-def _upsert_batch(engine_master, records: list[dict]) -> int:
-    if not records:
+    if "report_items" not in tables:
+        print(f"    [SKIP] Khong co bang report_items")
         return 0
-    with engine_master.connect() as c:
-        for rec in records:
-            c.execute(_UPSERT_SQL, rec)
-        c.commit()
-    return len(records)
 
-
-# ==============================================================================
-# SYNC 1: financial_data → financial_data
-# ==============================================================================
-def sync_financial_data(engine_master, engine_source) -> int:
-    with engine_source.connect() as c:
-        rows = c.execute(text(
-            "SELECT ticker, quarter, year, report_type, item_name, value "
-            "FROM financial_data"
+    total = 0
+    with engine_src.connect() as src, engine_master.connect() as dst:
+        # Doc cac companies tu source
+        companies = src.execute(text(
+            "SELECT ticker, name, company_type FROM companies"
         )).fetchall()
 
-    records = [
-        {
-            "ticker":      r[0] or "",
-            "quarter":     int(r[1] or 0),
-            "year":        int(r[2] or 0),
-            "report_type": r[3] or "",
-            "item_name":   (r[4] or "").strip(),
-            "value":       float(r[5] or 0),
-        }
-        for r in rows
-        if r[0] and r[2] and r[4]
-    ]
-    return _upsert_batch(engine_master, records)
+        for (ticker, name, ctype) in companies:
+            # Upsert company trong master
+            master_cid = _upsert_company_raw(dst, ticker, name, ctype)
 
+            # Doc periods cua ticker nay
+            periods = src.execute(text("""
+                SELECT rp.id, rp.quarter, rp.year, rp.report_kind,
+                       rp.unit, rp.unit_multiplier, rp.is_ytd,
+                       rp.pdf_filename, rp.ocr_chars
+                FROM report_periods rp
+                JOIN companies c ON c.id = rp.company_id
+                WHERE c.ticker = :t
+            """), {"t": ticker}).fetchall()
 
-# ==============================================================================
-# SYNC 2: financial_items → financial_data  (pipeline V2)
-# ==============================================================================
-def sync_financial_items(engine_master, engine_source, ticker: str) -> int:
-    with engine_source.connect() as c:
-        rows = c.execute(
-            text("SELECT quarter, year, report_type, item_name, value "
-                 "FROM financial_items WHERE ticker = :t"),
-            {"t": ticker}
-        ).fetchall()
+            for p in periods:
+                src_period_id = p[0]
 
-    records = [
-        {
-            "ticker":      ticker,
-            "quarter":     int(r[0] or 0),
-            "year":        int(r[1] or 0),
-            "report_type": r[2] or "",
-            "item_name":   (r[3] or "").strip(),
-            "value":       float(r[4] or 0),
-        }
-        for r in rows if r[1] and r[3]
-    ]
-    return _upsert_batch(engine_master, records)
+                # Upsert period trong master
+                dst.execute(text("""
+                    INSERT INTO report_periods
+                        (company_id, quarter, year, report_kind, unit,
+                         unit_multiplier, is_ytd, pdf_filename, ocr_chars)
+                    VALUES (:cid, :q, :y, :rk, :u, :um, :iy, :pf, :oc)
+                    ON CONFLICT(company_id, quarter, year, report_kind) DO UPDATE SET
+                        unit            = excluded.unit,
+                        unit_multiplier = excluded.unit_multiplier,
+                        is_ytd          = excluded.is_ytd,
+                        pdf_filename    = COALESCE(excluded.pdf_filename, report_periods.pdf_filename),
+                        ocr_chars       = COALESCE(excluded.ocr_chars, report_periods.ocr_chars)
+                """), {
+                    "cid": master_cid,
+                    "q": p[1], "y": p[2], "rk": p[3],
+                    "u": p[4], "um": p[5], "iy": p[6],
+                    "pf": p[7], "oc": p[8],
+                })
 
+                master_pid = dst.execute(text("""
+                    SELECT id FROM report_periods
+                    WHERE company_id = :cid AND quarter = :q AND year = :y
+                      AND report_kind = :rk
+                """), {"cid": master_cid, "q": p[1], "y": p[2], "rk": p[3]}).fetchone()[0]
 
-# ==============================================================================
-# SYNC 3: wide-format → financial_data  (pipeline V1)
-# ==============================================================================
-WIDE_TO_REPORT = {
-    "income_statements": "KQKD",
-    "balance_sheets":    "CDKT",
-    "cash_flows":        "LCTT",
-}
+                # Xoa items cu cua period nay trong master (de ghi lai sach)
+                dst.execute(text(
+                    "DELETE FROM report_items WHERE period_id = :pid"
+                ), {"pid": master_pid})
 
-_YEAR_HINTS    = ["year", "period_year"]
-_QUARTER_HINTS = ["quarter", "period_quarter"]
-_NAME_HINTS    = ["item_name", "name", "chi_tieu", "label", "description"]
-_VALUE_HINTS   = ["value", "current_value", "ky_nay", "period_value", "amount",
-                  "current_period", "this_period"]
+                # Copy items
+                items = src.execute(text("""
+                    SELECT statement, item_order, item_code, item_name,
+                           notes_ref, value, slug
+                    FROM report_items WHERE period_id = :pid
+                """), {"pid": src_period_id}).fetchall()
 
-def _pick(cols: set, hints: list):
-    for h in hints:
-        if h in cols:
-            return h
-    return None
+                for item in items:
+                    dst.execute(text("""
+                        INSERT INTO report_items
+                            (period_id, statement, item_order, item_code,
+                             item_name, notes_ref, value, slug)
+                        VALUES (:pid, :st, :io, :ic, :in_, :nr, :val, :sl)
+                    """), {
+                        "pid": master_pid,
+                        "st":  item[0], "io": item[1], "ic": item[2],
+                        "in_": item[3], "nr": item[4], "val": item[5],
+                        "sl":  item[6],
+                    })
+                    total += 1
 
-
-def sync_wide(engine_master, engine_source, inspector_source,
-              ticker: str, company_id: int) -> int:
-    src_tables = set(inspector_source.get_table_names())
-    total      = 0
-
-    for table, report_type in WIDE_TO_REPORT.items():
-        if table not in src_tables:
-            continue
-
-        cols        = {c["name"] for c in inspector_source.get_columns(table)}
-        year_col    = _pick(cols, _YEAR_HINTS)
-        quarter_col = _pick(cols, _QUARTER_HINTS)
-        name_col    = _pick(cols, _NAME_HINTS)
-        value_col   = _pick(cols, _VALUE_HINTS)
-
-        if not all([year_col, quarter_col, name_col, value_col]):
-            # Fallback: mỗi cột số = 1 item
-            n = _sync_wide_cols_as_items(
-                engine_master, engine_source, table, report_type,
-                ticker, company_id, year_col, quarter_col, cols
-            )
-            print(f"     [{report_type}] fallback-col: {n} rows")
-            total += n
-            continue
-
-        with engine_source.connect() as c:
-            rows = c.execute(
-                text(f"SELECT {year_col}, {quarter_col}, {name_col}, {value_col} "
-                     f"FROM {table} WHERE company_id = :cid"),
-                {"cid": company_id}
-            ).fetchall()
-
-        records = [
-            {
-                "ticker":      ticker,
-                "quarter":     int(r[1] or 0),
-                "year":        int(r[0] or 0),
-                "report_type": report_type,
-                "item_name":   (r[2] or "").strip(),
-                "value":       float(r[3] or 0),
-            }
-            for r in rows if r[0] and r[2]
-        ]
-        n = _upsert_batch(engine_master, records)
-        print(f"     [{report_type}] {n} rows", end="  ")
-        total += n
+        dst.commit()
 
     return total
 
 
-def _sync_wide_cols_as_items(engine_master, engine_source, table, report_type,
-                              ticker, company_id, year_col, quarter_col, cols) -> int:
-    """Khi không có name_col/value_col: mỗi cột số = 1 item_name."""
-    skip = {"id", "company_id", year_col, quarter_col}
-    skip = {s for s in skip if s}
+# ==============================================================================
+# MERGE ANALYTICS DB
+# ==============================================================================
 
-    with engine_source.connect() as c:
-        all_rows = c.execute(text(f"SELECT * FROM {table}")).fetchall()
+def _get_analytics_tables(engine) -> list[str]:
+    """Lay danh sach wide table (financials_*)."""
+    insp = inspect(engine)
+    return [t for t in insp.get_table_names() if t.startswith("financials_")]
 
-    records = []
-    for row in all_rows:
-        d = dict(row._mapping)
-        if d.get("company_id") != company_id:
-            continue
-        year    = d.get(year_col) if year_col else None
-        quarter = d.get(quarter_col) or 0 if quarter_col else 0
-        if not year:
-            continue
-        for col, val in d.items():
-            if col in skip:
-                continue
-            try:
-                fval = float(val)
-            except (TypeError, ValueError):
-                continue
-            records.append({
-                "ticker":      ticker,
-                "quarter":     int(quarter),
-                "year":        int(year),
-                "report_type": report_type,
-                "item_name":   col,
-                "value":       fval,
-            })
 
-    return _upsert_batch(engine_master, records)
+def _ensure_wide_table(engine_master, table_name: str, cols: list[str]) -> None:
+    """Tao wide table neu chua co, them cot moi neu can."""
+    insp = inspect(engine_master)
+    existing_tables = set(insp.get_table_names())
+
+    if table_name not in existing_tables:
+        col_defs = ",\n".join(f'    "{c}" INTEGER DEFAULT NULL' for c in cols)
+        ddl = f"""
+        CREATE TABLE IF NOT EXISTS "{table_name}" (
+            id      INTEGER PRIMARY KEY,
+            ticker  TEXT    NOT NULL,
+            quarter INTEGER NOT NULL,
+            year    INTEGER NOT NULL,
+            {col_defs},
+            UNIQUE (ticker, quarter, year)
+        )
+        """
+        with engine_master.connect() as c:
+            c.execute(text(ddl))
+            c.commit()
+        return
+
+    # Them cot moi neu source co them
+    existing_cols = {col["name"] for col in insp.get_columns(table_name)}
+    new_cols = [c for c in cols if c not in existing_cols]
+    if new_cols:
+        with engine_master.connect() as c:
+            for nc in new_cols:
+                c.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{nc}" INTEGER DEFAULT NULL'))
+            c.commit()
+
+
+def merge_one_analytics(engine_master, db_path: str) -> int:
+    """Gop 1 analytics.db vao master_analytics.db."""
+    engine_src = create_engine(f"sqlite:///{db_path}")
+    insp_src   = inspect(engine_src)
+    tables     = set(insp_src.get_table_names())
+
+    wide_tables = [t for t in tables if t.startswith("financials_")]
+    if not wide_tables:
+        print(f"    [SKIP] Khong co bang financials_*")
+        return 0
+
+    total = 0
+
+    with engine_src.connect() as src, engine_master.connect() as dst:
+        # Upsert companies
+        if "companies" in tables:
+            companies = src.execute(text(
+                "SELECT ticker, name, company_type FROM companies"
+            )).fetchall()
+            for (ticker, name, ctype) in companies:
+                _upsert_company_ana(dst, ticker, name, ctype)
+
+        # Gop tung wide table
+        for table in wide_tables:
+            cols = [c["name"] for c in insp_src.get_columns(table)]
+            data_cols = [c for c in cols if c not in ("id", "ticker", "quarter", "year")]
+
+            # Dam bao table + cot ton tai trong master
+            _ensure_wide_table(engine_master, table, data_cols)
+
+            rows = src.execute(text(f'SELECT * FROM "{table}"')).fetchall()
+            col_names = [c["name"] for c in insp_src.get_columns(table)]
+
+            for row in rows:
+                d = dict(zip(col_names, row))
+                ticker  = d.get("ticker")
+                quarter = d.get("quarter")
+                year    = d.get("year")
+                if not ticker or not quarter or not year:
+                    continue
+
+                # Xoa row cu
+                dst.execute(text(
+                    f'DELETE FROM "{table}" WHERE ticker=:t AND quarter=:q AND year=:y'
+                ), {"t": ticker, "q": quarter, "y": year})
+
+                # Insert moi
+                insert_cols  = ["ticker", "quarter", "year"] + data_cols
+                placeholders = ", ".join(f":{c}" for c in insert_cols)
+                col_list     = ", ".join(f'"{c}"' for c in insert_cols)
+
+                params = {"ticker": ticker, "quarter": quarter, "year": year}
+                for dc in data_cols:
+                    params[dc] = d.get(dc)
+
+                dst.execute(text(
+                    f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders})'
+                ), params)
+                total += 1
+
+        dst.commit()
+
+    return total
 
 
 # ==============================================================================
 # MAIN
 # ==============================================================================
-def merge_databases():
-    print("=" * 60)
-    print("MERGE TOOL v6 — Schema: financial_data")
-    print("=" * 60)
 
-    engine_master = create_engine(f"sqlite:///{MASTER_DB_PATH}")
-    ensure_master_schema(engine_master)
+def merge_raw() -> None:
+    print(f"\n{'='*60}")
+    print("MERGE RAW DB")
+    print(f"  incoming: {INCOMING_RAW_DIR}")
+    print(f"  master  : {MASTER_RAW_PATH}")
+    print(f"{'='*60}")
 
-    db_files = glob.glob(os.path.join(SOURCE_FOLDER, "*.db"))
+    db_files = sorted(glob.glob(str(INCOMING_RAW_DIR / "*.db")))
     if not db_files:
-        print(f"❌ Không có file .db nào trong: {SOURCE_FOLDER}")
+        print(f"  [EMPTY] Khong co file .db nao trong {INCOMING_RAW_DIR}")
         return
 
-    print(f"📂 {len(db_files)} file: {[os.path.basename(f) for f in db_files]}\n")
+    engine_master = create_engine(f"sqlite:///{MASTER_RAW_PATH}")
+    _ensure_raw_schema(engine_master)
+
     grand_total = 0
-
     for db_file in db_files:
-        print(f"\n{'─'*50}")
-        print(f"🔄 {os.path.basename(db_file)}")
-
+        fname = os.path.basename(db_file)
+        print(f"\n  -- {fname}")
         try:
-            engine_source    = create_engine(f"sqlite:///{db_file}")
-            inspector_source = inspect(engine_source)
-            src_tables       = inspector_source.get_table_names()
-            schema           = detect_schema(inspector_source)
-
-            print(f"   Bảng   : {src_tables}")
-            print(f"   Schema : {schema}")
-
-            if schema == "unknown":
-                print("   ⚠️  Không nhận ra schema, bỏ qua")
-                continue
-
-            # ── financial_data ──────────────────────────────────────────────
-            if schema == "financial_data":
-                with engine_source.connect() as c:
-                    n_src    = c.execute(text("SELECT COUNT(*) FROM financial_data")).scalar()
-                    tickers  = [r[0] for r in c.execute(
-                        text("SELECT DISTINCT ticker FROM financial_data")).fetchall()]
-                print(f"   Rows   : {n_src:,}  |  Tickers: {tickers}")
-                n = sync_financial_data(engine_master, engine_source)
-                print(f"   ✅ Synced {n:,} rows")
-                grand_total += n
-                continue
-
-            # ── financial_items (V2) ────────────────────────────────────────
-            if schema == "financial_items":
-                with engine_source.connect() as c:
-                    tickers = [r[0] for r in c.execute(
-                        text("SELECT DISTINCT ticker FROM financial_items")).fetchall()]
-                for ticker in tickers:
-                    n = sync_financial_items(engine_master, engine_source, ticker)
-                    print(f"   + {ticker}: {n} rows")
-                    grand_total += n
-                continue
-
-            # ── wide-format (V1) ────────────────────────────────────────────
-            if schema == "wide":
-                if "companies" not in src_tables:
-                    print("   ⚠️  Wide-format nhưng không có bảng companies, bỏ qua")
-                    continue
-
-                with engine_source.connect() as c:
-                    companies = c.execute(
-                        text("SELECT id, ticker FROM companies")
-                    ).fetchall()
-
-                for (cid, ticker) in companies:
-                    print(f"   + {ticker}:")
-                    n = sync_wide(engine_master, engine_source,
-                                  inspector_source, ticker, cid)
-                    print(f"  → {n} rows")
-                    grand_total += n
-
+            n = merge_one_raw(engine_master, db_file)
+            print(f"     -> {n:,} items da ghi")
+            grand_total += n
         except Exception as e:
-            print(f"   ❌ Lỗi: {e}")
+            print(f"     [ERROR] {e}")
             traceback.print_exc()
 
-    print("\n" + "=" * 60)
-    print(f"🎉 HOÀN TẤT — {grand_total:,} rows đã gộp vào master.db")
-    print("=" * 60)
-    _preview_master(engine_master)
+    print(f"\n  TONG: {grand_total:,} items vao {MASTER_RAW_PATH}")
+    _preview_raw(engine_master)
 
 
-def _preview_master(engine_master):
-    print("\n📊 MASTER DB:")
+def merge_analytics() -> None:
+    print(f"\n{'='*60}")
+    print("MERGE ANALYTICS DB")
+    print(f"  incoming: {INCOMING_ANA_DIR}")
+    print(f"  master  : {MASTER_ANA_PATH}")
+    print(f"{'='*60}")
+
+    db_files = sorted(glob.glob(str(INCOMING_ANA_DIR / "*.db")))
+    if not db_files:
+        print(f"  [EMPTY] Khong co file .db nao trong {INCOMING_ANA_DIR}")
+        return
+
+    engine_master = create_engine(f"sqlite:///{MASTER_ANA_PATH}")
     with engine_master.connect() as c:
-        total = c.execute(text("SELECT COUNT(*) FROM financial_data")).scalar()
-        print(f"  Total rows: {total:,}")
+        for ddl in ANA_DDL:
+            c.execute(text(ddl))
+        c.commit()
 
-        print("\n  Breakdown ticker × report_type:")
-        for r in c.execute(text(
-            "SELECT ticker, report_type, COUNT(*) "
-            "FROM financial_data "
-            "GROUP BY ticker, report_type "
-            "ORDER BY ticker, report_type"
-        )).fetchall():
-            print(f"    {r[0]:10s} | {r[1]:6s}: {r[2]:,}")
+    grand_total = 0
+    for db_file in db_files:
+        fname = os.path.basename(db_file)
+        print(f"\n  -- {fname}")
+        try:
+            n = merge_one_analytics(engine_master, db_file)
+            print(f"     -> {n:,} rows da ghi")
+            grand_total += n
+        except Exception as e:
+            print(f"     [ERROR] {e}")
+            traceback.print_exc()
 
-        print("\n  Sample rows:")
+    print(f"\n  TONG: {grand_total:,} rows vao {MASTER_ANA_PATH}")
+    _preview_analytics(engine_master)
+
+
+def _preview_raw(engine) -> None:
+    print("\n  PREVIEW master_raw.db:")
+    with engine.connect() as c:
+        n = c.execute(text("SELECT COUNT(*) FROM report_items")).scalar()
+        print(f"    report_items : {n:,} rows")
+        n = c.execute(text("SELECT COUNT(DISTINCT id) FROM report_periods")).scalar()
+        print(f"    report_periods: {n:,} ky")
         for r in c.execute(text(
-            "SELECT ticker, quarter, year, report_type, item_name, value "
-            "FROM financial_data LIMIT 5"
+            "SELECT c.ticker, COUNT(ri.id) "
+            "FROM report_items ri "
+            "JOIN report_periods rp ON ri.period_id = rp.id "
+            "JOIN companies c ON c.id = rp.company_id "
+            "GROUP BY c.ticker ORDER BY c.ticker"
         )).fetchall():
-            print(f"    {r}")
+            print(f"    {r[0]:10s}: {r[1]:,} items")
+
+
+def _preview_analytics(engine) -> None:
+    print("\n  PREVIEW master_analytics.db:")
+    insp = inspect(engine)
+    for table in sorted(insp.get_table_names()):
+        with engine.connect() as c:
+            n = c.execute(text(f'SELECT COUNT(*) FROM "{table}"')).scalar()
+            print(f"    {table}: {n:,} rows")
 
 
 if __name__ == "__main__":
-    merge_databases()
+    parser = argparse.ArgumentParser(description="Merge BCTC DB tu nhieu batch Kaggle")
+    parser.add_argument("--raw",       action="store_true", help="Chi merge raw.db")
+    parser.add_argument("--analytics", action="store_true", help="Chi merge analytics.db")
+    parser.add_argument("--preview",   action="store_true", help="Chi xem tong ket, khong gop")
+    args = parser.parse_args()
+
+    if args.preview:
+        if MASTER_RAW_PATH.exists():
+            _preview_raw(create_engine(f"sqlite:///{MASTER_RAW_PATH}"))
+        if MASTER_ANA_PATH.exists():
+            _preview_analytics(create_engine(f"sqlite:///{MASTER_ANA_PATH}"))
+    elif args.raw:
+        merge_raw()
+    elif args.analytics:
+        merge_analytics()
+    else:
+        merge_raw()
+        merge_analytics()
+
+    print("\nDONE.")

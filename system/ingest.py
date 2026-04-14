@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ingest.py - Pipeline trich xuat BCTC ghi dong thoi 2 DB.
-
-raw.db      : giu nguyen cau truc bao cao (tung dong chi tieu)
-analytics.db: wide table theo loai cong ty (corporate/bank/securities/insurance)
+ingest.py - Pipeline trich xuat BCTC.
 
 Flow:
   ticker_type.json
@@ -11,10 +8,14 @@ Flow:
     -> MetadataExtractor (ten CT, don vi, quy/nam)
     -> FinancialTablesExtractor x3 song song (BS/PL/CF)
     -> AggregatedParser (Pydantic, gia tri da ve VND)
-    -> ghi raw.db  (report_periods + report_items)
+    -> ghi master_raw.json  (luu tru vinh vien, khong can OCR lai)
     -> map canonical slug theo loai CT
     -> ghi analytics.db (financials_corporate/bank/securities/insurance)
     -> bank integrity checks
+
+Re-map khong can OCR lai:
+    from ingest import remap_analytics
+    remap_analytics()
 """
 
 import gc
@@ -23,6 +24,7 @@ import json
 import os
 import re
 import sys
+import threading
 import unicodedata
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -33,10 +35,8 @@ from ocr import get_ocr_service
 from services.pipeline import create_pipeline
 from canonical_map import map_to_canonical
 from Database.models_new import (
-    RawCompany, RawReportPeriod, RawReportItem,
-    make_raw_engine, make_session,
     AnalyticsCompany, ANALYTICS_TABLE_MAP,
-    make_analytics_engine,
+    make_analytics_engine, make_session,
     run_bank_integrity_checks,
 )
 
@@ -48,7 +48,7 @@ logger = get_logger(__name__)
 
 INPUT_DIRS        = glob.glob("/kaggle/input/datasets/huyvuong11/bctc-*")
 MD_CACHE_DIR      = "/kaggle/working/ocr_md_cache"
-RAW_DB_PATH       = "/kaggle/working/raw.db"
+RAW_JSON_PATH     = "/kaggle/working/master_raw.json"
 ANALYTICS_DB_PATH = "/kaggle/working/analytics.db"
 TICKER_TYPE_PATH  = os.path.join(os.path.dirname(__file__), "..", "ticker_type.json")
 
@@ -136,85 +136,96 @@ def load_or_ocr(pdf_path: str, ticker: str, ocr_service) -> str | None:
 
 
 # ==============================================================================
-# GHI RAW DB
+# RAW JSON - luu tru vinh vien
 # ==============================================================================
 
-UNIT_MULTIPLIER = {
-    "VND": 1.0,
-    "nghin VND": 1_000.0,
-    "trieu VND": 1_000_000.0,
-    "ty VND": 1_000_000_000.0,
-}
+_RAW_LOCK = threading.Lock()
 
 
-def upsert_raw(raw_session, ticker, company_name, company_type,
-               quarter, year, report, pdf_filename, md_len) -> int:
-    # Upsert company
-    company = raw_session.query(RawCompany).filter_by(ticker=ticker).first()
-    if company is None:
-        company = RawCompany(ticker=ticker, name=company_name or ticker,
-                             company_type=company_type)
-        raw_session.add(company)
-        raw_session.flush()
-    elif company_name and company_name != ticker:
-        company.name = company_name
+def _load_raw_json(path: str) -> dict:
+    """Doc master_raw.json, tra ve {} neu chua co."""
+    if not os.path.exists(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    # Xoa period cu
-    report_kind = getattr(report, "report_kind", "consolidated")
-    old = raw_session.query(RawReportPeriod).filter_by(
-        company_id=company.id, quarter=quarter, year=year, report_kind=report_kind
-    ).first()
-    if old:
-        raw_session.delete(old)
-        raw_session.flush()
 
-    # Tao period moi
-    unit = getattr(report, "unit", "VND") or "VND"
-    period = RawReportPeriod(
-        company_id=company.id,
-        quarter=quarter,
-        year=year,
-        report_kind=report_kind,
-        unit=unit,
-        unit_multiplier=UNIT_MULTIPLIER.get(unit, 1.0),
-        is_ytd=1 if getattr(report, "is_ytd", False) else 0,
-        pdf_filename=pdf_filename,
-        ocr_chars=md_len,
-    )
-    raw_session.add(period)
-    raw_session.flush()
+def _save_raw_json(path: str, data: dict):
+    """Ghi atomic vao master_raw.json."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
-    # Ghi tung item (giu nguyen ten goc, thu tu)
-    saved = 0
-    for stmt_name, stmt in [
-        ("CDKT", report.balance_sheet),
-        ("KQKD", report.income_statement),
-        ("LCTT", report.cash_flow),
-    ]:
-        for order, item in enumerate(stmt.items):
-            if item.value is None:
-                continue
-            slug = map_to_canonical(item.item_name, company_type=company_type)
-            raw_session.add(RawReportItem(
-                period_id=period.id,
-                statement=stmt_name,
-                item_order=order,
-                item_code=getattr(item, "item_code", None),
-                item_name=item.item_name,
-                notes_ref=getattr(item, "notes_ref", None),
-                value=int(item.value),
-                slug=slug,
-            ))
-            saved += 1
-    return saved
+
+def upsert_raw_json(ticker: str, quarter: int, year: int,
+                    company_type: str, company_name: str,
+                    unit: str, is_ytd: bool,
+                    pdf_filename: str, ocr_chars: int,
+                    report) -> int:
+    """
+    Them/cap nhat 1 ky bao cao vao master_raw.json.
+    Format: {"VCB": [{period1}, {period2}], "ACB": [...]}
+    Tra ve so items da luu.
+    """
+    with _RAW_LOCK:
+        data = _load_raw_json(RAW_JSON_PATH)
+
+        if ticker not in data:
+            data[ticker] = []
+
+        # Xoa period cu neu trung quy/nam
+        data[ticker] = [
+            p for p in data[ticker]
+            if not (p["quarter"] == quarter and p["year"] == year)
+        ]
+
+        # Build items theo statement, giu nguyen ten goc
+        items: dict[str, list] = {"CDKT": [], "KQKD": [], "LCTT": []}
+        total = 0
+        for stmt_name, stmt_obj in [
+            ("CDKT", report.balance_sheet),
+            ("KQKD", report.income_statement),
+            ("LCTT", report.cash_flow),
+        ]:
+            for order, item in enumerate(stmt_obj.items):
+                if item.value is None:
+                    continue
+                items[stmt_name].append({
+                    "item_order": order,
+                    "item_code":  getattr(item, "item_code",  None),
+                    "item_name":  item.item_name,
+                    "notes_ref":  getattr(item, "notes_ref",  None),
+                    "value":      int(item.value),
+                })
+                total += 1
+
+        data[ticker].append({
+            "ticker":       ticker,
+            "quarter":      quarter,
+            "year":         year,
+            "company_type": company_type,
+            "company_name": company_name,
+            "unit":         unit,
+            "is_ytd":       is_ytd,
+            "pdf_filename": pdf_filename,
+            "ocr_chars":    ocr_chars,
+            "items":        items,
+        })
+
+        # Sort theo nam/quy
+        data[ticker].sort(key=lambda p: (p["year"], p["quarter"]))
+        _save_raw_json(RAW_JSON_PATH, data)
+
+    return total
 
 
 # ==============================================================================
-# GHI ANALYTICS DB
+# ANALYTICS DB
 # ==============================================================================
 
-def upsert_analytics(analytics_session, ticker, company_name, company_type,
-                     quarter, year, report) -> int:
+def upsert_analytics(analytics_session, ticker: str, company_name: str,
+                     company_type: str, quarter: int, year: int, report) -> int:
     # Upsert company
     co = analytics_session.query(AnalyticsCompany).filter_by(ticker=ticker).first()
     if co is None:
@@ -225,7 +236,7 @@ def upsert_analytics(analytics_session, ticker, company_name, company_type,
     elif company_name and company_name != ticker:
         co.name = company_name
 
-    # Chon model
+    # Chon model va slug list theo loai CT
     ctype = company_type if company_type in ANALYTICS_TABLE_MAP else "corporate"
     Model, slug_list = ANALYTICS_TABLE_MAP[ctype]
 
@@ -234,7 +245,7 @@ def upsert_analytics(analytics_session, ticker, company_name, company_type,
         ticker=ticker, quarter=quarter, year=year
     ).delete(synchronize_session=False)
 
-    # Gom slug -> value
+    # Gom slug -> value (uu tien gia tri tuyet doi lon hon)
     slug_data: dict[str, int] = {}
     for stmt in [report.balance_sheet, report.income_statement, report.cash_flow]:
         for item in stmt.items:
@@ -264,7 +275,7 @@ def upsert_analytics(analytics_session, ticker, company_name, company_type,
 # BANK INTEGRITY CHECK
 # ==============================================================================
 
-def check_bank_integrity(ticker, quarter, year, report, company_type):
+def check_bank_integrity(ticker: str, quarter: int, year: int, report, company_type: str):
     if company_type != "bank":
         return
     slug_data: dict[str, float] = {}
@@ -288,7 +299,92 @@ def check_bank_integrity(ticker, quarter, year, report, company_type):
 
 
 # ==============================================================================
-# MAIN
+# REMAP - tu raw.json -> analytics.db khong can OCR lai
+# ==============================================================================
+
+def remap_analytics(
+    raw_json_path: str = RAW_JSON_PATH,
+    analytics_db_path: str = ANALYTICS_DB_PATH,
+):
+    """
+    Doc master_raw.json -> re-map canonical -> ghi lai analytics.db.
+    Dung khi cai thien canonical_map ma khong can OCR lai.
+
+    Cach dung:
+        from ingest import remap_analytics
+        remap_analytics()
+    """
+    from services.parser import ParsedReport, ParsedStatement, FinancialItem
+
+    logger.info(f"Bat dau remap tu {raw_json_path} ...")
+    data = _load_raw_json(raw_json_path)
+    if not data:
+        logger.error("master_raw.json rong hoac chua ton tai.")
+        return
+
+    analytics_engine = make_analytics_engine(analytics_db_path)
+    AnalyticsSession = make_session(analytics_engine)
+
+    total_slugs = 0
+    total_periods = 0
+
+    for ticker, periods in data.items():
+        for period in periods:
+            quarter      = period["quarter"]
+            year         = period["year"]
+            company_type = period["company_type"]
+            company_name = period["company_name"]
+
+            # Rebuild ParsedReport tu raw JSON
+            def _build_stmt(raw_items: list) -> ParsedStatement:
+                stmt = ParsedStatement()
+                stmt.items = [
+                    FinancialItem(
+                        item_code = i.get("item_code"),
+                        item_name = i["item_name"],
+                        value     = i["value"],
+                        notes_ref = i.get("notes_ref"),
+                    )
+                    for i in raw_items
+                    if i.get("value") is not None
+                ]
+                return stmt
+
+            report = ParsedReport(
+                company_name = company_name,
+                stock_ticker = ticker,
+                year         = year,
+                quarter      = quarter,
+                unit         = period.get("unit", "VND"),
+                is_ytd       = period.get("is_ytd", False),
+            )
+            report.balance_sheet    = _build_stmt(period["items"].get("CDKT", []))
+            report.income_statement = _build_stmt(period["items"].get("KQKD", []))
+            report.cash_flow        = _build_stmt(period["items"].get("LCTT", []))
+
+            # Ghi analytics.db
+            ana_sess = AnalyticsSession()
+            try:
+                n = upsert_analytics(ana_sess, ticker, company_name,
+                                     company_type, quarter, year, report)
+                ana_sess.commit()
+                total_slugs += n
+                total_periods += 1
+                logger.info(f"  {ticker} Q{quarter}/{year}: +{n} slugs")
+            except Exception as e:
+                ana_sess.rollback()
+                logger.error(f"  {ticker} Q{quarter}/{year} error: {e}")
+            finally:
+                AnalyticsSession.remove()
+
+    logger.info("=" * 60)
+    logger.info(f"REMAP XONG | {total_periods} ky | {total_slugs} slugs")
+    logger.info(f"analytics.db: {analytics_db_path}")
+    _preview_analytics(analytics_db_path)
+
+
+# ==============================================================================
+# MAIN RUN
 # ==============================================================================
 
 def run():
@@ -302,9 +398,7 @@ def run():
     ocr      = get_ocr_service("hybrid")
     pipeline = create_pipeline(mode="separate", extract_notes=False, extract_metadata=True)
 
-    raw_engine       = make_raw_engine(RAW_DB_PATH)
     analytics_engine = make_analytics_engine(ANALYTICS_DB_PATH)
-    RawSession       = make_session(raw_engine)
     AnalyticsSession = make_session(analytics_engine)
 
     all_files: list[tuple[str, str]] = []
@@ -321,9 +415,9 @@ def run():
     total_raw = total_ana = 0
 
     for i, (ticker, pdf_path) in enumerate(all_files, 1):
-        fname        = os.path.basename(pdf_path)
+        fname         = os.path.basename(pdf_path)
         quarter, year = parse_quarter_year(fname)
-        company_type = ticker_type_map.get(ticker, "corporate")
+        company_type  = ticker_type_map.get(ticker, "corporate")
 
         logger.info(
             f"[{i}/{len(all_files)}] {ticker} ({company_type})"
@@ -331,7 +425,7 @@ def run():
             + f" | {fname}"
         )
 
-        # Buoc 1: OCR
+        # Buoc 1: OCR (co cache .md)
         md = load_or_ocr(pdf_path, ticker, ocr)
         if not md:
             logger.error("  OCR that bai\n")
@@ -344,7 +438,7 @@ def run():
             logger.error(f"  Pipeline that bai: {e}\n")
             continue
 
-        # Buoc 3: fallback quarter/year tu metadata
+        # Buoc 3: fallback quarter/year tu metadata LLM
         if not quarter or not year:
             quarter = getattr(report, "quarter", None)
             year    = getattr(report, "year",    None)
@@ -360,19 +454,24 @@ def run():
             f"CF={len(report.cash_flow.items)} items"
         )
 
-        # Buoc 4a: ghi raw.db
-        raw_sess = RawSession()
+        # Buoc 4a: ghi master_raw.json (luu tru vinh vien)
         try:
-            n = upsert_raw(raw_sess, ticker, company_name, company_type,
-                           quarter, year, report, fname, len(md))
-            raw_sess.commit()
+            n = upsert_raw_json(
+                ticker       = ticker,
+                quarter      = quarter,
+                year         = year,
+                company_type = company_type,
+                company_name = company_name,
+                unit         = getattr(report, "unit", "VND") or "VND",
+                is_ytd       = getattr(report, "is_ytd", False),
+                pdf_filename = fname,
+                ocr_chars    = len(md),
+                report       = report,
+            )
             total_raw += n
-            logger.info(f"  raw.db: +{n} items")
+            logger.info(f"  master_raw.json: +{n} items")
         except Exception as e:
-            raw_sess.rollback()
-            logger.error(f"  raw.db error: {e}")
-        finally:
-            RawSession.remove()
+            logger.error(f"  master_raw.json error: {e}")
 
         # Buoc 4b: ghi analytics.db
         ana_sess = AnalyticsSession()
@@ -396,26 +495,29 @@ def run():
 
     logger.info("=" * 60)
     logger.info(f"HOAN THANH | raw={total_raw} items | analytics={total_ana} slugs")
-    logger.info(f"raw.db      : {RAW_DB_PATH}")
-    logger.info(f"analytics.db: {ANALYTICS_DB_PATH}")
-    _preview()
+    logger.info(f"master_raw.json : {RAW_JSON_PATH}")
+    logger.info(f"analytics.db    : {ANALYTICS_DB_PATH}")
+    _preview_analytics(ANALYTICS_DB_PATH)
 
 
-def _preview():
+# ==============================================================================
+# PREVIEW
+# ==============================================================================
+
+def _preview_analytics(db_path: str):
     import sqlite3
-    for label, path in [("raw.db", RAW_DB_PATH), ("analytics.db", ANALYTICS_DB_PATH)]:
-        try:
-            conn   = sqlite3.connect(path)
-            tables = [r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()]
-            logger.info(f"\n{label}:")
-            for t in tables:
-                cnt = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-                logger.info(f"  {t}: {cnt} rows")
-            conn.close()
-        except Exception as e:
-            logger.error(f"Preview {label}: {e}")
+    try:
+        conn   = sqlite3.connect(db_path)
+        tables = [r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()]
+        logger.info(f"\nanalytics.db ({db_path}):")
+        for t in tables:
+            cnt = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+            logger.info(f"  {t}: {cnt} rows")
+        conn.close()
+    except Exception as e:
+        logger.error(f"Preview analytics.db: {e}")
 
 
 if __name__ == "__main__":
