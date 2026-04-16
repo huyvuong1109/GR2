@@ -49,6 +49,7 @@ logger = get_logger(__name__)
 INPUT_DIRS        = glob.glob("/kaggle/input/datasets/huyvuong11/bctc-*")
 MD_CACHE_DIR      = "/kaggle/working/ocr_md_cache"
 RAW_JSON_PATH     = "/kaggle/working/master_raw.json"
+RAW_JSON_LOCAL_PATH     = "D:\X1G8\GR2\FinancialApp\Database\master_db\master_raw.json"
 ANALYTICS_DB_PATH = "/kaggle/working/analytics.db"
 TICKER_TYPE_PATH  = os.path.join(os.path.dirname(__file__), "..", "ticker_type.json")
 
@@ -303,7 +304,7 @@ def check_bank_integrity(ticker: str, quarter: int, year: int, report, company_t
 # ==============================================================================
 
 def remap_analytics(
-    raw_json_path: str = RAW_JSON_PATH,
+    raw_json_path: str = RAW_JSON_LOCAL_PATH,
     analytics_db_path: str = ANALYTICS_DB_PATH,
 ):
     """
