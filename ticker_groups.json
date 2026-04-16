@@ -19,5 +19,6 @@
   "group_17": ["DRC", "CSM", "SRC", "PAC", "SVC", "TMT", "ABB", "ACB", "VIX", "APS"],
   "group_18": ["KBC", "ITA", "SZL", "TIP", "BCM", "KHG", "NLG", "IJC", "HDG", "FOX"],
   "group_19": ["HUT", "C4G", "DHA", "VLB", "BMC", "YBM", "HGM", "PVT", "VIP", "VOS"],
-  "group_20": ["VNA", "MVN", "SGN", "QNS", "LSS", "KTS", "MIA", "HSL", "NAF", "AFX"]
+  "group_20": ["VNA", "MVN", "SGN", "QNS", "LSS", "KTS", "MIA", "HSL", "NAF", "AFX"],
+  "group_21": ["TCB","VPB"]
 }
