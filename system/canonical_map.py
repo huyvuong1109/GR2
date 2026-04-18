@@ -22,6 +22,7 @@ _PREFIX_JUNK_RE     = re.compile(r"^(?:&#\d+;|[|Ì Í§¦_]+|[IVXivx]{1,4}\.)\s*
 _TRONG_PREFIX_RE    = re.compile(r"^Trong\s*[-–]\s*", flags=re.IGNORECASE)
 _LEADING_DASH_RE    = re.compile(r"^\s*[-–]\s*")
 _SLASH_VARIANT_RE   = re.compile(r"\s*/\s*\([^)]{1,10}\)", flags=re.IGNORECASE)
+_SO_DU_RE = re.compile(r"^s[oố]\s*d[uư]\s*(cu[oố]i|d[aầ]u)\s*k[yỳ]", flags=re.IGNORECASE)
 _ORDER_PREFIX_RE    = re.compile(
     r"^(?:[0-9]{1,3}[\.\)\-]\s+|[IVXivx]{1,4}[\.\)\-]\s+|[A-Da-d][\.\)]\s+|[a-z]{1,2}\.\s+)"
 )
@@ -87,6 +88,10 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "dau tu nam giu den ngay dao han ngan han",
         "dau tu nam giu den ngay dao han",
         "gia tri thuan dau tu ngan han",
+        "cac khoan dau tu tai chinh ngan han",   # "II. Các khoản đầu tư tài chính ngắn hạn"
+        "dau tu nam giu den ngay dao han",        # [15x] + [6x] + [5x] variants
+        "giam chung khoan kinh doanh",           # [6x] "Giảm chứng khoán kinh doanh"
+        "du phong giam gia dau tu ngan han", 
     ],
     "phai_thu_ngan_han_khach_hang": [
         "phai thu ngan han cua khach hang", "phai thu khach hang",
@@ -105,10 +110,16 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "thue va cac khoan khac phai thu nha nuoc",
         "phai thu ngan han kho doi",
         "du phong phai thu ngan han kho doi",
+        "du phong phai thu ngan han kho doi",    # [11x]+[8x] "Dự phòng phải thu ngắn hạn khó đòi"
+        "cac khoan phai thu khac",               # [9x] "4. Các khoản phải thu khác"
+        "thue gtgt duoc khau tru",               # [10x]+[4x]
+        "tai san thieu cho xu ly",               # [7x] "6. Tài sản thiếu chờ xử lý"
+        "tam ung giai phong mat bang",           # [4x]
     ],
     "hang_ton_kho": [
         "hang ton kho", "inventories", "ton kho",
         "hang ton kho rong",
+        "chi phi san xuat kinh doanh do dang",
     ],
     "tai_san_ngan_han_khac": [
         "tai san ngan han khac", "other current assets",
@@ -134,6 +145,9 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "tai san co dinh",          # OCR lỗi "có" thay "cố"
         "nguyen gia", "nguyen gia tai san co dinh",
         "gia tri hao mon luy ke", "hao mon luy ke",
+        "tai san co dinh huu hinh",              # [9x]+[4x] với prefix số
+        "tai san co dinh thue tai chinh",        # [5x] "2. Tài sản cố định thuê tài chính"
+        "tai san co dinh",                       # "II. Tài sản cố định" [4x]
     ],
     "tai_san_co_dinh_vo_hinh": [
         "tai san co dinh vo hinh", "intangible assets",
@@ -158,6 +172,10 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "dau tu gop von vao don vi khac",   # "Đầu tư góp vốn vào đơn vị khác"
         "du phong dau tu tai chinh dai han",
         "dau tu nam giu den ngay dao han",  # dài hạn version
+        "cac khoan dau tu tai chinh dai han",    # [6x] "V. Các khoản đầu tư tài chính dài hạn"
+        "dau tu vao cong ty lien ket lien doanh", # [7x] "2. Đầu tư vào công ty liên kết, liên doanh"
+        "du phong giam gia dau tu tai chinh dai han", # [7x]+[6x]
+        "dau tu gop von vao don vi khac",        # [4x]
     ],
     "loi_the_thuong_mai": [
         "loi the thuong mai",
@@ -199,6 +217,10 @@ CORPORATE_MAP: dict[str, list[str]] = {
     "chi_phi_phai_tra_ngan_han": [
         "chi phi phai tra ngan han", "accrued liabilities",
     ],
+    "chi_phi_phai_tra_dai_han": [               # slug mới cần thêm vào CORPORATE_SLUGS
+        "chi phi phai tra dai han",              # [4x] "Chỉ phí phải trả dài hạn" (OCR lỗi)
+        "chi phi phai tra dai han",
+    ],
     "du_phong_phai_tra_ngan_han": [
         "du phong phai tra ngan han",
         "du phong phai ngan han",
@@ -227,6 +249,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
     "tong_no_phai_tra": [
         "tong no phai tra", "total liabilities", "tong cong no phai tra",
         "no phai tra",
+        "tong cong", 
     ],
     "von_gop_cua_chu_so_huu": [
         "von gop cua chu so huu", "von dieu le", "charter capital",
@@ -256,6 +279,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "non controlling interest", "minority interest",
         "loi ich co dong thieu so",
         "loi ich cua co dong co dong khong kiem soat",  # OCR lỗi "cỗ"
+        "loi ich cua co dong thieu so",
     ],
     "loi_nhuan_sau_thue_chua_phan_phoi": [
         "loi nhuan sau thue chua phan phoi", "retained earnings",
@@ -327,6 +351,8 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "loi nhuan tu hoat dong kinh doanh",
         "lai lo tu hoat dong kinh doanh",
         "lai lo rong truoc thue",
+        "loi nhuan tu hoat dong kinh doanh",     # [14x]+[5x] kể cả variant có/không formula
+        "loi nhuan tu hdkd",
     ],
     "thu_nhap_khac": [
         "thu nhap khac", "other income",
@@ -460,6 +486,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "co tuc loi nhuan da tra cho chu so huu", "dividends paid",
         "co tuc da tra",
         "co tuc loi nhuan da tra",
+        "co tuc loi nhuan da tra cho co dong khong kiem soat",  # [5x] "cỗ đông"
     ],
     "tien_thu_tu_phat_hanh_co_phieu": [
         "tang von co phan tu gop von va hoac phat hanh co phieu",
@@ -467,6 +494,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
     ],
     "tien_thu_thue_tndn_da_nop": [
         "tien thu nhap doanh nghiep da tra",
+        "thue thu nhap doanh nghiep da nop", 
     ],
     "tien_thu_khac_hdkd": [
         "tien thu khac tu cac hoat dong kinh doanh",
@@ -484,8 +512,8 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "net cash from financing activities", "cff",
         "luu chuyen tien tu hoat dong tai chinh",
     ],
-    "tien_dau_ky":  ["tien va tuong duong tien dau ky", "cash at beginning"],
-    "tien_cuoi_ky": ["tien va tuong duong tien cuoi ky", "cash at end"],
+    "tien_dau_ky":  ["tien va tuong duong tien dau ky", "so du dau ky", "cash at beginning"],
+    "tien_cuoi_ky": ["tien va tuong duong tien cuoi ky", "so du cuoi ky", "cash at end"],
 
     "tang_truong_doanh_thu": ["tang truong doanh thu"],
     "tang_truong_loi_nhuan": ["tang truong loi nhuan"],
