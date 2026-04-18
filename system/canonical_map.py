@@ -622,15 +622,30 @@ BANK_MAP: dict[str, list[str]] = {
     "no_nhom_4":  ["no nhom 4", "no nghi ngo", "nhom 4", "doubtful"],
     "no_nhom_5":  ["no nhom 5", "no co kha nang mat von", "nhom 5", "loss", "no mat von"],
     # KQKD
-    "thu_nhap_lai_thuan": [
-        "thu nhap lai thuan", "net interest income", "nii",
+    "thu_nhap_lai_va_tuong_tu": [
         "thu nhap lai va cac khoan thu nhap tuong tu",
+        "thu nhap lai va cac khoan tuong tu",
+        "interest and similar income",
+    ],
+    "chi_phi_lai_va_tuong_tu": [
+        "chi phi lai va cac khoan chi phi tuong tu",
+        "chi phi lai va cac khoan tuong tu",
+        "interest and similar expenses",
+    ],
+    "thu_nhap_tu_dich_vu": [               # THÊM MỚI
+        "thu nhap tu hoat dong dich vu",
+        "income from service activities",
+    ],
+    "chi_phi_dich_vu": [                   # THÊM MỚI
+        "chi phi hoat dong dich vu",
+        "service activity expenses",
+    ],
+    "thu_nhap_lai_thuan": [
+        "thu nhap lai thuan", "net interest income", "nii",        
     ],
     "chi_phi_lai":  ["chi phi lai va cac khoan tuong tu"],
     "lai_thuan_tu_dich_vu": [
         "lai thuan tu hoat dong dich vu", "net fee income",
-        "thu nhap tu hoat dong dich vu",
-        "chi phi hoat dong dich vu",    # sẽ được preprocess bỏ "chi phí" -> không khớp, OK
         "lai thuan tu dich vu",
     ],
     "lai_thuan_ngoai_hoi": [

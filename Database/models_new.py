@@ -241,7 +241,11 @@ BANK_CDKT = [
 ]
 
 BANK_KQKD = [
+    "thu_nhap_lai_va_tuong_tu",        # Doanh thu lai gop (truoc khi tru chi phi)
+    "chi_phi_lai_va_tuong_tu",         # Chi phi lai gop
     "thu_nhap_lai_thuan",              # Net Interest Income (NII)
+    "thu_nhap_tu_dich_vu",
+    "chi_phi_dich_vu", 
     "lai_thuan_tu_dich_vu",            # Net Fee Income
     "lai_thuan_ngoai_hoi",             # Net Forex Gain
     "lai_thuan_chung_khoan",           # Net Securities Trading Gain
