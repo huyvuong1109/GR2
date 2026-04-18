@@ -46,7 +46,21 @@ logger = get_logger(__name__)
 # CAU HINH
 # ==============================================================================
 
-INPUT_DIRS        = glob.glob("/kaggle/input/datasets/huyvuong11/bctc-*")
+
+# Tu dong detect tat ca dataset co chua PDF
+# Ho tro ca format cu (bctc-DIG) va format moi (bctc-group-21)
+_BASE = "/kaggle/input/datasets/huyvuong11"
+
+INPUT_DIRS = []
+for dataset_dir in glob.glob(f"{_BASE}/bctc-*"):
+    # Moi subfolder trong dataset = 1 cong ty
+    for subdir in glob.glob(f"{dataset_dir}/*/"):
+        if os.path.isdir(subdir):
+            INPUT_DIRS.append(subdir)
+
+# Fallback: neu khong tim thay subfolder, thu dung truc tiep
+if not INPUT_DIRS:
+    INPUT_DIRS = glob.glob(f"{_BASE}/bctc-*")
 MD_CACHE_DIR      = "/kaggle/working/ocr_md_cache"
 RAW_JSON_PATH     = "/kaggle/working/master_raw.json"
 ANALYTICS_DB_PATH = "/kaggle/working/analytics.db"
@@ -73,10 +87,8 @@ def _norm(text: str) -> str:
 
 
 def parse_ticker(dir_path: str) -> str:
-    name = os.path.basename(dir_path)
-    return name[5:].replace("-", "").upper() if name.lower().startswith("bctc-") \
-        else name.replace("-", "").upper()
-
+    """Lay ticker tu ten subfolder cuoi cung."""
+    return os.path.basename(dir_path.rstrip("/\\")).upper()
 
 def parse_quarter_year(filename: str) -> tuple[int | None, int | None]:
     low = _norm(filename)
@@ -402,11 +414,10 @@ def run():
     AnalyticsSession = make_session(analytics_engine)
 
     all_files: list[tuple[str, str]] = []
-    for d in INPUT_DIRS:
-        ticker = parse_ticker(d)
-        for pdf in sorted(glob.glob(os.path.join(d, "*.pdf"))):
+    for ticker_dir in INPUT_DIRS:
+        ticker = parse_ticker(ticker_dir)
+        for pdf in sorted(glob.glob(os.path.join(ticker_dir, "*.pdf"))):
             all_files.append((ticker, pdf))
-
     if not all_files:
         logger.error("Khong tim thay file PDF nao.")
         return
