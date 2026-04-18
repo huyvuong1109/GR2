@@ -289,8 +289,7 @@ def check_bank_integrity(ticker: str, quarter: int, year: int, report, company_t
     if company_type != "bank":
         return
     slug_data: dict[str, float] = {}
-    for stmt in [report.balance_sheet, report.income_statement, report.cash_flow]:
-        for item in stmt.items:
+    for item in report.income_statement.items:
             if item.value is None:
                 continue
             slug = map_to_canonical(item.item_name, company_type="bank")
