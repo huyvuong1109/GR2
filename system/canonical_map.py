@@ -370,6 +370,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "lai lo tu thanh ly tai san co dinh",
         "lai lo khac",              # "Lãi/(lỗ) khác" sau khi bỏ "/(lỗ)"
         "lai khac",
+        "lai tu hoat dong dau tu",
     ],
     "loi_nhuan_truoc_thue": [
         "tong loi nhuan ke toan truoc thue", "profit before tax",
@@ -379,6 +380,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
     "chi_phi_thue_tndn_hien_hanh": [
         "chi phi thue thu nhap doanh nghiep hien hanh",
         "chi phi thue tndn hien hanh",
+        "chi phi tndn hien hanh",
     ],
     "chi_phi_thue_tndn_hoan_lai": [
         "chi phi thue thu nhap doanh nghiep hoan lai",
@@ -450,6 +452,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "anh huong cua thay doi ty gia hoi doai quy doi ngoai te",
         "effect of exchange rate changes",
         "anh huong cua chenh lech ty gia",
+        "anh huong c cua luu doi ty gia",
     ],
     "lctt_thuan_hdkd": [
         "luu chuyen tien thuan tu hoat dong kinh doanh",
