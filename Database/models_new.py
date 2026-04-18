@@ -395,6 +395,7 @@ BANK_INTEGRITY_CHECKS = [
             "lai_thuan_tu_dich_vu",
             "lai_thuan_ngoai_hoi",
             "lai_thuan_chung_khoan",
+            "lai_thuan_mua_ban_chung_khoan_dau_tu",
             "thu_nhap_khac",
         ],
         "result": "tong_thu_nhap_hoat_dong",
@@ -412,8 +413,8 @@ BANK_INTEGRITY_CHECKS = [
     {
         "name": "loi_nhuan_truoc_thue",
         "formula": {
-            "add": ["loi_nhuan_thuan_truoc_du_phong"],
-            "sub": ["chi_phi_du_phong_rui_ro"],
+            "add": ["tong_thu_nhap_hoat_dong"],
+            "sub": ["chi_phi_hoat_dong", "chi_phi_du_phong_rui_ro"],
         },
         "result": "loi_nhuan_truoc_thue",
         "tolerance_pct": 5.0,
