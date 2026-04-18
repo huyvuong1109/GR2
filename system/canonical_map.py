@@ -653,7 +653,7 @@ BANK_MAP: dict[str, list[str]] = {
         "kinh doanh ngoai hoi va vang",
     ],
     "lai_thuan_chung_khoan": [
-        "lai thuan tu mua ban chung khoan kinh doanh", "net trading gain",
+        "lai thuan tu mua ban chung khoan kinh doanh", "net trading gain", "lai thuan tu mua ban chung khoan",
     ],
     "lai_thuan_mua_ban_chung_khoan_dau_tu": [
         "lai thuan tu mua ban chung khoan dau tu",
@@ -678,10 +678,12 @@ BANK_MAP: dict[str, list[str]] = {
         "loi nhuan thuan tu hoat dong kinh doanh truoc chi phi du phong",
         "net profit before provision", "loi nhuan truoc du phong",
         "ln tu hdkd truoc cf du phong",
+        "lai thuan tu hoat dong kinh doanh truoc chi phi du phong",
+        "lai thuan tu hoat dong kinh doanh truoc",  
     ],
     "chi_phi_du_phong_rui_ro": [
         "chi phi du phong rui ro tin dung", "provision expenses",
-        "du phong rui ro", "chi phi trich lap du phong",
+        "chi phi trich lap du phong",
         "chi phi du phong rui ro tin dung",
     ],
     "loi_nhuan_truoc_thue":     ["loi nhuan truoc thue", "profit before tax", "ln truoc thue"],
