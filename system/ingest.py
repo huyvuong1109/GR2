@@ -270,10 +270,8 @@ def upsert_analytics(analytics_session, ticker: str, company_name: str,
                     slug = map_to_canonical(orig, company_type=ctype)
             if slug is None or slug not in slug_list:
                 continue
-            existing = slug_data.get(slug)
-            if existing is None or abs(item.value) > abs(existing):
+            if slug not in slug_data:
                 slug_data[slug] = int(item.value)
-
     # Ghi row
     row = Model(ticker=ticker, quarter=quarter, year=year)
     for slug, val in slug_data.items():
