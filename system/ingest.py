@@ -294,7 +294,7 @@ def check_bank_integrity(ticker: str, quarter: int, year: int, report, company_t
             if item.value is None:
                 continue
             slug = map_to_canonical(item.item_name, company_type="bank")
-            if slug:
+            if slug and slug not in slug_data:
                 slug_data[slug] = float(item.value)
 
     failures = run_bank_integrity_checks(slug_data)
