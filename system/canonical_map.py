@@ -8,6 +8,7 @@ import unicodedata
 
 
 def _norm(text: str) -> str:
+    text = (text or "").replace("Đ", "D").replace("đ", "d").replace("Đ", "d")
     nfkd = unicodedata.normalize("NFKD", text or "")
     t = "".join(c for c in nfkd if unicodedata.category(c) != "Mn")
     t = re.sub(r"[^a-zA-Z0-9\s]", " ", t).lower()
@@ -302,6 +303,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "doanh thu ban hang va cung cap dich vu", "revenue",
         "doanh thu thuan ve ban hang", "net revenue from sales",
         "doanh thu",
+        "n ban hang va cung",
     ],
     "cac_khoan_giam_tru_doanh_thu": [
         "cac khoan giam tru doanh thu", "deductions from revenue",
@@ -353,6 +355,9 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "lai lo rong truoc thue",
         "loi nhuan tu hoat dong kinh doanh",     # [14x]+[5x] kể cả variant có/không formula
         "loi nhuan tu hdkd",
+        "loi nhuan tu hoat dong kinh doanh 30 20 21 22 24 25", # Công thức bị dính
+        "loi tu hoat dong kinh doanh",                         # "Lợi từ..."
+        "loi nhuan tu hoat dong kinh doanh",
     ],
     "thu_nhap_khac": [
         "thu nhap khac", "other income",
@@ -405,6 +410,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "co dong cua cong ty me",
         "loi nhuan lo sau thue cua cong ty me",   # "Lợi nhuận/(lỗ) sau thuế của công ty mẹ"
         "trong loi nhuan lo sau thue cua cong ty me",
+        "loi nhueu sau thue cua so dong cong ty me",
     ],
     "eps_co_ban": [
         "lai co ban tren co phieu", "basic eps",
