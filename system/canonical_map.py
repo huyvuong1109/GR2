@@ -544,7 +544,7 @@ BANK_MAP: dict[str, list[str]] = {
         "tien gui tai cac tctd khac va cho vay cac tctd khac",
     ],
     "chung_khoan_kinh_doanh": [
-        "chung khoan kinh doanh", "trading securities",
+        "trading securities",
         "du phong giam gia chung khoan kinh doanh",
     ],
     "cho_vay_khach_hang": [
@@ -651,9 +651,11 @@ BANK_MAP: dict[str, list[str]] = {
     "lai_thuan_ngoai_hoi": [
         "lai thuan tu kinh doanh ngoai hoi va vang", "net forex gain",
         "kinh doanh ngoai hoi va vang",
+        "lo thuan tu hoat dong kinh doanh ngoai hoi",
+        "lo thuan tu kinh doanh ngoai hoi", 
     ],
     "lai_thuan_chung_khoan": [
-        "lai thuan tu mua ban chung khoan kinh doanh", "net trading gain", "lai thuan tu mua ban chung khoan",
+        "lai thuan tu mua ban chung khoan kinh doanh", "net trading gain", "lai thuan tu mua ban chung khoan", "thuan tu mua ban chung khoan kinh doanh", 
     ],
     "lai_thuan_mua_ban_chung_khoan_dau_tu": [
         "lai thuan tu mua ban chung khoan dau tu",
@@ -680,6 +682,7 @@ BANK_MAP: dict[str, list[str]] = {
         "ln tu hdkd truoc cf du phong",
         "lai thuan tu hoat dong kinh doanh truoc chi phi du phong",
         "lai thuan tu hoat dong kinh doanh truoc",  
+        "lai thuan tu hoat dong kinh doanh truoc chi phi du phong rui ro tin dung",
     ],
     "chi_phi_du_phong_rui_ro": [
         "chi phi du phong rui ro tin dung", "provision expenses",
