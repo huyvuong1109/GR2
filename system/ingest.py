@@ -259,15 +259,29 @@ def upsert_analytics(analytics_session, ticker: str, company_name: str,
 
     # Gom slug -> value (uu tien gia tri tuyet doi lon hon)
     slug_data: dict[str, int] = {}
-    for stmt in [report.balance_sheet, report.income_statement, report.cash_flow]:
+    for stmt_name, stmt in [
+        ("CDKT", report.balance_sheet),
+        ("KQKD", report.income_statement),
+        ("LCTT", report.cash_flow),
+    ]:
         for item in stmt.items:
             if item.value is None:
                 continue
-            slug = map_to_canonical(item.item_name, company_type=ctype)
+            slug = map_to_canonical(
+                item.item_name,
+                company_type=ctype,
+                statement=stmt_name,
+                strict=False,
+            )
             if slug is None:
                 orig = getattr(item, "original_name", None)
                 if orig:
-                    slug = map_to_canonical(orig, company_type=ctype)
+                    slug = map_to_canonical(
+                        orig,
+                        company_type=ctype,
+                        statement=stmt_name,
+                        strict=False,
+                    )
             if slug is None or slug not in slug_list:
                 continue
             if slug not in slug_data:
@@ -292,7 +306,12 @@ def check_bank_integrity(ticker: str, quarter: int, year: int, report, company_t
     for item in report.income_statement.items:
             if item.value is None:
                 continue
-            slug = map_to_canonical(item.item_name, company_type="bank")
+            slug = map_to_canonical(
+                item.item_name,
+                company_type="bank",
+                statement="KQKD",
+                strict=False,
+            )
             if slug and slug not in slug_data:
                 slug_data[slug] = float(item.value)
 

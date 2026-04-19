@@ -5,6 +5,7 @@ canonical_map.py - Map ten chi tieu OCR/LLM -> slug chuan.
 
 import re
 import unicodedata
+from functools import lru_cache
 
 
 def _norm(text: str) -> str:
@@ -37,6 +38,11 @@ _THUYET_MINH_RE     = re.compile(r"thuyet\s*minh\s*\d*", flags=re.IGNORECASE)
 _TRAILING_STAR_RE   = re.compile(r"\s*\(\s*\*+\s*\)\s*$")
 _TRAILING_NOISE_RE  = re.compile(r"\s+(?:nay|truoc|cuoi ky|dau ky)\s*$", flags=re.IGNORECASE)
 _DONG_SUFFIX_RE     = re.compile(r"\s*\(dong\)\s*$", flags=re.IGNORECASE)
+
+# Cac keyword qua chung de dung substring matching.
+_NOISY_SUBSTR_KWS = {
+    "tien", "cash",
+}
 
 
 def _preprocess(name: str) -> str:
@@ -584,6 +590,7 @@ BANK_MAP: dict[str, list[str]] = {
     "cac_khoan_no_chinh_phu_nhnn": [
         "cac khoan no chinh phu va ngan hang nha nuoc",
         "cac khoan no chinh phu nhnn",
+        "cac khoan no chinh phu va nhnn viet nam",
         "von tai tro uy thac dau tu cua cp va cac to chuc td khac",
     ],
     "tien_gui_vay_cac_tctd": [
@@ -669,6 +676,7 @@ BANK_MAP: dict[str, list[str]] = {
     "tong_thu_nhap_hoat_dong": [
         "tong thu nhap hoat dong", "total operating income",
         "tong thu nhap truoc du phong", "tong thu nhap",
+        "doanh thu dong",
     ],
     "chi_phi_hoat_dong": [
         "chi phi hoat dong", "operating expenses", "opex",
@@ -714,6 +722,7 @@ BANK_MAP: dict[str, list[str]] = {
     "lctt_thuan_hdkd": [
         "luu chuyen tien thuan tu hoat dong kinh doanh", "cfo",
         "luu chuyen tien thuan tu hdkd truoc thay doi von luu dong",
+        "luu chuyen tien thuan tu hdkd truoc thay doi vld",
         "luu chuyen tien thuan tu hdkd truoc thue",
         "luu chuyen tien te rong tu cac hoat dong sxkd",
     ],
@@ -748,45 +757,98 @@ BANK_MAP: dict[str, list[str]] = {
 # ==============================================================================
 
 SECURITIES_MAP: dict[str, list[str]] = {
-    "tien_va_tuong_duong_tien":   ["tien va cac khoan tuong duong tien", "cash and equivalents", "tien va tuong duong tien"],
+    "tien_va_tuong_duong_tien":   [
+        "tien va cac khoan tuong duong tien", "cash and equivalents", "tien va tuong duong tien",
+        "tien va tuong duong tien dong",
+    ],
     "fvtpl":                      ["chung khoan fvtpl", "fvtpl", "tai san tai chinh ghi nhan theo fvtpl"],
     "afs":                        ["chung khoan san sang de ban", "afs", "available for sale"],
     "htm":                        ["chung khoan giu den ngay dao han", "htm", "held to maturity"],
     "cho_vay_margin":             ["cho vay giao dich ky quy", "margin loans", "cho vay margin", "phai thu cho vay giao dich ky quy"],
     "phai_thu_khach_hang":        ["phai thu khach hang", "receivables from customers", "cac khoan phai thu ngan han"],
-    "tai_san_ngan_han_khac":      ["tai san ngan han khac", "other current assets", "tai san luu dong khac"],
-    "tong_tai_san_ngan_han":      ["tong tai san ngan han", "total current assets"],
+    "tai_san_ngan_han_khac":      [
+        "tai san ngan han khac", "other current assets", "tai san luu dong khac",
+    ],
+    "tong_tai_san_ngan_han":      [
+        "tong tai san ngan han", "total current assets",
+        "tai san ngan han", "tai san ngan han dong", "tai san luu dong",
+    ],
     "tai_san_co_dinh":            ["tai san co dinh", "fixed assets"],
-    "dau_tu_tai_chinh_dai_han":   ["dau tu tai chinh dai han", "long term investments", "dau tu dai han"],
-    "tai_san_dai_han_khac":       ["tai san dai han khac", "other non current assets"],
-    "tong_tai_san_dai_han":       ["tong tai san dai han", "total non current assets"],
-    "tong_tai_san":               ["tong tai san", "total assets", "tong cong tai san"],
-    "phai_tra_khach_hang":        ["phai tra khach hang", "tien cua nha dau tu", "payables to customers"],
+    "dau_tu_tai_chinh_dai_han":   [
+        "dau tu tai chinh dai han", "long term investments", "dau tu dai han",
+        "dau tu dai han dong", "dau tu vao cac doanh nghiep khac",
+    ],
+    "tai_san_dai_han_khac":       [
+        "tai san dai han khac", "other non current assets",
+        "tai san dai han khac dong", "tra truoc dai han", "tra truoc dai han dong",
+    ],
+    "tong_tai_san_dai_han":       [
+        "tong tai san dai han", "total non current assets",
+        "tai san dai han", "tai san dai han dong",
+    ],
+    "tong_tai_san":               [
+        "tong tai san", "total assets", "tong cong tai san",
+        "tong tai san dong", "tong cong tai san dong", "tong cong tai san a b",
+    ],
+    "phai_tra_khach_hang":        [
+        "phai tra khach hang", "tien cua nha dau tu", "payables to customers",
+        "nguoi mua tra tien truoc ngan han", "nguoi mua tra tien truoc ngan han dong",
+    ],
     "vay_ngan_han":               ["vay ngan han", "short term borrowings", "vay va no thue tai chinh ngan han"],
-    "tong_no_ngan_han":           ["tong no ngan han", "total current liabilities", "no ngan han"],
+    "tong_no_ngan_han":           [
+        "tong no ngan han", "total current liabilities", "no ngan han", "no ngan han dong",
+    ],
     "vay_dai_han":                ["vay dai han", "long term borrowings"],
-    "tong_no_dai_han":            ["tong no dai han", "total non current liabilities"],
-    "tong_no_phai_tra":           ["tong no phai tra", "total liabilities", "no phai tra"],
-    "von_dieu_le":                ["von dieu le", "charter capital", "co phieu pho thong", "von gop cua chu so huu"],
+    "tong_no_dai_han":            [
+        "tong no dai han", "total non current liabilities", "no dai han", "no dai han dong",
+    ],
+    "tong_no_phai_tra":           [
+        "tong no phai tra", "total liabilities", "no phai tra",
+        "no phai tra dong", "tong cong no phai tra",
+    ],
+    "von_dieu_le":                [
+        "von dieu le", "charter capital", "co phieu pho thong", "von gop cua chu so huu",
+        "von gop cua chu so huu dong", "co phieu pho thong dong", "von va cac quy dong",
+    ],
     "thang_du_von":               ["thang du von co phan", "share premium"],
-    "loi_nhuan_chua_phan_phoi":   ["loi nhuan chua phan phoi", "retained earnings", "lai chua phan phoi"],
-    "tong_von_chu_so_huu":        ["tong von chu so huu", "total equity", "von chu so huu"],
-    "tong_nguon_von":             ["tong nguon von", "total liabilities and equity", "tong cong nguon von"],
+    "loi_nhuan_chua_phan_phoi":   [
+        "loi nhuan chua phan phoi", "retained earnings", "lai chua phan phoi", "lai chua phan phoi dong",
+    ],
+    "tong_von_chu_so_huu":        [
+        "tong von chu so huu", "total equity", "von chu so huu", "von chu so huu dong",
+    ],
+    "tong_nguon_von":             [
+        "tong nguon von", "total liabilities and equity", "tong cong nguon von", "tong cong nguon von dong",
+    ],
     "doanh_thu_moi_gioi":         ["doanh thu moi gioi chung khoan", "brokerage revenue", "phi moi gioi", "hoa hong moi gioi"],
     "doanh_thu_tu_van":           ["doanh thu tu van tai chinh", "advisory fees", "phi tu van"],
     "doanh_thu_ngan_hang_dau_tu": ["doanh thu ngan hang dau tu", "investment banking fees"],
     "lai_kinh_doanh_chung_khoan": ["lai tu mua ban chung khoan tu doanh", "proprietary trading gain"],
     "lai_cho_vay_margin":         ["lai tu cho vay giao dich ky quy", "interest from margin lending"],
     "doanh_thu_quan_ly_quy":      ["phi quan ly quy", "fund management fees"],
-    "tong_doanh_thu_hoat_dong":   ["tong doanh thu hoat dong", "total operating revenue"],
+    "tong_doanh_thu_hoat_dong":   [
+        "tong doanh thu hoat dong", "total operating revenue",
+        "doanh thu dong", "doanh thu thuan", "doanh thu ban hang va cung cap dich vu",
+    ],
     "chi_phi_hoat_dong":          ["chi phi hoat dong", "operating expenses", "chi phi quan ly dn"],
-    "loi_nhuan_truoc_thue":       ["loi nhuan truoc thue", "profit before tax", "ln truoc thue"],
+    "loi_nhuan_truoc_thue":       [
+        "loi nhuan truoc thue", "profit before tax", "ln truoc thue", "lai lo rong truoc thue",
+    ],
     "chi_phi_thue_tndn":          ["chi phi thue thu nhap doanh nghiep", "income tax expense", "chi phi thue tndn hien hanh", "chi phi thue tndn hoan lai"],
     "loi_nhuan_sau_thue":         ["loi nhuan sau thue", "net profit", "loi nhuan thuan"],
     "eps_co_ban":                 ["lai co ban tren co phieu", "basic eps"],
-    "lctt_thuan_hdkd":            ["luu chuyen tien thuan tu hoat dong kinh doanh", "luu chuyen tien te rong tu cac hoat dong sxkd"],
-    "lctt_thuan_hddt":            ["luu chuyen tien thuan tu hoat dong dau tu", "luu chuyen tu hoat dong dau tu"],
-    "lctt_thuan_hdtc":            ["luu chuyen tien thuan tu hoat dong tai chinh", "luu chuyen tien tu hoat dong tai chinh"],
+    "lctt_thuan_hdkd":            [
+        "luu chuyen tien thuan tu hoat dong kinh doanh", "luu chuyen tien te rong tu cac hoat dong sxkd",
+        "luu chuyen tien thuan tu hdkd truoc thay doi von luu dong", "luu chuyen tien thuan tu hdkd truoc thay doi vld",
+    ],
+    "lctt_thuan_hddt":            [
+        "luu chuyen tien thuan tu hoat dong dau tu", "luu chuyen tu hoat dong dau tu",
+        "tien thu co tuc va loi nhuan duoc chia", "tien thu tu viec ban cac khoan dau tu vao doanh nghiep khac",
+    ],
+    "lctt_thuan_hdtc":            [
+        "luu chuyen tien thuan tu hoat dong tai chinh", "luu chuyen tien tu hoat dong tai chinh",
+        "tang von co phan tu gop von va hoac phat hanh co phieu",
+    ],
     "tien_dau_ky":                ["tien va tuong duong tien dau ky", "cash at beginning"],
     "tien_cuoi_ky":               ["tien va tuong duong tien cuoi ky", "cash at end"],
 }
@@ -797,37 +859,76 @@ SECURITIES_MAP: dict[str, list[str]] = {
 # ==============================================================================
 
 INSURANCE_MAP: dict[str, list[str]] = {
-    "tien_va_tuong_duong_tien":     ["tien va cac khoan tuong duong tien", "cash and equivalents", "tien va tuong duong tien"],
-    "dau_tu_tai_chinh":             ["dau tu tai chinh", "financial investments"],
+    "tien_va_tuong_duong_tien":     [
+        "tien va cac khoan tuong duong tien", "cash and equivalents", "tien va tuong duong tien",
+        "tien va tuong duong tien dong",
+    ],
+    "dau_tu_tai_chinh":             [
+        "dau tu tai chinh", "financial investments",
+        "dau tu dai han", "dau tu dai han dong", "dau tu vao cac doanh nghiep khac", "gia tri rong tai san dau tu",
+    ],
     "phai_thu_phi_bao_hiem":        ["phai thu phi bao hiem", "insurance premium receivables", "phai thu ve hoat dong bao hiem"],
-    "tai_san_ngan_han_khac":        ["tai san ngan han khac", "other current assets"],
-    "tong_tai_san_ngan_han":        ["tong tai san ngan han", "total current assets"],
+    "tai_san_ngan_han_khac":        ["tai san ngan han khac", "other current assets", "tai san luu dong khac"],
+    "tong_tai_san_ngan_han":        [
+        "tong tai san ngan han", "total current assets", "tai san ngan han", "tai san ngan han dong",
+    ],
     "tai_san_co_dinh":              ["tai san co dinh", "fixed assets"],
-    "tai_san_dai_han_khac":         ["tai san dai han khac", "other non current assets"],
-    "tong_tai_san_dai_han":         ["tong tai san dai han", "total non current assets"],
-    "tong_tai_san":                 ["tong tai san", "total assets", "tong cong tai san"],
+    "tai_san_dai_han_khac":         [
+        "tai san dai han khac", "other non current assets", "tai san dai han khac dong", "tra truoc dai han", "tra truoc dai han dong",
+    ],
+    "tong_tai_san_dai_han":         [
+        "tong tai san dai han", "total non current assets", "tai san dai han", "tai san dai han dong",
+    ],
+    "tong_tai_san":                 [
+        "tong tai san", "total assets", "tong cong tai san", "tong tai san dong", "tong cong tai san dong",
+    ],
     "du_phong_nghiep_vu":           ["du phong nghiep vu bao hiem", "provision for insurance liabilities", "du phong nghiep vu"],
     "phai_tra_nguoi_ban":           ["phai tra nguoi ban", "accounts payable"],
-    "tong_no_phai_tra":             ["tong no phai tra", "total liabilities", "no phai tra"],
-    "von_dieu_le":                  ["von dieu le", "charter capital", "von gop cua chu so huu"],
-    "loi_nhuan_chua_phan_phoi":     ["loi nhuan chua phan phoi", "retained earnings", "lai chua phan phoi"],
-    "tong_von_chu_so_huu":          ["tong von chu so huu", "total equity", "von chu so huu"],
-    "tong_nguon_von":               ["tong nguon von", "total liabilities and equity", "tong cong nguon von"],
-    "doanh_thu_phi_bao_hiem_goc":   ["doanh thu phi bao hiem goc", "gross premium revenue", "phi bao hiem goc"],
+    "tong_no_phai_tra":             [
+        "tong no phai tra", "total liabilities", "no phai tra", "no phai tra dong", "tong cong no phai tra",
+    ],
+    "von_dieu_le":                  [
+        "von dieu le", "charter capital", "von gop cua chu so huu",
+        "von gop cua chu so huu dong", "co phieu pho thong dong", "von va cac quy dong",
+    ],
+    "loi_nhuan_chua_phan_phoi":     [
+        "loi nhuan chua phan phoi", "retained earnings", "lai chua phan phoi", "lai chua phan phoi dong",
+    ],
+    "tong_von_chu_so_huu":          [
+        "tong von chu so huu", "total equity", "von chu so huu", "von chu so huu dong",
+    ],
+    "tong_nguon_von":               [
+        "tong nguon von", "total liabilities and equity", "tong cong nguon von", "tong cong nguon von dong",
+    ],
+    "doanh_thu_phi_bao_hiem_goc":   [
+        "doanh thu phi bao hiem goc", "gross premium revenue", "phi bao hiem goc",
+        "doanh thu dong", "doanh thu thuan", "doanh thu ban hang va cung cap dich vu",
+    ],
     "phi_tai_bao_hiem":             ["phi tai bao hiem", "reinsurance premium"],
     "doanh_thu_phi_bao_hiem_thuan": ["doanh thu phi bao hiem giu lai", "net premium revenue", "phi bao hiem thuan"],
     "chi_boi_thuong":               ["chi boi thuong bao hiem", "claims paid", "chi tra boi thuong", "boi thuong bao hiem"],
     "chi_phi_khai_thac":            ["chi phi khai thac bao hiem", "acquisition costs"],
-    "chi_phi_quan_ly":              ["chi phi quan ly", "management expenses"],
-    "doanh_thu_hoat_dong_tai_chinh":  ["doanh thu hoat dong tai chinh", "financial income"],
+    "chi_phi_quan_ly":              ["chi phi quan ly", "management expenses", "chi phi quan ly dn"],
+    "doanh_thu_hoat_dong_tai_chinh":  [
+        "doanh thu hoat dong tai chinh", "financial income", "thu nhap tai chinh", "thu nhap lai",
+    ],
     "loi_nhuan_hoat_dong_bao_hiem":   ["loi nhuan hoat dong kinh doanh bao hiem", "underwriting profit"],
-    "loi_nhuan_truoc_thue":         ["loi nhuan truoc thue", "profit before tax", "ln truoc thue"],
+    "loi_nhuan_truoc_thue":         ["loi nhuan truoc thue", "profit before tax", "ln truoc thue", "lai lo rong truoc thue"],
     "chi_phi_thue_tndn":            ["chi phi thue thu nhap doanh nghiep", "income tax expense"],
     "loi_nhuan_sau_thue":           ["loi nhuan sau thue", "net profit", "loi nhuan thuan"],
     "eps_co_ban":                   ["lai co ban tren co phieu", "basic eps"],
-    "lctt_thuan_hdkd":              ["luu chuyen tien thuan tu hoat dong kinh doanh"],
-    "lctt_thuan_hddt":              ["luu chuyen tien thuan tu hoat dong dau tu"],
-    "lctt_thuan_hdtc":              ["luu chuyen tien thuan tu hoat dong tai chinh"],
+    "lctt_thuan_hdkd":              [
+        "luu chuyen tien thuan tu hoat dong kinh doanh", "luu chuyen tien te rong tu cac hoat dong sxkd",
+        "luu chuyen tien thuan tu hdkd truoc thay doi von luu dong", "luu chuyen tien thuan tu hdkd truoc thay doi vld",
+    ],
+    "lctt_thuan_hddt":              [
+        "luu chuyen tien thuan tu hoat dong dau tu", "luu chuyen tu hoat dong dau tu",
+        "tien thu co tuc va loi nhuan duoc chia", "tien thu tu viec ban cac khoan dau tu vao doanh nghiep khac",
+    ],
+    "lctt_thuan_hdtc":              [
+        "luu chuyen tien thuan tu hoat dong tai chinh", "luu chuyen tien tu hoat dong tai chinh",
+        "tang von co phan tu gop von va hoac phat hanh co phieu",
+    ],
     "tien_dau_ky":                  ["tien va tuong duong tien dau ky"],
     "tien_cuoi_ky":                 ["tien va tuong duong tien cuoi ky"],
 }
@@ -852,42 +953,99 @@ for _ctype, _cmap in ALL_MAPS.items():
             _INDEX[_ctype][_norm(_kw)] = _slug
 
 
+@lru_cache(maxsize=8)
+def _statement_slug_sets(company_type: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    from Database.models_new import (
+        CORPORATE_CDKT, CORPORATE_KQKD, CORPORATE_LCTT,
+        BANK_CDKT,       BANK_KQKD,      BANK_LCTT,
+        SECURITIES_CDKT, SECURITIES_KQKD, SECURITIES_LCTT,
+        INSURANCE_CDKT,  INSURANCE_KQKD,  INSURANCE_LCTT,
+    )
+    sm = {
+        "corporate":  (CORPORATE_CDKT,  CORPORATE_KQKD,  CORPORATE_LCTT),
+        "bank":       (BANK_CDKT,       BANK_KQKD,       BANK_LCTT),
+        "securities": (SECURITIES_CDKT, SECURITIES_KQKD, SECURITIES_LCTT),
+        "insurance":  (INSURANCE_CDKT,  INSURANCE_KQKD,  INSURANCE_LCTT),
+    }
+    cdkt, kqkd, lctt = sm.get(company_type, sm["corporate"])
+    return frozenset(cdkt), frozenset(kqkd), frozenset(lctt)
+
+
+def _slug_matches_statement(slug: str, company_type: str, statement: str | None) -> bool:
+    if not statement:
+        return True
+    stmt = statement.upper().strip()
+    ctype = company_type if company_type in ALL_MAPS else "corporate"
+    cdkt, kqkd, lctt = _statement_slug_sets(ctype)
+    if stmt == "CDKT":
+        return slug in cdkt
+    if stmt == "KQKD":
+        return slug in kqkd
+    if stmt == "LCTT":
+        return slug in lctt
+    return True
+
+
+def _allow_substring_keyword(kw: str) -> bool:
+    return len(kw) >= 8 and kw not in _NOISY_SUBSTR_KWS
+
+
 # ==============================================================================
 # MAIN LOOKUP
 # ==============================================================================
 
-def map_to_canonical(item_name: str, company_type: str = "corporate") -> str | None:
-    idx = _INDEX.get(company_type, _INDEX["corporate"])
+def map_to_canonical(
+    item_name: str,
+    company_type: str = "corporate",
+    statement: str | None = None,
+    strict: bool = False,
+) -> str | None:
+    ctype = company_type if company_type in _INDEX else "corporate"
+    idx = _INDEX.get(ctype, _INDEX["corporate"])
 
     clean = _preprocess(item_name)
     if not clean:
         return None
 
-    n = _norm(clean)
-    if n:
-        if n in idx:
-            return idx[n]
-        for kw, slug in idx.items():
-            if kw in n:
+    def _try_lookup(text_norm: str) -> str | None:
+        if not text_norm:
+            return None
+
+        if text_norm in idx:
+            slug = idx[text_norm]
+            if _slug_matches_statement(slug, ctype, statement):
                 return slug
-        if len(n) >= 10:
+
+        if strict:
+            return None
+
+        for kw, slug in idx.items():
+            if not _allow_substring_keyword(kw):
+                continue
+            if kw in text_norm and _slug_matches_statement(slug, ctype, statement):
+                return slug
+
+        if len(text_norm) >= 12:
             for kw, slug in idx.items():
-                if n in kw:
+                if not _allow_substring_keyword(kw):
+                    continue
+                if text_norm in kw and _slug_matches_statement(slug, ctype, statement):
                     return slug
+
+        return None
+
+    n = _norm(clean)
+    slug = _try_lookup(n)
+    if slug is not None:
+        return slug
 
     # Pass 2: ten goc neu khac sau preprocess
     if clean != item_name:
         n_raw = _norm(item_name)
         if n_raw and n_raw != n:
-            if n_raw in idx:
-                return idx[n_raw]
-            for kw, slug in idx.items():
-                if kw in n_raw:
-                    return slug
-            if len(n_raw) >= 10:
-                for kw, slug in idx.items():
-                    if n_raw in kw:
-                        return slug
+            slug = _try_lookup(n_raw)
+            if slug is not None:
+                return slug
 
     return None
 
