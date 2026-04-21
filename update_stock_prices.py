@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, text
 
 # Database path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(SCRIPT_DIR, "Database", "master_db", "master.db")
+DB_PATH = os.path.join(SCRIPT_DIR, "Database", "master_db", "analytics(final).db")
 
 # SSI API endpoint (public, không cần auth)
 SSI_API_URL = "https://iboard.ssi.com.vn/dchart/api/1.1/defaultAllStocks"

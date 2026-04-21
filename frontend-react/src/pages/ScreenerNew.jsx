@@ -12,13 +12,9 @@ import {
   ChevronDown,
   RotateCcw,
   Download,
-  Bookmark,
   Star,
   Eye,
-  BarChart3,
-  Activity,
   AlertTriangle,
-  CheckCircle2,
   Scale,
   Percent,
   DollarSign,
@@ -26,23 +22,15 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Badge, SkeletonTable } from '../components/ui'
-import { formatCurrency, formatPercent, formatRatio } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
+import DynamicScreenerPanel from '../components/screener/DynamicScreenerPanel'
 
-// Industry options
-const industries = [
-  { value: '', label: 'Tất cả ngành' },
-  { value: 'Ngân hàng', label: 'Ngân hàng' },
-  { value: 'Bất động sản', label: 'Bất động sản' },
-  { value: 'Thực phẩm', label: 'Thực phẩm & Đồ uống' },
-  { value: 'Công nghệ', label: 'Công nghệ' },
-  { value: 'Thép', label: 'Thép & Vật liệu' },
-  { value: 'Bán lẻ', label: 'Bán lẻ' },
-  { value: 'Công nghiệp', label: 'Công nghiệp' },
-  { value: 'Xây dựng', label: 'Xây dựng' },
-  { value: 'Dầu khí', label: 'Dầu khí' },
-  { value: 'Điện', label: 'Điện' },
+const fallbackTickerGroups = [
+  { code: 'bank', label: 'Ngan hang', tickers: [] },
+  { code: 'securities', label: 'Chung khoan', tickers: [] },
+  { code: 'insurance', label: 'Bao hiem', tickers: [] },
+  { code: 'corporate', label: 'Doanh nghiep', tickers: [] },
 ]
 
 // Preset strategies
@@ -81,7 +69,7 @@ const presetFilters = [
   },
   {
     id: 'undervalued',
-    name: 'Định giá thấp',
+    name: 'Co phieu gia tri',
     icon: Scale,
     color: 'from-teal-500 to-green-600',
     desc: 'P/E < 10, P/B < 1',
@@ -99,7 +87,7 @@ const presetFilters = [
 
 const initialFilters = {
   search: '',
-  industry: '',
+  ticker_group: '',
   min_pe: '',
   max_pe: '',
   min_pb: '',
@@ -191,9 +179,34 @@ export default function Screener() {
   const [stocks, setStocks] = useState([])
   const [activePreset, setActivePreset] = useState(null)
   const [error, setError] = useState(null)
+  const [dynamicPayload, setDynamicPayload] = useState([])
+  const [dynamicNotice, setDynamicNotice] = useState('')
+  const [tickerGroups, setTickerGroups] = useState([])
+
+  const groupOptions = useMemo(() => {
+    const groups = tickerGroups.length ? tickerGroups : fallbackTickerGroups
+    return [
+      { value: '', label: 'Tat ca ma nganh' },
+      ...groups.map((group) => ({
+        value: group.code,
+        label: group.label,
+      })),
+    ]
+  }, [tickerGroups])
+
+  const tickerToGroupCode = useMemo(() => {
+    const map = {}
+    const groups = tickerGroups.length ? tickerGroups : fallbackTickerGroups
+    groups.forEach((group) => {
+      ;(group.tickers || []).forEach((ticker) => {
+        map[String(ticker).toUpperCase()] = group.code
+      })
+    })
+    return map
+  }, [tickerGroups])
 
   // Fetch stocks with filters
-  const fetchStocks = async (filterParams = {}) => {
+  const fetchStocks = async (filterParams = {}, activeDynamicPayload = []) => {
     setLoading(true)
     setError(null)
     
@@ -206,6 +219,10 @@ export default function Screener() {
           params.append(key, value)
         }
       })
+
+      if (activeDynamicPayload.length > 0) {
+        params.append('dynamic_filters', JSON.stringify(activeDynamicPayload))
+      }
       
       params.append('sort_by', sortConfig.key)
       params.append('sort_order', sortConfig.direction)
@@ -236,27 +253,50 @@ export default function Screener() {
     fetchStocks()
   }, [])
 
+  useEffect(() => {
+    const fetchTickerGroups = async () => {
+      try {
+        const payload = await api.get('/ticker-groups?limit=4')
+        setTickerGroups(Array.isArray(payload) ? payload : [])
+      } catch (groupError) {
+        console.error('Error fetching ticker groups:', groupError)
+        setTickerGroups([])
+      }
+    }
+
+    fetchTickerGroups()
+  }, [])
+
   // Handle filter change
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setActivePreset(null)
   }
 
-  // Apply filters
-  const applyFilters = () => {
+  const buildApiFiltersFromQuickInputs = () => {
     const apiFilters = {}
+
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== '' && key !== 'search') {
+      if (value !== '' && key !== 'search' && key !== 'ticker_group') {
         apiFilters[key] = value
       }
     })
-    fetchStocks(apiFilters)
+
+    return apiFilters
+  }
+
+  // Apply filters
+  const applyFilters = () => {
+    const apiFilters = buildApiFiltersFromQuickInputs()
+    fetchStocks(apiFilters, dynamicPayload)
   }
 
   // Apply preset
   const applyPreset = (preset) => {
     setActivePreset(preset.id)
     setFilters({ ...initialFilters, ...preset.filters })
+    setDynamicPayload([])
+    setDynamicNotice('')
     fetchStocks(preset.filters)
   }
 
@@ -264,6 +304,8 @@ export default function Screener() {
   const resetFilters = () => {
     setFilters(initialFilters)
     setActivePreset(null)
+    setDynamicPayload([])
+    setDynamicNotice('')
     fetchStocks()
   }
 
@@ -277,24 +319,40 @@ export default function Screener() {
 
   // Client-side search filter
   const filteredStocks = useMemo(() => {
-    if (!filters.search) return stocks
-    
-    const search = filters.search.toLowerCase()
-    return stocks.filter(s =>
-      s.ticker?.toLowerCase().includes(search) ||
-      s.name?.toLowerCase().includes(search)
+    const selectedGroupCode = filters.ticker_group
+    const selectedGroup = (tickerGroups.length ? tickerGroups : fallbackTickerGroups).find(
+      (group) => group.code === selectedGroupCode
     )
-  }, [stocks, filters.search])
+
+    const allowedTickers = selectedGroup
+      ? new Set((selectedGroup.tickers || []).map((ticker) => String(ticker).toUpperCase()))
+      : null
+
+    return stocks.filter((stock) => {
+      const ticker = String(stock.ticker || '').toUpperCase()
+
+      if (allowedTickers && !allowedTickers.has(ticker)) {
+        return false
+      }
+
+      if (!filters.search) {
+        return true
+      }
+
+      const search = filters.search.toLowerCase()
+      return stock.ticker?.toLowerCase().includes(search) || stock.name?.toLowerCase().includes(search)
+    })
+  }, [stocks, filters.search, filters.ticker_group, tickerGroups])
 
   // Export to CSV
   const handleExport = () => {
     if (filteredStocks.length === 0) return
     
-    const headers = ['Mã CK', 'Tên công ty', 'Ngành', 'Giá', 'Vốn hóa', 'P/E', 'P/B', 'ROE', 'ROA', 'D/E', 'F-Score']
+    const headers = ['Mã CK', 'Tên công ty', 'Mã ngành', 'Giá', 'Vốn hóa', 'P/E', 'P/B', 'ROE', 'ROA', 'D/E', 'F-Score']
     const rows = filteredStocks.map(s => [
       s.ticker,
       s.name,
-      s.industry,
+      tickerToGroupCode[String(s.ticker || '').toUpperCase()] || 'N/A',
       s.price,
       s.market_cap,
       s.pe_ratio,
@@ -328,6 +386,49 @@ export default function Screener() {
         ? prev.filter(t => t !== ticker)
         : prev.length < 5 ? [...prev, ticker] : prev
     )
+  }
+
+  const pushDynamicPayloadToApi = async (payload, queryParams) => {
+    if (!payload || payload.length === 0) {
+      return
+    }
+
+    try {
+      await api.post('/screener', {
+        dynamic_filters: payload,
+        mapped_filters: queryParams,
+      })
+    } catch (postError) {
+      console.warn('Dynamic payload endpoint chưa xử lý đầy đủ:', postError)
+    }
+  }
+
+  const handleDynamicApply = async ({ payload, queryParams }) => {
+    setActivePreset(null)
+    setDynamicPayload(payload)
+    setDynamicNotice(`Đã tạo payload ${payload.length} điều kiện và gửi API lọc.`)
+
+    const mergedFilters = {
+      ...buildApiFiltersFromQuickInputs(),
+      ...queryParams,
+    }
+
+    await pushDynamicPayloadToApi(payload, queryParams)
+    fetchStocks(mergedFilters, payload)
+  }
+
+  const handleDynamicSave = async ({ payload, queryParams }) => {
+    setDynamicPayload(payload)
+
+    const saveSnapshot = {
+      savedAt: new Date().toISOString(),
+      payload,
+      queryParams,
+    }
+
+    localStorage.setItem('dynamic_screener_snapshot', JSON.stringify(saveSnapshot))
+    await pushDynamicPayloadToApi(payload, queryParams)
+    setDynamicNotice(`Đã lưu ${payload.length} điều kiện lọc động.`)
   }
 
   return (
@@ -392,6 +493,15 @@ export default function Screener() {
         })}
       </div>
 
+      <DynamicScreenerPanel
+        onApplyFilters={handleDynamicApply}
+        onSaveFilters={handleDynamicSave}
+      />
+
+      {dynamicNotice && (
+        <p className="text-xs text-cyan-300">{dynamicNotice}</p>
+      )}
+
       {/* Search & Quick Filters */}
       <Card className="bg-white/5 border-white/10 relative z-20">
         <CardContent className="p-4">
@@ -410,13 +520,13 @@ export default function Screener() {
               </div>
             </div>
 
-            {/* Industry */}
+            {/* Ticker Group */}
             <div className="w-48">
-              <label className="text-sm text-gray-400 mb-1 block">Ngành</label>
+              <label className="text-sm text-gray-400 mb-1 block">Mã ngành</label>
               <Select
-                value={filters.industry}
-                onChange={(e) => handleFilterChange('industry', e.target.value)}
-                options={industries}
+                value={filters.ticker_group}
+                onChange={(e) => handleFilterChange('ticker_group', e.target.value)}
+                options={groupOptions}
                 className="bg-white/5 border-white/20"
               />
             </div>
@@ -480,7 +590,7 @@ export default function Screener() {
                   <h4 className="text-sm font-medium text-gray-300 mb-3">Bộ lọc nâng cao</h4>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {/* Valuation */}
+                    {/* Market ratios */}
                     <div>
                       <label className="text-xs text-gray-500">P/B tối đa</label>
                       <Input
@@ -662,7 +772,7 @@ export default function Screener() {
                       />
                     </th>
                     <th className="p-3 text-gray-400 font-medium">Mã CK</th>
-                    <th className="p-3 text-gray-400 font-medium">Ngành</th>
+                    <th className="p-3 text-gray-400 font-medium">Mã ngành</th>
                     <th className="p-3 text-gray-400 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('price')}>
                       Giá {sortConfig.key === 'price' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
                     </th>
@@ -722,7 +832,7 @@ export default function Screener() {
                       </td>
                       <td className="p-3">
                         <Badge variant="outline" className="text-xs">
-                          {stock.industry || 'N/A'}
+                          {tickerToGroupCode[String(stock.ticker || '').toUpperCase()] || 'N/A'}
                         </Badge>
                       </td>
                       <td className="p-3 text-right font-mono text-white">
@@ -753,18 +863,11 @@ export default function Screener() {
                         <HealthScoreBadge score={stock.f_score} />
                       </td>
                       <td className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Link to={`/company/${stock.ticker}`}>
-                            <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Link to={`/valuation/${stock.ticker}`}>
-                            <Button variant="ghost" size="sm" className="text-gray-400 hover:text-green-400">
-                              <BarChart3 className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                        </div>
+                        <Link to={`/company/${stock.ticker}`}>
+                          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
                       </td>
                     </motion.tr>
                   ))}

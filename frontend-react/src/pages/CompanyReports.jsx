@@ -1,374 +1,212 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft,
-  FileText,
   Calendar,
-  Building2,
+  ChevronRight,
+  Database,
+  Eye,
+  FileText,
+  Layers,
+  Search,
+  Wallet,
   TrendingUp,
   DollarSign,
-  Wallet,
-  Download,
-  Eye,
   X,
-  ChevronRight,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '../components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input } from '../components/ui'
 import { formatCurrency } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 
-// Report type configurations
+const META_KEYS = new Set([
+  'id',
+  'ticker',
+  'company_type',
+  'period_type',
+  'period_year',
+  'period_quarter',
+  'fiscal_year',
+  'quarter',
+  'period_label',
+])
+
 const REPORT_TYPES = [
-  { 
-    id: 'balance_sheet', 
-    name: 'Cân đối kế toán', 
-    icon: Wallet, 
-    color: 'from-blue-500 to-cyan-600',
-    description: 'Tài sản, nợ phải trả và vốn chủ sở hữu'
+  {
+    id: 'balance_sheet',
+    name: 'Can doi ke toan',
+    icon: Wallet,
+    gradient: 'from-blue-500 to-indigo-500',
+    description: 'Hien thi day du tat ca cot CDKT theo tung quy',
   },
-  { 
-    id: 'income_statement', 
-    name: 'Kết quả hoạt động kinh doanh', 
-    icon: TrendingUp, 
-    color: 'from-green-500 to-emerald-600',
-    description: 'Doanh thu, chi phí và lợi nhuận'
+  {
+    id: 'income_statement',
+    name: 'Ket qua kinh doanh',
+    icon: TrendingUp,
+    gradient: 'from-indigo-500 to-purple-500',
+    description: 'Hien thi day du tat ca cot KQKD theo tung quy',
   },
-  { 
-    id: 'cash_flow', 
-    name: 'Lưu chuyển tiền tệ', 
-    icon: DollarSign, 
-    color: 'from-purple-500 to-pink-600',
-    description: 'Dòng tiền từ hoạt động kinh doanh, đầu tư và tài chính'
+  {
+    id: 'cash_flow',
+    name: 'Luu chuyen tien te',
+    icon: DollarSign,
+    gradient: 'from-blue-500 to-purple-600',
+    description: 'Hien thi day du tat ca cot LCTT theo tung quy',
   },
 ]
 
-// Modal hiển thị 3 bảng báo cáo chi tiết
-const ReportDetailModal = ({ isOpen, onClose, reports, type, ticker }) => {
-  if (!isOpen || !reports) return null
+const toArray = (value) => {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.data)) return value.data
+  return []
+}
 
-  const reportConfig = REPORT_TYPES.find(r => r.id === type)
+const formatPeriodLabel = (report) => {
+  const year = report?.period_year ?? report?.fiscal_year
+  const quarter = report?.period_quarter ?? report?.quarter
+
+  if (quarter !== null && quarter !== undefined && `${quarter}` !== '' && Number(quarter) > 0) {
+    return `Q${quarter}/${year ?? '-'}`
+  }
+
+  if (year !== null && year !== undefined && `${year}` !== '') {
+    return `${year}`
+  }
+
+  return report?.period_label || '-'
+}
+
+const humanizeFieldName = (field) =>
+  String(field)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
+const normalizeText = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .trim()
+
+const collectStatementFields = (reports) => {
+  const fields = new Set()
+
+  reports.forEach((record) => {
+    Object.keys(record || {}).forEach((key) => {
+      if (!META_KEYS.has(key)) {
+        fields.add(key)
+      }
+    })
+  })
+
+  return Array.from(fields).sort((a, b) => a.localeCompare(b))
+}
+
+const formatCellValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-'
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return formatCurrency(value, false)
+  }
+
+  const parsed = Number(value)
+  if (!Number.isNaN(parsed) && Number.isFinite(parsed) && `${value}`.trim() !== '') {
+    return formatCurrency(parsed, false)
+  }
+
+  return String(value)
+}
+
+const DynamicStatementTable = ({ reports, fields }) => {
+  if (!reports.length) {
+    return (
+      <div className="rounded-2xl border border-blue-500/20 bg-slate-950/50 p-8 text-center text-blue-100/70">
+        Khong co du lieu cho bao cao nay.
+      </div>
+    )
+  }
+
+  if (!fields.length) {
+    return (
+      <div className="rounded-2xl border border-blue-500/20 bg-slate-950/50 p-8 text-center text-blue-100/70">
+        Da co ky bao cao nhung khong tim thay cot du lieu de hien thi.
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-h-[64vh] overflow-auto rounded-2xl border border-blue-500/25 bg-slate-950/50 shadow-inner shadow-blue-950/30">
+      <table className="w-full min-w-max text-sm">
+        <thead className="sticky top-0 z-30 bg-gradient-to-r from-slate-900 via-blue-950/85 to-purple-950/85">
+          <tr>
+            <th className="sticky left-0 z-40 min-w-[320px] border-r border-blue-500/30 bg-slate-900/95 px-4 py-3 text-left font-semibold uppercase tracking-wide text-blue-200">
+              Chi tieu
+            </th>
+            {reports.map((report, index) => (
+              <th
+                key={`${formatPeriodLabel(report)}-${index}`}
+                className="min-w-[150px] border-l border-white/5 px-4 py-3 text-right font-semibold text-blue-100"
+              >
+                {formatPeriodLabel(report)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {fields.map((field, rowIndex) => (
+            <tr
+              key={field}
+              className={cn(
+                'border-t border-white/5 transition-colors hover:bg-blue-500/[0.05]',
+                rowIndex % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent'
+              )}
+            >
+              <td className="sticky left-0 z-10 border-r border-blue-500/20 bg-slate-950/95 px-4 py-3">
+                <p className="font-semibold text-blue-50">{humanizeFieldName(field)}</p>
+                <p className="text-xs text-blue-300/60">{field}</p>
+              </td>
+              {reports.map((report, index) => (
+                <td
+                  key={`${field}-${index}`}
+                  className="border-l border-white/5 px-4 py-3 text-right font-mono text-blue-50/90"
+                >
+                  {formatCellValue(report?.[field])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const ReportDetailModal = ({ isOpen, onClose, reports, type, ticker }) => {
+  const [fieldQuery, setFieldQuery] = useState('')
+  const reportConfig = REPORT_TYPES.find((item) => item.id === type)
+  const reportRows = toArray(reports)
+  const fields = collectStatementFields(reportRows)
   const Icon = reportConfig?.icon || FileText
 
-  const renderBalanceSheetTable = (data) => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-white/10">
-            <th className="text-left p-3 text-gray-400 font-medium">Kỳ báo cáo</th>
-            {data.slice(0, 5).map((r, i) => (
-              <th key={i} className="text-right p-3 text-white font-medium">
-                {r.fiscal_year || r.quarter}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {/* TÀI SẢN */}
-          <tr className="bg-blue-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-blue-400">TÀI SẢN</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Tổng tài sản</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-white font-bold">
-                {formatCurrency(r.total_assets)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Tài sản ngắn hạn</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.current_assets)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-10">+ Tiền và tương đương</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.cash)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Tài sản dài hạn</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.long_term_assets)}
-              </td>
-            ))}
-          </tr>
+  useEffect(() => {
+    if (isOpen) {
+      setFieldQuery('')
+    }
+  }, [isOpen, type, ticker])
 
-          {/* NỢ PHẢI TRẢ */}
-          <tr className="bg-red-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-red-400">NỢ PHẢI TRẢ</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Tổng nợ phải trả</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-white font-bold">
-                {formatCurrency(r.total_liabilities)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Nợ ngắn hạn</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.current_liabilities)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Nợ dài hạn</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.long_term_liabilities)}
-              </td>
-            ))}
-          </tr>
+  const filteredFields = useMemo(() => {
+    const keyword = normalizeText(fieldQuery)
+    if (!keyword) return fields
 
-          {/* VỐN CHỦ SỞ HỮU */}
-          <tr className="bg-green-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-green-400">VỐN CHỦ SỞ HỮU</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Tổng vốn chủ sở hữu</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-white font-bold">
-                {formatCurrency(r.shareholders_equity || r.total_equity)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Vốn điều lệ</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.charter_capital)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Lợi nhuận chưa phân phối</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-gray-300">
-                {formatCurrency(r.retained_earnings)}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
+    return fields.filter((field) => {
+      const fieldName = normalizeText(field)
+      const fieldLabel = normalizeText(humanizeFieldName(field))
+      return fieldName.includes(keyword) || fieldLabel.includes(keyword)
+    })
+  }, [fields, fieldQuery])
 
-  const renderIncomeStatementTable = (data) => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-white/10">
-            <th className="text-left p-3 text-gray-400 font-medium">Kỳ báo cáo</th>
-            {data.slice(0, 5).map((r, i) => (
-              <th key={i} className="text-right p-3 text-white font-medium">
-                {r.fiscal_year || r.quarter}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {/* DOANH THU */}
-          <tr className="bg-cyan-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-cyan-400">DOANH THU</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Doanh thu thuần</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-white font-bold">
-                {formatCurrency(r.revenue || r.net_revenue)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Giá vốn hàng bán</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.cost_of_revenue)})
-              </td>
-            ))}
-          </tr>
-
-          {/* LỢI NHUẬN */}
-          <tr className="bg-green-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-green-400">LỢI NHUẬN</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lợi nhuận gộp</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-green-400 font-bold">
-                {formatCurrency(r.gross_profit)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Chi phí bán hàng</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.selling_expenses)})
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Chi phí quản lý</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.admin_expenses)})
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lợi nhuận hoạt động</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-green-400 font-bold">
-                {formatCurrency(r.operating_income)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">+ Thu nhập tài chính</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-green-300">
-                {formatCurrency(r.financial_income)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Chi phí tài chính</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.financial_expenses)})
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lợi nhuận trước thuế</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-green-400 font-bold">
-                {formatCurrency(r.profit_before_tax)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Thuế TNDN</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.income_tax)})
-              </td>
-            ))}
-          </tr>
-          <tr className="border-t-2 border-green-500/30 bg-green-500/10">
-            <td className="p-3 text-white font-bold">LỢI NHUẬN SAU THUẾ</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-green-400 font-bold text-lg">
-                {formatCurrency(r.net_income || r.profit)}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
-
-  const renderCashFlowTable = (data) => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-white/10">
-            <th className="text-left p-3 text-gray-400 font-medium">Kỳ báo cáo</th>
-            {data.slice(0, 5).map((r, i) => (
-              <th key={i} className="text-right p-3 text-white font-medium">
-                {r.fiscal_year || r.quarter}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {/* HOẠT ĐỘNG KINH DOANH */}
-          <tr className="bg-cyan-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-cyan-400">HOẠT ĐỘNG KINH DOANH</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lưu chuyển tiền từ HĐKD</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className={cn(
-                "p-3 text-right font-mono font-bold",
-                (r.operating_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-              )}>
-                {formatCurrency(r.operating_cash_flow)}
-              </td>
-            ))}
-          </tr>
-
-          {/* HOẠT ĐỘNG ĐẦU TƯ */}
-          <tr className="bg-blue-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-blue-400">HOẠT ĐỘNG ĐẦU TƯ</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lưu chuyển tiền từ đầu tư</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className={cn(
-                "p-3 text-right font-mono font-bold",
-                (r.investing_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-              )}>
-                {formatCurrency(r.investing_cash_flow)}
-              </td>
-            ))}
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-400 pl-6">- Mua sắm TSCĐ</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className="p-3 text-right font-mono text-red-300">
-                ({formatCurrency(r.capex)})
-              </td>
-            ))}
-          </tr>
-
-          {/* HOẠT ĐỘNG TÀI CHÍNH */}
-          <tr className="bg-purple-500/10">
-            <td colSpan={6} className="p-2 font-semibold text-purple-400">HOẠT ĐỘNG TÀI CHÍNH</td>
-          </tr>
-          <tr className="border-b border-white/5 hover:bg-white/5">
-            <td className="p-3 text-gray-300 font-medium">Lưu chuyển tiền từ tài chính</td>
-            {data.slice(0, 5).map((r, i) => (
-              <td key={i} className={cn(
-                "p-3 text-right font-mono font-bold",
-                (r.financing_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-              )}>
-                {formatCurrency(r.financing_cash_flow)}
-              </td>
-            ))}
-          </tr>
-
-          {/* TỔNG HỢP */}
-          <tr className="border-t-2 border-white/20 bg-white/5">
-            <td className="p-3 text-white font-bold">Tăng/Giảm tiền thuần</td>
-            {data.slice(0, 5).map((r, i) => {
-              const net = (r.operating_cash_flow || 0) + (r.investing_cash_flow || 0) + (r.financing_cash_flow || 0)
-              return (
-                <td key={i} className={cn(
-                  "p-3 text-right font-mono font-bold text-lg",
-                  net > 0 ? "text-green-400" : "text-red-400"
-                )}>
-                  {formatCurrency(net)}
-                </td>
-              )
-            })}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
+  if (!isOpen) return null
 
   return (
     <AnimatePresence>
@@ -376,53 +214,76 @@ const ReportDetailModal = ({ isOpen, onClose, reports, type, ticker }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
         onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
       >
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-gray-900 border border-white/10 rounded-xl max-w-7xl w-full max-h-[90vh] overflow-hidden"
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 8 }}
+          transition={{ duration: 0.2 }}
+          onClick={(event) => event.stopPropagation()}
+          className="relative flex max-h-[92vh] w-full max-w-[98vw] flex-col overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-950"
         >
-          {/* Header */}
-          <div className={cn(
-            "border-b border-white/10 p-6 flex items-center justify-between",
-            `bg-gradient-to-r ${reportConfig?.color}/10`
-          )}>
-            <div className="flex items-center gap-3">
-              <div className={cn("p-3 rounded-lg bg-gradient-to-br", reportConfig?.color)}>
-                <Icon className="w-6 h-6 text-white" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-35"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+            }}
+          />
+
+          <div className="relative flex items-start justify-between border-b border-blue-500/20 bg-gradient-to-r from-slate-950 via-blue-950/35 to-purple-950/40 px-6 py-5">
+            <div className="flex items-center gap-4">
+              <div className={cn('rounded-xl bg-gradient-to-br p-3 shadow-lg shadow-blue-500/20', reportConfig?.gradient)}>
+                <Icon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white">{reportConfig?.name}</h3>
-                <p className="text-sm text-gray-400">{ticker} - So sánh theo năm</p>
+                <h3 className="text-xl font-bold text-blue-50">{reportConfig?.name || 'Bao cao chi tiet'}</h3>
+                <p className="mt-1 text-sm text-blue-200/70">{ticker} • Bang day du cot du lieu theo tung ky bao cao</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="rounded-lg border border-blue-500/20 p-2 text-blue-200 transition-colors hover:bg-blue-500/15"
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-            {type === 'balance_sheet' && renderBalanceSheetTable(reports)}
-            {type === 'income_statement' && renderIncomeStatementTable(reports)}
-            {type === 'cash_flow' && renderCashFlowTable(reports)}
+          <div className="relative flex flex-wrap items-center gap-2 border-b border-blue-500/15 bg-slate-950/80 px-6 py-3">
+            <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">{reportRows.length} ky bao cao</Badge>
+            <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{fields.length} cot tong</Badge>
+            <Badge className="border-indigo-500/30 bg-indigo-500/10 text-indigo-200">{filteredFields.length} cot dang hien thi</Badge>
+
+            <div className="ml-auto w-full max-w-sm">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-200/50" />
+                <Input
+                  value={fieldQuery}
+                  onChange={(event) => setFieldQuery(event.target.value)}
+                  placeholder="Tim nhanh chi tieu theo ten cot..."
+                  className="border-blue-500/25 bg-slate-900/70 pl-9 text-blue-50 placeholder:text-blue-200/45"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-white/10 p-4 flex justify-end gap-3 bg-white/5">
-            <Button variant="outline" onClick={onClose}>
-              Đóng
-            </Button>
-            <Button className="bg-cyan-600 hover:bg-cyan-700">
-              <Download className="w-4 h-4 mr-2" />
-              Xuất Excel
+          <div className="relative overflow-y-auto p-6">
+            <DynamicStatementTable reports={reportRows} fields={filteredFields} />
+          </div>
+
+          <div className="relative flex items-center justify-between border-t border-blue-500/20 bg-slate-900/70 px-6 py-4">
+            <p className="text-xs text-blue-200/65">
+              Sticky header va sticky cot chi tieu da duoc bat cho bang rong va dai.
+            </p>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="border-blue-500/35 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20"
+            >
+              Dong
             </Button>
           </div>
         </motion.div>
@@ -434,7 +295,11 @@ const ReportDetailModal = ({ isOpen, onClose, reports, type, ticker }) => {
 export default function CompanyReports() {
   const { ticker } = useParams()
   const [company, setCompany] = useState(null)
-  const [reports, setReports] = useState({})
+  const [reports, setReports] = useState({
+    balance_sheet: [],
+    income_statement: [],
+    cash_flow: [],
+  })
   const [loading, setLoading] = useState(true)
   const [selectedReportType, setSelectedReportType] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -450,26 +315,48 @@ export default function CompanyReports() {
     try {
       const [companyRes, balanceSheets, incomeStatements, cashFlows] = await Promise.all([
         api.get(`/companies/${ticker}`).catch(() => null),
-        api.get(`/companies/${ticker}/balance-sheets`).catch(() => ({ data: [] })),
-        api.get(`/companies/${ticker}/income-statements`).catch(() => ({ data: [] })),
-        api.get(`/companies/${ticker}/cash-flows`).catch(() => ({ data: [] })),
+        api.get(`/companies/${ticker}/balance-sheets`).catch(() => []),
+        api.get(`/companies/${ticker}/income-statements`).catch(() => []),
+        api.get(`/companies/${ticker}/cash-flows`).catch(() => []),
       ])
 
-      if (companyRes) {
-        setCompany(companyRes.data || companyRes)
+      const companyPayload = companyRes?.data || companyRes || null
+      if (companyPayload) {
+        setCompany(companyPayload)
       }
 
       setReports({
-        balance_sheet: balanceSheets.data || [],
-        income_statement: incomeStatements.data || [],
-        cash_flow: cashFlows.data || [],
+        balance_sheet: toArray(balanceSheets),
+        income_statement: toArray(incomeStatements),
+        cash_flow: toArray(cashFlows),
       })
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('Error fetching company reports:', error)
+      setReports({
+        balance_sheet: [],
+        income_statement: [],
+        cash_flow: [],
+      })
     } finally {
       setLoading(false)
     }
   }
+
+  const reportStats = useMemo(
+    () =>
+      REPORT_TYPES.map((reportType) => {
+        const rows = reports[reportType.id] || []
+        const fields = collectStatementFields(rows)
+
+        return {
+          ...reportType,
+          rowCount: rows.length,
+          fieldCount: fields.length,
+          latestPeriod: rows[0] ? formatPeriodLabel(rows[0]) : '-',
+        }
+      }),
+    [reports]
+  )
 
   const handleViewReport = (reportType) => {
     setSelectedReportType(reportType)
@@ -478,10 +365,10 @@ export default function CompanyReports() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="flex min-h-[55vh] items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Đang tải dữ liệu...</p>
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-500/25 border-t-purple-500" />
+          <p className="text-blue-200/70">Dang tai du lieu bao cao...</p>
         </div>
       </div>
     )
@@ -489,95 +376,110 @@ export default function CompanyReports() {
 
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <Link 
-        to="/" 
-        className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Quay lại Dashboard
-      </Link>
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 bg-slate-950 p-5">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
+            backgroundSize: '30px 30px',
+          }}
+        />
+        <div className="pointer-events-none absolute -left-14 -top-14 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-purple-500/25 blur-3xl" />
 
-      {/* Company Header */}
-      <Card className="bg-white/5 border-white/10">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">{ticker?.slice(0, 2)}</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <FileText className="w-7 h-7 text-cyan-400" />
-                {ticker}
-              </h1>
-              <p className="text-gray-400">{company?.company_name || company?.name || 'Đang tải...'}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <Link
+          to="/"
+          className="relative inline-flex items-center gap-2 rounded-lg border border-blue-500/25 bg-slate-900/70 px-3 py-2 text-sm text-blue-100 transition-colors hover:bg-blue-500/10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Quay lai Dashboard
+        </Link>
 
-      {/* Report Types Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {REPORT_TYPES.map((reportType) => {
-          const Icon = reportType.icon
-          const reportData = reports[reportType.id] || []
-          const latestReport = reportData[0]
+        <Card className="relative mt-4 border-blue-500/20 bg-slate-900/60 p-0">
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-2xl font-bold text-white shadow-lg shadow-blue-500/30">
+                {ticker?.slice(0, 2)}
+              </div>
+              <div>
+                <h1 className="flex items-center gap-3 text-2xl font-bold text-blue-50">
+                  <FileText className="h-7 w-7 text-blue-300" />
+                  {ticker}
+                </h1>
+                <p className="mt-1 text-blue-200/70">{company?.company_name || company?.name || 'Dang tai ten cong ty...'}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {reportStats.map((report) => {
+          const Icon = report.icon
 
           return (
-            <Card key={reportType.id} className="bg-white/5 border-white/10 overflow-hidden group hover:border-cyan-500/50 transition-all">
-              <div className={cn("h-2 bg-gradient-to-r", reportType.color)} />
-              
-              <CardHeader className="pb-3">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <div className={cn("p-3 rounded-lg bg-gradient-to-br", reportType.color)}>
-                    <Icon className="w-5 h-5 text-white" />
+            <Card
+              key={report.id}
+              className="overflow-hidden border-blue-500/20 bg-gradient-to-br from-slate-950/90 via-blue-950/20 to-purple-950/20"
+            >
+              <div className={cn('h-1.5 bg-gradient-to-r', report.gradient)} />
+
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-start gap-3 text-blue-50">
+                  <div className={cn('rounded-lg bg-gradient-to-br p-2.5', report.gradient)}>
+                    <Icon className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold">{reportType.name}</h3>
-                    <p className="text-xs text-gray-500 font-normal">{reportType.description}</p>
+                    <p className="text-lg font-bold leading-6">{report.name}</p>
+                    <p className="mt-1 text-xs font-normal text-blue-200/70">{report.description}</p>
                   </div>
                 </CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-3">
-                {reportData.length > 0 ? (
+                {report.rowCount > 0 ? (
                   <>
-                    {/* Latest Report Info */}
-                    <div className="p-3 bg-white/5 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Báo cáo mới nhất:</p>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-cyan-400" />
-                        <span className="font-medium text-white">
-                          {latestReport?.fiscal_year || latestReport?.quarter}
-                        </span>
+                    <div className="rounded-xl border border-blue-500/15 bg-slate-900/60 p-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-200/70">Ky moi nhat</span>
+                        <span className="font-semibold text-blue-50">{report.latestPeriod}</span>
                       </div>
                     </div>
 
-                    {/* Available Reports Count */}
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">Số báo cáo:</span>
-                      <Badge className="bg-cyan-500/20 text-cyan-400">
-                        {reportData.length} kỳ
-                      </Badge>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-blue-500/15 bg-blue-500/10 p-2.5">
+                        <div className="flex items-center gap-2 text-xs text-blue-200/70">
+                          <Calendar className="h-3.5 w-3.5" />
+                          So ky
+                        </div>
+                        <p className="mt-1 text-lg font-bold text-blue-50">{report.rowCount}</p>
+                      </div>
+                      <div className="rounded-lg border border-purple-500/20 bg-purple-500/10 p-2.5">
+                        <div className="flex items-center gap-2 text-xs text-purple-200/80">
+                          <Database className="h-3.5 w-3.5" />
+                          So cot DB
+                        </div>
+                        <p className="mt-1 text-lg font-bold text-purple-100">{report.fieldCount}</p>
+                      </div>
                     </div>
 
-                    {/* View Button */}
                     <Button
-                      onClick={() => handleViewReport(reportType.id)}
+                      onClick={() => handleViewReport(report.id)}
                       className={cn(
-                        "w-full bg-gradient-to-r group-hover:shadow-lg transition-all",
-                        reportType.color
+                        'w-full bg-gradient-to-r text-white shadow-lg transition-all hover:brightness-110',
+                        report.gradient
                       )}
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Xem chi tiết
-                      <ChevronRight className="w-4 h-4 ml-auto group-hover:translate-x-1 transition-transform" />
+                      <Eye className="mr-2 h-4 w-4" />
+                      Xem toan bo cot
+                      <ChevronRight className="ml-auto h-4 w-4" />
                     </Button>
                   </>
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-500 text-sm">Chưa có dữ liệu</p>
+                  <div className="rounded-xl border border-blue-500/15 bg-slate-900/55 p-6 text-center">
+                    <Layers className="mx-auto mb-2 h-9 w-9 text-blue-300/50" />
+                    <p className="text-sm text-blue-200/60">Chua co du lieu statement nay</p>
                   </div>
                 )}
               </CardContent>
@@ -586,7 +488,6 @@ export default function CompanyReports() {
         })}
       </div>
 
-      {/* Report Detail Modal */}
       <ReportDetailModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

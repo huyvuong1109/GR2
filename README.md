@@ -16,6 +16,7 @@
 - **6 chiến lược preset**: Value, Growth, Dividend, Quality, Turnaround, GARP
 - **Bộ lọc tùy chỉnh**: P/E, P/B, ROE, ROA, D/E, Dividend Yield
 - **Piotroski F-Score** (0-9): Đánh giá sức khỏe tài chính
+- Lọc theo 4 nhóm mã: Bank, Securities, Insurance, Corporate (nguồn `ticker_type.json`)
 - Xuất kết quả ra Excel/CSV
 - Chọn nhiều cổ phiếu để so sánh
 
@@ -23,7 +24,7 @@
 - **Health Score** (0-100): Tổng hợp 8 chỉ số tài chính
 - **F-Score** (0-9): Đánh giá theo phương pháp Piotroski
 - Biểu đồ doanh thu, lợi nhuận 5 năm
-- 4 tab chi tiết: Overview, Health, Financials, Ratios
+- Hiển thị thông tin nền tảng: tên công ty, vốn hóa, khối lượng cổ phiếu lưu hành
 - Cảnh báo rủi ro tự động (ROE thấp, nợ cao, lỗ ròng)
 
 ### 📋 Financial Reports (Báo cáo tài chính)
@@ -39,10 +40,6 @@
 - **Bar Chart**: So sánh doanh thu, lợi nhuận, tổng tài sản
 - Bảng tổng hợp với highlight công ty tốt nhất
 - Tìm kiếm công ty nhanh
-
-### 💰 Valuation (Định giá)
-- **Graham Formula**: Tính giá trị nội tại
-- **DCF Model**: Định giá dòng tiền chiết khấu
 
 ---
 
@@ -67,9 +64,6 @@ source venv/bin/activate
 
 # Cài đặt dependencies
 pip install -r requirements.txt
-
-# Tạo database mẫu (nếu chưa có)
-python Database/seed_data.py
 ```
 
 ### Bước 2: Cài đặt Frontend
@@ -125,11 +119,10 @@ FinancialApp/
 │   │   ├── pages/             # Trang chính
 │   │   │   ├── Dashboard.jsx           # Tổng quan
 │   │   │   ├── ScreenerNew.jsx         # Sàng lọc CP
-│   │   │   ├── CompanyAnalysisNew.jsx  # Phân tích công ty
+│   │   │   ├── CompanyAnalysisSimple.jsx  # Phân tích công ty
 │   │   │   ├── Comparison.jsx          # So sánh
 │   │   │   ├── FinancialReports.jsx    # Danh sách BC
 │   │   │   ├── CompanyReports.jsx      # BC từng công ty
-│   │   │   └── Valuation.jsx           # Định giá
 │   │   ├── components/        # UI components
 │   │   │   ├── Layout.jsx
 │   │   │   ├── charts/        # Recharts components
@@ -143,9 +136,8 @@ FinancialApp/
 │
 ├── Database/
 │   ├── models.py              # SQLAlchemy models
-│   ├── seed_data.py           # Script tạo dữ liệu mẫu
 │   └── master_db/
-│       └── master.db          # SQLite database
+│       └── analytics(final).db # SQLite database chính
 │
 ├── update_stock_prices.py     # Script cập nhật giá
 ├── requirements.txt           # Python dependencies
@@ -179,14 +171,8 @@ GET  /api/companies/{ticker}/cash-flows        # BCLCTT chi tiết
 POST /api/screener/advanced                    # Sàng lọc nâng cao
 GET  /api/screening/presets                    # Các preset có sẵn
 GET  /api/analysis/{ticker}/health-score       # Health Score + F-Score
+GET  /api/ticker-groups                        # Nhóm mã từ ticker_type.json
 POST /api/compare                              # So sánh cổ phiếu
-```
-
-### Valuation (Định giá)
-```
-POST /api/valuation/graham                     # Graham Formula
-POST /api/valuation/dcf                        # DCF Model
-GET  /api/valuation/{ticker}/comparables       # So sánh tương đối
 ```
 
 ### Market (Thị trường)
@@ -214,10 +200,7 @@ Database sử dụng **SQLite** với các bảng chính:
 - `cash_flows`: Báo cáo lưu chuyển tiền tệ
 - `financial_ratios`: Các chỉ số tài chính
 
-**Sample data** (15+ công ty, 11 năm dữ liệu 2015-2025):
-```bash
-python Database/seed_data.py
-```
+Database chính đang sử dụng: `Database/master_db/analytics(final).db`.
 
 ---
 
@@ -225,7 +208,7 @@ python Database/seed_data.py
 
 ### Backend (`.env` - tùy chọn)
 ```env
-DATABASE_URL=sqlite:///./Database/master_db/master.db
+DATABASE_URL=sqlite:///./Database/master_db/analytics(final).db
 API_HOST=0.0.0.0
 API_PORT=8000
 ```
@@ -237,13 +220,27 @@ VITE_API_URL=http://localhost:8000
 
 ---
 
-## 🔄 Cập nhật giá cổ phiếu
+## 🔄 Cập nhật dữ liệu công ty
 
 ```bash
+# Cập nhật giá thị trường
 python update_stock_prices.py
+
+# Cập nhật thông tin companies từ API chứng khoán
+python update_companies_from_api.py
+
+# Test nhanh 10 mã đầu tiên
+python update_companies_from_api.py --limit 10
+
+# Chạy định kỳ mỗi 60 phút
+python update_companies_from_api.py --interval-minutes 60
 ```
 
-Script này sẽ cập nhật giá mới nhất từ nguồn dữ liệu (cần cấu hình API key nếu dùng dịch vụ trả phí).
+Script `update_companies_from_api.py` sẽ đồng bộ các trường trong bảng `companies` gồm:
+- `name`, `industry`
+- `company_type` (map theo `ticker_type.json`)
+- `current_price`, `market_cap`, `shares_outstanding`
+- `profile_updated_at`
 
 ---
 
@@ -282,10 +279,14 @@ cd frontend-react
 npm install
 ```
 
-### Database không có dữ liệu
+### Database không truy cập được
 
 ```bash
-python Database/seed_data.py
+# Windows
+dir Database\master_db\analytics(final).db
+
+# macOS/Linux
+ls "Database/master_db/analytics(final).db"
 ```
 
 ### CORS Error
@@ -390,7 +391,6 @@ Start Command: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ### v1.0
 - ✅ Stock Screener với 6 preset strategies
 - ✅ Company Analysis cơ bản
-- ✅ Valuation tools (Graham, DCF)
 
 ---
 

@@ -13,9 +13,10 @@ import asyncio
 import subprocess
 import sys
 import os
+import json
 
 from backend.database import get_db
-from backend.config import APP_NAME, APP_VERSION, APP_DESCRIPTION, API_HOST, API_PORT
+from backend.config import APP_NAME, APP_VERSION, APP_DESCRIPTION, API_HOST, API_PORT, DATABASE_URL
 
 # Global variable to track background task
 price_update_task = None
@@ -25,6 +26,71 @@ def get_project_root():
     """Lấy đường dẫn thư mục gốc của project"""
     # __file__ = backend/main.py -> cần lên 1 cấp
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def load_ticker_groups(limit: int = 4) -> List[Dict[str, Any]]:
+    """Đọc ticker_type.json và trả về 4 nhóm: bank, securities, insurance, corporate."""
+    groups_path = os.path.join(get_project_root(), "ticker_type.json")
+    if not os.path.exists(groups_path):
+        return []
+
+    with open(groups_path, "r", encoding="utf-8") as file:
+        payload = json.load(file)
+
+    ordered_types = [
+        ("bank", "Ngan hang"),
+        ("securities", "Chung khoan"),
+        ("insurance", "Bao hiem"),
+    ]
+
+    grouped: List[Dict[str, Any]] = []
+    known_tickers = set()
+
+    for code, label in ordered_types:
+        raw_tickers = payload.get(code, [])
+        if not isinstance(raw_tickers, list):
+            raw_tickers = []
+
+        tickers = sorted({str(t).strip().upper() for t in raw_tickers if str(t).strip()})
+        known_tickers.update(tickers)
+
+        grouped.append(
+            {
+                "code": code,
+                "label": label,
+                "tickers": tickers,
+                "count": len(tickers),
+            }
+        )
+
+    corporate_tickers = sorted({str(t).strip().upper() for t in payload.get("corporate", []) if str(t).strip()})
+
+    if not corporate_tickers:
+        try:
+            companies_df = db.get_all_companies()
+            if not companies_df.empty and "ticker" in companies_df.columns:
+                all_db_tickers = {
+                    str(t).strip().upper()
+                    for t in companies_df["ticker"].dropna().tolist()
+                    if str(t).strip()
+                }
+                corporate_tickers = sorted(all_db_tickers - known_tickers)
+        except Exception:
+            corporate_tickers = []
+
+    grouped.append(
+        {
+            "code": "corporate",
+            "label": "Doanh nghiep",
+            "tickers": corporate_tickers,
+            "count": len(corporate_tickers),
+        }
+    )
+
+    if limit > 0:
+        return grouped[:limit]
+
+    return grouped
 
 def run_price_update_sync():
     """Chạy script cập nhật giá cổ phiếu (đồng bộ)"""
@@ -183,14 +249,6 @@ class NotificationResponse(BaseModel):
     industry: Optional[str] = None
 
 
-class ValuationInput(BaseModel):
-    eps: float
-    growth_rate: float  # %
-    discount_rate: float = 10.0  # %
-    terminal_growth: float = 3.0  # %
-    years: int = 10
-
-
 class CompareRequest(BaseModel):
     tickers: List[str]
 
@@ -306,6 +364,15 @@ async def get_company(ticker: str):
     return company
 
 
+@app.get("/api/ticker-groups")
+async def get_ticker_groups(limit: int = Query(4, ge=1, le=50)):
+    """Lấy danh sách nhóm ticker từ ticker_type.json để hiển thị mã ngành."""
+    groups = load_ticker_groups(limit)
+    if not groups:
+        raise HTTPException(status_code=404, detail="Khong tim thay du lieu ticker_type.json")
+    return groups
+
+
 @app.get("/api/companies/{ticker}/financials")
 async def get_company_financials(ticker: str):
     """Lấy dữ liệu tài chính chi tiết của công ty"""
@@ -392,81 +459,6 @@ async def screen_stocks_get(
     
     df = db.screen_stocks(filters)
     return df.fillna(0).to_dict(orient='records')
-
-
-@app.get("/api/valuation/{ticker}")
-async def get_valuation_inputs(ticker: str):
-    """Lấy dữ liệu đầu vào cho trang định giá"""
-    data = db.get_valuation_inputs(ticker.upper())
-    if not data:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu cho mã {ticker}")
-    return data
-
-
-@app.post("/api/valuation/graham")
-async def calculate_graham_value(
-    eps: float = Query(..., description="EPS hiện tại"),
-    growth_rate: float = Query(..., description="Tỷ lệ tăng trưởng dự kiến (%)")
-):
-    """
-    Tính giá trị nội tại theo công thức Benjamin Graham
-    V = EPS × (8.5 + 2g)
-    Trong đó: g = growth rate (%)
-    """
-    intrinsic_value = eps * (8.5 + 2 * growth_rate)
-    return {
-        "method": "Benjamin Graham Formula",
-        "formula": "V = EPS × (8.5 + 2g)",
-        "eps": eps,
-        "growth_rate": growth_rate,
-        "intrinsic_value": round(intrinsic_value, 2)
-    }
-
-
-@app.post("/api/valuation/dcf")
-async def calculate_dcf(input_data: ValuationInput):
-    """
-    Tính giá trị nội tại theo phương pháp DCF đơn giản
-    """
-    eps = input_data.eps
-    g = input_data.growth_rate / 100
-    r = input_data.discount_rate / 100
-    terminal_g = input_data.terminal_growth / 100
-    years = input_data.years
-    
-    # Dự phóng EPS
-    projected_eps = []
-    current_eps = eps
-    for i in range(years):
-        current_eps = current_eps * (1 + g)
-        projected_eps.append(current_eps)
-    
-    # Chiết khấu dòng tiền
-    pv_cash_flows = sum([
-        projected_eps[i] / ((1 + r) ** (i + 1))
-        for i in range(years)
-    ])
-    
-    # Terminal Value
-    terminal_value = projected_eps[-1] * (1 + terminal_g) / (r - terminal_g)
-    pv_terminal = terminal_value / ((1 + r) ** years)
-    
-    intrinsic_value = pv_cash_flows + pv_terminal
-    
-    return {
-        "method": "Discounted Cash Flow (DCF)",
-        "inputs": {
-            "eps": eps,
-            "growth_rate": input_data.growth_rate,
-            "discount_rate": input_data.discount_rate,
-            "terminal_growth": input_data.terminal_growth,
-            "projection_years": years
-        },
-        "pv_cash_flows": round(pv_cash_flows, 2),
-        "terminal_value": round(terminal_value, 2),
-        "pv_terminal_value": round(pv_terminal, 2),
-        "intrinsic_value": round(intrinsic_value, 2)
-    }
 
 
 @app.get("/api/industries")
@@ -682,27 +674,6 @@ async def get_preset_filters():
     ]
 
 
-@app.get("/api/valuation/{ticker}/comparables")
-async def get_comparable_companies(ticker: str):
-    """Lấy các công ty cùng ngành để so sánh"""
-    companies_df = db.get_all_companies()
-    
-    # Get company industry
-    company = companies_df[companies_df['ticker'] == ticker.upper()]
-    if company.empty:
-        raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
-    
-    industry = company.iloc[0]['industry']
-    
-    # Get other companies in same industry
-    comparables = companies_df[
-        (companies_df['industry'] == industry) & 
-        (companies_df['ticker'] != ticker.upper())
-    ]
-    
-    return comparables.fillna(0).to_dict(orient='records')
-
-
 @app.get("/api/notifications")
 async def get_notifications(unread_only: bool = False, limit: int = 20):
     """Lấy danh sách thông báo"""
@@ -721,7 +692,7 @@ async def get_notifications(unread_only: bool = False, limit: int = 20):
         },
         {
             "id": 2,
-            "title": "Cảnh báo định giá",
+            "title": "Canh bao thi truong",
             "message": "FPT đang giao dịch trên giá trị nội tại 20%",
             "type": "warning",
             "timestamp": (datetime.now() - timedelta(hours=5)).isoformat(),
@@ -800,7 +771,7 @@ async def get_financial_ratios(ticker: str, year: Optional[int] = None):
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -865,7 +836,7 @@ async def get_f_score(ticker: str):
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -877,15 +848,15 @@ async def get_f_score(ticker: str):
         # Get latest and previous year data
         balance_sheets = session.query(BalanceSheet).filter(
             BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc()).limit(2).all()
+        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
         
         income_statements = session.query(IncomeStatement).filter(
             IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc()).limit(2).all()
+        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
         
         cash_flows = session.query(CashFlow).filter(
             CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc()).limit(1).all()
+        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(1).all()
         
         balance = balance_sheets[0] if balance_sheets else None
         prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
@@ -911,7 +882,7 @@ async def get_f_score(ticker: str):
 async def get_health_score(ticker: str):
     """
     Tính Health Score tổng hợp (0-100)
-    Bao gồm F-Score, định giá, tăng trưởng và warnings
+    Bao gồm F-Score, chi so thi truong, tang truong va warnings
     """
     from backend.financial_analysis import (
         calculate_financial_ratios, calculate_piotroski_f_score,
@@ -921,7 +892,7 @@ async def get_health_score(ticker: str):
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -933,15 +904,15 @@ async def get_health_score(ticker: str):
         # Get financial data
         balance_sheets = session.query(BalanceSheet).filter(
             BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc()).limit(2).all()
+        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
         
         income_statements = session.query(IncomeStatement).filter(
             IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc()).limit(4).all()
+        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(4).all()
         
         cash_flows = session.query(CashFlow).filter(
             CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc()).limit(4).all()
+        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(4).all()
         
         balance = balance_sheets[0] if balance_sheets else None
         prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
@@ -1000,7 +971,7 @@ async def get_risk_warnings(ticker: str):
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -1012,15 +983,15 @@ async def get_risk_warnings(ticker: str):
         # Get data
         balance = session.query(BalanceSheet).filter(
             BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc()).first()
+        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).first()
         
         income_statements = session.query(IncomeStatement).filter(
             IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc()).limit(4).all()
+        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(4).all()
         
         cash_flows = session.query(CashFlow).filter(
             CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc()).limit(4).all()
+        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(4).all()
         
         income = income_statements[0] if income_statements else None
         prev_income = income_statements[1] if len(income_statements) > 1 else None
@@ -1063,7 +1034,7 @@ async def compare_companies(request: CompareRequest):
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -1077,15 +1048,15 @@ async def compare_companies(request: CompareRequest):
             
             balance = session.query(BalanceSheet).filter(
                 BalanceSheet.company_id == company.id
-            ).order_by(BalanceSheet.period_year.desc()).first()
+            ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).first()
             
             income_list = session.query(IncomeStatement).filter(
                 IncomeStatement.company_id == company.id
-            ).order_by(IncomeStatement.period_year.desc()).limit(2).all()
+            ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
             
             cash_flow = session.query(CashFlow).filter(
                 CashFlow.company_id == company.id
-            ).order_by(CashFlow.period_year.desc()).first()
+            ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).first()
             
             income = income_list[0] if income_list else None
             prev_income = income_list[1] if len(income_list) > 1 else None
@@ -1162,7 +1133,7 @@ async def export_company_data(ticker: str, format: str = "json"):
     import csv
     import io
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -1174,15 +1145,15 @@ async def export_company_data(ticker: str, format: str = "json"):
         # Get all financial data
         balance_sheets = session.query(BalanceSheet).filter(
             BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc()).all()
+        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).all()
         
         income_statements = session.query(IncomeStatement).filter(
             IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc()).all()
+        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).all()
         
         cash_flows = session.query(CashFlow).filter(
             CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc()).all()
+        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).all()
         
         if format.lower() == "csv":
             # Create CSV
@@ -1270,7 +1241,7 @@ async def export_company_data(ticker: str, format: str = "json"):
 
 @app.get("/api/screener/advanced")
 async def advanced_screener(
-    # Valuation filters
+    # Market ratio filters
     min_pe: Optional[float] = None,
     max_pe: Optional[float] = None,
     min_pb: Optional[float] = None,
@@ -1310,7 +1281,7 @@ async def advanced_screener(
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
+    engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -1327,15 +1298,15 @@ async def advanced_screener(
             # Get financial data
             balance = session.query(BalanceSheet).filter(
                 BalanceSheet.company_id == company.id
-            ).order_by(BalanceSheet.period_year.desc()).first()
+            ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).first()
             
             income_list = session.query(IncomeStatement).filter(
                 IncomeStatement.company_id == company.id
-            ).order_by(IncomeStatement.period_year.desc()).limit(2).all()
+            ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
             
             cash_flow = session.query(CashFlow).filter(
                 CashFlow.company_id == company.id
-            ).order_by(CashFlow.period_year.desc()).first()
+            ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).first()
             
             income = income_list[0] if income_list else None
             prev_income = income_list[1] if len(income_list) > 1 else None
@@ -1472,138 +1443,19 @@ async def advanced_screener(
 @app.get("/api/companies/{ticker}/balance-sheets")
 async def get_company_balance_sheets(ticker: str):
     """Lấy danh sách các báo cáo cân đối kế toán của công ty"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from Database.models import Company, BalanceSheet
-    
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    
-    try:
-        # First get company by ticker
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            return []
-        
-        # Get all balance sheets for this company
-        reports = session.query(BalanceSheet).filter(
-            BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc()).all()
-        
-        if not reports:
-            return []
-        
-        return [{
-            "ticker": ticker.upper(),
-            "period_year": r.period_year,
-            "period_type": r.period_type,
-            "period_quarter": r.period_quarter,
-            "total_assets": r.total_assets,
-            "current_assets": r.current_assets,
-            "non_current_assets": r.non_current_assets,
-            "cash": r.cash_and_equivalents,
-            "short_term_investments": r.short_term_investments,
-            "inventories": r.inventories,
-            "accounts_receivable": r.accounts_receivable,
-            "fixed_assets": r.fixed_assets,
-            "total_liabilities": r.total_liabilities,
-            "current_liabilities": r.current_liabilities,
-            "non_current_liabilities": r.non_current_liabilities,
-            "short_term_debt": r.short_term_debt,
-            "long_term_debt": r.long_term_debt,
-            "total_equity": r.total_equity,
-            "retained_earnings": r.retained_earnings
-        } for r in reports]
-    finally:
-        session.close()
+    return db.get_company_balance_sheets_mapped(ticker.upper())
 
 
 @app.get("/api/companies/{ticker}/income-statements")
 async def get_company_income_statements(ticker: str):
     """Lấy danh sách các báo cáo kết quả kinh doanh của công ty"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from Database.models import Company, IncomeStatement
-    
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    
-    try:
-        # First get company by ticker
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            return []
-        
-        # Get all income statements for this company
-        reports = session.query(IncomeStatement).filter(
-            IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc()).all()
-        
-        if not reports:
-            return []
-        
-        return [{
-            "ticker": ticker.upper(),
-            "period_year": r.period_year,
-            "period_type": r.period_type,
-            "period_quarter": r.period_quarter,
-            "revenue": r.revenue,
-            "cost_of_goods_sold": r.cost_of_goods_sold,
-            "gross_profit": r.gross_profit,
-            "selling_expenses": r.selling_expenses,
-            "admin_expenses": r.admin_expenses,
-            "operating_income": r.operating_income,
-            "financial_expenses": r.financial_expenses,
-            "interest_expenses": r.interest_expenses,
-            "profit_before_tax": r.profit_before_tax,
-            "net_income": r.net_profit,
-            "net_profit_to_shareholders": r.net_profit_to_shareholders
-        } for r in reports]
-    finally:
-        session.close()
+    return db.get_company_income_statements_mapped(ticker.upper())
 
 
 @app.get("/api/companies/{ticker}/cash-flows")
 async def get_company_cash_flows(ticker: str):
     """Lấy danh sách các báo cáo lưu chuyển tiền tệ của công ty"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from Database.models import Company, CashFlow
-    
-    engine = create_engine('sqlite:///./Database/master_db/master.db')
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    
-    try:
-        # First get company by ticker
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            return []
-        
-        # Get all cash flows for this company
-        reports = session.query(CashFlow).filter(
-            CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc()).all()
-        
-        if not reports:
-            return []
-        
-        return [{
-            "ticker": ticker.upper(),
-            "period_year": r.period_year,
-            "period_type": r.period_type,
-            "period_quarter": r.period_quarter,
-            "operating_cash_flow": r.operating_cash_flow,
-            "investing_cash_flow": r.investing_cash_flow,
-            "financing_cash_flow": r.financing_cash_flow,
-            "capex": r.capex,
-            "dividends_paid": r.dividends_paid,
-            "ending_cash": r.ending_cash
-        } for r in reports]
-    finally:
-        session.close()
+    return db.get_company_cash_flows_mapped(ticker.upper())
 
 
 @app.post("/api/update-prices")

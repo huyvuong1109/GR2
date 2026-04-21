@@ -1,335 +1,276 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  FileText,
-  ChevronRight,
-  ChevronDown,
   Calendar,
-  Building2,
-  TrendingUp,
-  DollarSign,
-  Wallet,
+  ChevronDown,
+  ChevronRight,
+  Database,
+  FileText,
   Search,
-  Download,
+  TrendingUp,
+  Wallet,
+  DollarSign,
   X,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '../components/ui'
-import { formatFullCurrency } from '../utils/formatters'
+import { Badge, Card, CardContent, Input } from '../components/ui'
+import { formatCurrency } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 
-// Report type badges
+const META_KEYS = new Set([
+  'id',
+  'ticker',
+  'company_type',
+  'period_type',
+  'period_year',
+  'period_quarter',
+  'fiscal_year',
+  'quarter',
+  'period_label',
+])
+
 const REPORT_TYPES = [
-  { id: 'balance_sheet', name: 'Cân đối kế toán', icon: Wallet, color: 'bg-blue-500/20 text-blue-400', activeColor: 'bg-blue-500 text-white' },
-  { id: 'income_statement', name: 'Kết quả kinh doanh', icon: TrendingUp, color: 'bg-green-500/20 text-green-400', activeColor: 'bg-green-500 text-white' },
-  { id: 'cash_flow', name: 'Lưu chuyển tiền tệ', icon: DollarSign, color: 'bg-purple-500/20 text-purple-400', activeColor: 'bg-purple-500 text-white' },
+  {
+    id: 'balance_sheet',
+    key: 'balance_sheets',
+    name: 'Can doi ke toan',
+    icon: Wallet,
+    gradient: 'from-blue-500 to-indigo-500',
+  },
+  {
+    id: 'income_statement',
+    key: 'income_statements',
+    name: 'Ket qua kinh doanh',
+    icon: TrendingUp,
+    gradient: 'from-indigo-500 to-purple-500',
+  },
+  {
+    id: 'cash_flow',
+    key: 'cash_flows',
+    name: 'Luu chuyen tien te',
+    icon: DollarSign,
+    gradient: 'from-blue-500 to-purple-600',
+  },
 ]
 
-// Modal hiển thị báo cáo chi tiết - với tabs cho 3 loại báo cáo
-const ReportModal = ({ isOpen, onClose, company, reports, selectedYear }) => {
-  const [activeTab, setActiveTab] = useState('balance_sheet')
-  
-  if (!isOpen || !company) return null
+const toArray = (value) => {
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.data)) return value.data
+  return []
+}
 
-  // Lấy báo cáo theo năm đã chọn
-  const getReportByYear = (reportList, year) => {
-    return reportList?.find(r => (r.period_year || r.fiscal_year) === year) || reportList?.[0] || {}
+const periodYear = (record) => record?.period_year ?? record?.fiscal_year ?? null
+const periodQuarter = (record) => record?.period_quarter ?? record?.quarter ?? null
+
+const periodKey = (record) => `${periodYear(record) ?? 'na'}-${periodQuarter(record) ?? 0}`
+
+const formatPeriodLabel = (record) => {
+  const year = periodYear(record)
+  const quarter = periodQuarter(record)
+
+  if (quarter !== null && quarter !== undefined && `${quarter}` !== '' && Number(quarter) > 0) {
+    return `Q${quarter}/${year ?? '-'}`
   }
 
-  const balanceSheet = getReportByYear(reports?.balance_sheets, selectedYear)
-  const incomeStatement = getReportByYear(reports?.income_statements, selectedYear)
-  const cashFlow = getReportByYear(reports?.cash_flows, selectedYear)
+  if (year !== null && year !== undefined && `${year}` !== '') {
+    return `${year}`
+  }
 
-  const renderBalanceSheet = (data) => (
-    <div className="space-y-6">
-      {/* Tài sản */}
-      <div>
-        <h4 className="text-cyan-400 font-semibold mb-3 flex items-center gap-2">
-          <Wallet className="w-4 h-4" />
-          TÀI SẢN
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Tổng tài sản</span>
-            <span className="text-white font-mono font-bold">
-              {formatFullCurrency(data.total_assets)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Tài sản ngắn hạn</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.current_assets)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500 pl-4">+ Tiền và tương đương tiền</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.cash || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500 pl-4">+ Đầu tư tài chính ngắn hạn</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.short_term_investments || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500 pl-4">+ Hàng tồn kho</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.inventories || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Tài sản dài hạn</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.non_current_assets)}
-            </span>
-          </div>
-        </div>
-      </div>
+  return record?.period_label || 'Ky khong xac dinh'
+}
 
-      {/* Nợ phải trả */}
-      <div>
-        <h4 className="text-red-400 font-semibold mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          NỢ PHẢI TRẢ
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Tổng nợ</span>
-            <span className="text-white font-mono font-bold">
-              {formatFullCurrency(data.total_liabilities)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Nợ ngắn hạn</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.current_liabilities)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Nợ dài hạn</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.non_current_liabilities)}
-            </span>
-          </div>
-        </div>
-      </div>
+const collectFields = (record) =>
+  Object.keys(record || {})
+    .filter((key) => !META_KEYS.has(key))
+    .sort((a, b) => a.localeCompare(b))
 
-      {/* Vốn chủ sở hữu */}
-      <div>
-        <h4 className="text-green-400 font-semibold mb-3 flex items-center gap-2">
-          <Building2 className="w-4 h-4" />
-          VỐN CHỦ SỞ HỮU
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Tổng vốn CSH</span>
-            <span className="text-white font-mono font-bold">
-              {formatFullCurrency(data.total_equity)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Lợi nhuận chưa phân phối</span>
-            <span className="text-gray-300 font-mono">
-              {formatFullCurrency(data.retained_earnings)}
-            </span>
-          </div>
-        </div>
+const collectFieldCountFromReports = (reportSet) => {
+  const fields = new Set()
+
+  ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
+    toArray(reportSet?.[key]).forEach((record) => {
+      Object.keys(record || {}).forEach((field) => {
+        if (!META_KEYS.has(field)) {
+          fields.add(field)
+        }
+      })
+    })
+  })
+
+  return fields.size
+}
+
+const normalizeText = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .trim()
+
+const humanizeFieldName = (field) =>
+  String(field)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
+const formatValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-'
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return formatCurrency(value, false)
+  }
+
+  const parsed = Number(value)
+  if (!Number.isNaN(parsed) && Number.isFinite(parsed) && `${value}`.trim() !== '') {
+    return formatCurrency(parsed, false)
+  }
+
+  return String(value)
+}
+
+const getYearsList = (reports) => {
+  const yearSet = new Set()
+
+  ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
+    toArray(reports?.[key]).forEach((record) => {
+      const year = Number(periodYear(record) || 0)
+      if (year > 0) {
+        yearSet.add(year)
+      }
+    })
+  })
+
+  return Array.from(yearSet).sort((a, b) => b - a)
+}
+
+const getQuarterOptionsByYear = (reports, selectedYear) => {
+  if (!selectedYear) return []
+
+  const quarterMap = new Map()
+
+  ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
+    toArray(reports?.[key]).forEach((record) => {
+      const year = Number(periodYear(record) || 0)
+      if (year !== selectedYear) return
+
+      const quarter = Number(periodQuarter(record) || 0)
+      const keyValue = `${year}-${quarter}`
+
+      if (!quarterMap.has(keyValue)) {
+        const label = quarter > 0 ? `Q${quarter}` : 'Ca nam'
+        quarterMap.set(keyValue, {
+          key: keyValue,
+          year,
+          quarter,
+          label,
+          fullLabel: quarter > 0 ? `${label}/${year}` : `${year}`,
+        })
+      }
+    })
+  })
+
+  return Array.from(quarterMap.values()).sort((a, b) => b.quarter - a.quarter)
+}
+
+const getRecordByPeriod = (reports, reportTypeKey, periodSelection) => {
+  const reportList = toArray(reports?.[reportTypeKey])
+  if (!periodSelection) {
+    return reportList[0] || null
+  }
+  return (
+    reportList.find(
+      (record) =>
+        Number(periodYear(record) || 0) === Number(periodSelection.year || 0) &&
+        Number(periodQuarter(record) || 0) === Number(periodSelection.quarter || 0)
+    ) || null
+  )
+}
+
+const DynamicRecordTable = ({ record, metricQuery }) => {
+  if (!record) {
+    return (
+      <div className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-8 text-center text-blue-200/70">
+        Khong tim thay du lieu cho ky nay.
       </div>
+    )
+  }
+
+  const fields = collectFields(record)
+  const keyword = normalizeText(metricQuery)
+  const visibleFields =
+    keyword === ''
+      ? fields
+      : fields.filter((field) => {
+          const byName = normalizeText(field)
+          const byLabel = normalizeText(humanizeFieldName(field))
+          return byName.includes(keyword) || byLabel.includes(keyword)
+        })
+
+  if (!visibleFields.length) {
+    return (
+      <div className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-8 text-center text-blue-200/70">
+        Khong co cot phu hop voi tu khoa tim kiem.
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-h-[60vh] overflow-auto rounded-xl border border-blue-500/25 bg-slate-950/55">
+      <table className="w-full min-w-[680px] text-sm">
+        <thead className="sticky top-0 z-20">
+          <tr className="border-b border-blue-500/20 bg-gradient-to-r from-slate-900 via-blue-950/70 to-purple-950/70">
+            <th className="w-[45%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-200">Chi tieu</th>
+            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-blue-200">Gia tri</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleFields.map((field, index) => (
+            <tr
+              key={field}
+              className={cn('border-t border-white/5 transition-colors hover:bg-blue-500/[0.05]', index % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent')}
+            >
+              <td className="px-4 py-3 align-top">
+                <p className="font-semibold text-blue-50">{humanizeFieldName(field)}</p>
+                <p className="text-xs text-blue-300/55">{field}</p>
+              </td>
+              <td className="px-4 py-3 text-right font-mono text-blue-100">{formatValue(record[field])}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
+}
 
-  const renderIncomeStatement = (data) => (
-    <div className="space-y-6">
-      {/* Doanh thu */}
-      <div>
-        <h4 className="text-cyan-400 font-semibold mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          DOANH THU
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Doanh thu thuần</span>
-            <span className="text-white font-mono font-bold">
-              {formatFullCurrency(data.revenue)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Giá vốn hàng bán</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(data.cost_of_goods_sold || 0)})
-            </span>
-          </div>
-        </div>
-      </div>
+const ReportModal = ({
+  isOpen,
+  onClose,
+  company,
+  reports,
+  selectedYear,
+  selectedPeriod,
+  periodOptions,
+  onSelectPeriod,
+}) => {
+  const [activeTab, setActiveTab] = useState('balance_sheet')
+  const [metricQuery, setMetricQuery] = useState('')
 
-      {/* Lợi nhuận */}
-      <div>
-        <h4 className="text-green-400 font-semibold mb-3 flex items-center gap-2">
-          <DollarSign className="w-4 h-4" />
-          LỢI NHUẬN
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Lợi nhuận gộp</span>
-            <span className="text-green-400 font-mono font-bold">
-              {formatFullCurrency(data.gross_profit)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Chi phí bán hàng</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(data.selling_expenses || 0)})
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Chi phí quản lý</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(data.admin_expenses || 0)})
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-white/5 mt-2">
-            <span className="text-gray-400">Lợi nhuận hoạt động</span>
-            <span className="text-green-400 font-mono font-bold">
-              {formatFullCurrency(data.operating_income)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">+ Thu nhập tài chính</span>
-            <span className="text-green-300 font-mono">
-              {formatFullCurrency(data.financial_income || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Chi phí tài chính</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(data.financial_expenses || 0)})
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-white/5 mt-2">
-            <span className="text-gray-400">Lợi nhuận trước thuế</span>
-            <span className="text-green-400 font-mono font-bold">
-              {formatFullCurrency(data.profit_before_tax)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Thuế TNDN</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(data.income_tax || 0)})
-            </span>
-          </div>
-          <div className="flex justify-between py-3 border-t-2 border-green-500/30 mt-2">
-            <span className="text-white font-semibold">LỢI NHUẬN SAU THUẾ</span>
-            <span className="text-green-400 font-mono font-bold text-lg">
-              {formatFullCurrency(data.net_income)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('balance_sheet')
+      setMetricQuery('')
+    }
+  }, [isOpen])
 
-  const renderCashFlow = (data) => (
-    <div className="space-y-6">
-      {/* Hoạt động kinh doanh */}
-      <div>
-        <h4 className="text-cyan-400 font-semibold mb-3 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4" />
-          HOẠT ĐỘNG KINH DOANH
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Lưu chuyển tiền từ HĐKD</span>
-            <span className={cn(
-              "font-mono font-bold",
-              (data.operating_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-            )}>
-              {formatFullCurrency(data.operating_cash_flow || 0)}
-            </span>
-          </div>
-        </div>
-      </div>
+  if (!isOpen || !company) return null
 
-      {/* Hoạt động đầu tư */}
-      <div>
-        <h4 className="text-blue-400 font-semibold mb-3 flex items-center gap-2">
-          <Wallet className="w-4 h-4" />
-          HOẠT ĐỘNG ĐẦU TƯ
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Lưu chuyển tiền từ đầu tư</span>
-            <span className={cn(
-              "font-mono font-bold",
-              (data.investing_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-            )}>
-              {formatFullCurrency(data.investing_cash_flow || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Mua sắm TSCĐ (CAPEX)</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(Math.abs(data.capex || 0))})
-            </span>
-          </div>
-        </div>
-      </div>
+  const activeReportType = REPORT_TYPES.find((type) => type.id === activeTab)
+  const activeRecord = getRecordByPeriod(reports, activeReportType?.key, selectedPeriod)
+  const activeFieldCount = activeRecord ? collectFields(activeRecord).length : 0
 
-      {/* Hoạt động tài chính */}
-      <div>
-        <h4 className="text-purple-400 font-semibold mb-3 flex items-center gap-2">
-          <DollarSign className="w-4 h-4" />
-          HOẠT ĐỘNG TÀI CHÍNH
-        </h4>
-        <div className="space-y-2 pl-4">
-          <div className="flex justify-between py-2 border-b border-white/5">
-            <span className="text-gray-400">Lưu chuyển tiền từ tài chính</span>
-            <span className={cn(
-              "font-mono font-bold",
-              (data.financing_cash_flow || 0) > 0 ? "text-green-400" : "text-red-400"
-            )}>
-              {formatFullCurrency(data.financing_cash_flow || 0)}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-gray-500">- Cổ tức đã trả</span>
-            <span className="text-red-300 font-mono">
-              ({formatFullCurrency(Math.abs(data.dividends_paid || 0))})
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Tổng hợp */}
-      <div className="border-t-2 border-white/10 pt-4">
-        <div className="flex justify-between py-3 bg-white/5 rounded-lg px-4 mb-2">
-          <span className="text-white font-semibold">Tăng/Giảm tiền thuần</span>
-          <span className={cn(
-            "font-mono font-bold text-lg",
-            ((data.operating_cash_flow || 0) + (data.investing_cash_flow || 0) + (data.financing_cash_flow || 0)) > 0 
-              ? "text-green-400" 
-              : "text-red-400"
-          )}>
-            {formatFullCurrency(
-              (data.operating_cash_flow || 0) + 
-              (data.investing_cash_flow || 0) + 
-              (data.financing_cash_flow || 0)
-            )}
-          </span>
-        </div>
-        <div className="flex justify-between py-3 bg-cyan-500/10 rounded-lg px-4">
-          <span className="text-cyan-400 font-semibold">Tiền cuối kỳ</span>
-          <span className="text-cyan-400 font-mono font-bold text-lg">
-            {formatFullCurrency(data.ending_cash || 0)}
-          </span>
-        </div>
-      </div>
-    </div>
-  )
-
-  const currentData = activeTab === 'balance_sheet' ? balanceSheet : 
-                      activeTab === 'income_statement' ? incomeStatement : cashFlow
+  const selectedPeriodLabel =
+    selectedPeriod && Number(selectedPeriod.quarter || 0) > 0
+      ? `Q${selectedPeriod.quarter}/${selectedPeriod.year}`
+      : `${selectedPeriod?.year || selectedYear || '-'}`
 
   return (
     <AnimatePresence>
@@ -337,80 +278,117 @@ const ReportModal = ({ isOpen, onClose, company, reports, selectedYear }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
-          className="bg-gray-900 border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 8 }}
+          transition={{ duration: 0.2 }}
+          onClick={(event) => event.stopPropagation()}
+          className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-950"
         >
-          {/* Header */}
-          <div className="border-b border-white/10 p-6 bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">{company.ticker?.slice(0, 2)}</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">{company.ticker}</h3>
-                  <p className="text-sm text-gray-400">{company.name}</p>
-                </div>
+          <div
+            className="pointer-events-none absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+            }}
+          />
+
+          <div className="relative border-b border-blue-500/20 px-6 py-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-blue-50">{company.ticker}</h3>
+                <p className="mt-1 text-sm text-blue-200/70">{company.name}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
-                  <Calendar className="w-3 h-3 mr-1" />
-                  Năm {selectedYear}
+              <div className="flex items-center gap-2">
+                <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                  {selectedPeriodLabel}
                 </Badge>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  className="rounded-lg border border-blue-500/20 p-2 text-blue-200 transition-colors hover:bg-blue-500/15"
                 >
-                  <X className="w-5 h-5 text-gray-400" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-2">
-              {REPORT_TYPES.map(type => {
+            <div className="mt-4 flex flex-wrap gap-2">
+              {REPORT_TYPES.map((type) => {
                 const Icon = type.icon
                 const isActive = activeTab === type.id
+
                 return (
                   <button
                     key={type.id}
                     onClick={() => setActiveTab(type.id)}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all",
-                      isActive ? type.activeColor : "bg-white/5 text-gray-400 hover:bg-white/10"
+                      'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all',
+                      isActive
+                        ? `border-blue-400/40 bg-gradient-to-r ${type.gradient} text-white shadow-lg shadow-blue-500/25`
+                        : 'border-blue-500/20 bg-slate-900/60 text-blue-200/80 hover:bg-blue-500/10'
                     )}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="h-4 w-4" />
                     {type.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-blue-500/15 pt-3">
+              {(periodOptions || []).map((periodOption) => {
+                const isActivePeriod =
+                  Number(selectedPeriod?.year || 0) === Number(periodOption.year || 0) &&
+                  Number(selectedPeriod?.quarter || 0) === Number(periodOption.quarter || 0)
+
+                return (
+                  <button
+                    key={`${periodOption.key}-${activeTab}`}
+                    type="button"
+                    onClick={() => onSelectPeriod(periodOption)}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all',
+                      isActivePeriod
+                        ? 'border-blue-400/45 bg-blue-500/20 text-blue-50'
+                        : 'border-blue-500/25 bg-slate-900/60 text-blue-200/80 hover:bg-blue-500/10'
+                    )}
+                  >
+                    {periodOption.label}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-            {activeTab === 'balance_sheet' && renderBalanceSheet(currentData)}
-            {activeTab === 'income_statement' && renderIncomeStatement(currentData)}
-            {activeTab === 'cash_flow' && renderCashFlow(currentData)}
+          <div className="relative flex flex-wrap items-center gap-2 border-b border-blue-500/15 px-6 py-3">
+            <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{activeFieldCount} cot du lieu</Badge>
+            <Badge className="border-indigo-500/30 bg-indigo-500/10 text-indigo-200">Ky da chon theo nam -&gt; quy</Badge>
+
+            <div className="ml-auto w-full max-w-sm">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-200/50" />
+                <Input
+                  value={metricQuery}
+                  onChange={(event) => setMetricQuery(event.target.value)}
+                  placeholder="Tim nhanh chi tieu..."
+                  className="border-blue-500/25 bg-slate-900/70 pl-9 text-blue-50 placeholder:text-blue-200/40"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-white/10 p-4 flex justify-end gap-3 bg-white/5">
-            <Button variant="outline" onClick={onClose}>
-              Đóng
-            </Button>
-            <Button className="bg-cyan-600 hover:bg-cyan-700">
-              <Download className="w-4 h-4 mr-2" />
-              Xuất PDF
-            </Button>
+          <div className="relative overflow-y-auto p-6">
+            <DynamicRecordTable record={activeRecord} metricQuery={metricQuery} />
+          </div>
+
+          <div className="relative border-t border-blue-500/20 bg-slate-900/65 px-6 py-4 text-xs text-blue-200/60">
+            Bao cao hien thi toan bo cot cua ky duoc chon theo quy trinh: ma cong ty -&gt; nam -&gt; quy.
           </div>
         </motion.div>
       </motion.div>
@@ -421,11 +399,13 @@ const ReportModal = ({ isOpen, onClose, company, reports, selectedYear }) => {
 export default function FinancialReports() {
   const [companies, setCompanies] = useState([])
   const [expandedCompany, setExpandedCompany] = useState(null)
+  const [selectedYearByTicker, setSelectedYearByTicker] = useState({})
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState(null)
   const [selectedYear, setSelectedYear] = useState(null)
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
 
   useEffect(() => {
     fetchCompanies()
@@ -453,9 +433,9 @@ export default function FinancialReports() {
       ])
 
       return {
-        balance_sheets: Array.isArray(balanceSheets) ? balanceSheets : [],
-        income_statements: Array.isArray(incomeStatements) ? incomeStatements : [],
-        cash_flows: Array.isArray(cashFlows) ? cashFlows : [],
+        balance_sheets: toArray(balanceSheets),
+        income_statements: toArray(incomeStatements),
+        cash_flows: toArray(cashFlows),
       }
     } catch (error) {
       console.error('Error fetching reports:', error)
@@ -470,159 +450,195 @@ export default function FinancialReports() {
   const handleCompanyClick = async (ticker) => {
     if (expandedCompany === ticker) {
       setExpandedCompany(null)
-    } else {
-      setExpandedCompany(ticker)
-      const reports = await fetchReports(ticker)
-      setCompanies(prev => prev.map(c => 
-        c.ticker === ticker ? { ...c, reports } : c
-      ))
+      return
     }
+
+    setExpandedCompany(ticker)
+
+    const targetCompany = companies.find((item) => item.ticker === ticker)
+    if (targetCompany?.reports) {
+      return
+    }
+
+    const reports = await fetchReports(ticker)
+    setCompanies((prev) => prev.map((company) => (company.ticker === ticker ? { ...company, reports } : company)))
   }
 
-  // Khi bấm vào một năm bất kỳ -> mở modal hiện cả 3 loại báo cáo
-  const handleOpenReport = (company, year) => {
+  const handleOpenYear = (company, year) => {
+    const reports = company.reports || {}
+    const periodOptions = getQuarterOptionsByYear(reports, year)
+    const defaultPeriod = periodOptions[0] || { key: `${year}-0`, year, quarter: 0, label: `${year}`, fullLabel: `${year}` }
+
+    setSelectedYearByTicker((prev) => ({
+      ...prev,
+      [company.ticker]: year,
+    }))
+
     setSelectedCompany(company)
     setSelectedYear(year)
+    setSelectedPeriod(defaultPeriod)
     setModalOpen(true)
   }
 
-  // Lấy danh sách năm từ tất cả các báo cáo
-  const getYearsList = (reports) => {
-    const years = new Set()
-    ;['balance_sheets', 'income_statements', 'cash_flows'].forEach(key => {
-      reports?.[key]?.forEach(r => {
-        const year = r.period_year || r.fiscal_year
-        if (year) years.add(year)
-      })
-    })
-    return Array.from(years).sort((a, b) => b - a)
+  const handleSelectPeriodInModal = (period) => {
+    setSelectedPeriod(period)
   }
 
-  const filteredCompanies = companies.filter(c => 
-    c.ticker?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCompanies = useMemo(
+    () =>
+      companies.filter(
+        (company) =>
+          company.ticker?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          company.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [companies, searchQuery]
   )
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <FileText className="w-8 h-8 text-cyan-400" />
-            Báo cáo tài chính
-          </h1>
-          <p className="text-gray-400 mt-1">
-            Xem chi tiết báo cáo tài chính của các công ty niêm yết
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 bg-slate-950 p-6">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-35"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
+            backgroundSize: '30px 30px',
+          }}
+        />
+        <div className="pointer-events-none absolute -left-16 top-0 h-44 w-44 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 bottom-0 h-52 w-52 rounded-full bg-purple-500/20 blur-3xl" />
+
+        <h1 className="relative flex items-center gap-3 text-3xl font-bold text-blue-50">
+          <FileText className="h-8 w-8 text-blue-300" />
+          Bao cao tai chinh
+        </h1>
+          <p className="relative mt-2 text-blue-200/70">
+            Luong moi: Bam ma cong ty -&gt; chon nam bao cao -&gt; chon quy bao cao -&gt; xem full cot du lieu.
           </p>
-        </div>
       </div>
 
-      {/* Search */}
-      <Card className="bg-white/5 border-white/10">
+      <Card className="border-blue-500/20 bg-slate-900/65">
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-200/55" />
             <Input
-              placeholder="Tìm kiếm mã cổ phiếu hoặc tên công ty..."
+              placeholder="Tim ma co phieu hoac ten cong ty..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/5 border-white/20 text-lg"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="border-blue-500/20 bg-slate-950/55 pl-10 text-blue-50 placeholder:text-blue-200/40"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Companies List */}
       <div className="space-y-3">
-        {filteredCompanies.map((company) => {
-          const isExpanded = expandedCompany === company.ticker
-          const reports = company.reports || {}
-          const yearsList = getYearsList(reports)
+        {loading && (
+          <Card className="border-blue-500/20 bg-slate-900/65">
+            <CardContent className="p-8 text-center text-blue-200/70">Dang tai danh sach cong ty...</CardContent>
+          </Card>
+        )}
 
-          return (
-            <Card key={company.ticker} className="bg-white/5 border-white/10 overflow-hidden">
-              <button
-                onClick={() => handleCompanyClick(company.ticker)}
-                className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+        {!loading &&
+          filteredCompanies.map((company) => {
+            const isExpanded = expandedCompany === company.ticker
+            const reports = company.reports || {}
+            const years = getYearsList(reports)
+            const fieldCount = collectFieldCountFromReports(reports)
+            const highlightedYear = selectedYearByTicker[company.ticker] || null
+
+            return (
+              <Card
+                key={company.ticker}
+                className="overflow-hidden border-blue-500/20 bg-gradient-to-br from-slate-950/85 via-blue-950/20 to-purple-950/20"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                    <span className="text-white font-bold">{company.ticker?.slice(0, 2)}</span>
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-lg font-bold text-white">{company.ticker}</h3>
-                    <p className="text-sm text-gray-400">{company.name}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-gray-400">
-                    {company.industry || 'N/A'}
-                  </Badge>
-                  {isExpanded ? (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </button>
+                <button
+                  onClick={() => handleCompanyClick(company.ticker)}
+                  className="w-full px-4 py-4 transition-colors hover:bg-blue-500/10"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-4 text-left">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 font-bold text-white shadow-lg shadow-blue-500/25">
+                        {company.ticker?.slice(0, 2)}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-blue-50">{company.ticker}</h3>
+                        <p className="text-sm text-blue-200/65">{company.name}</p>
+                      </div>
+                    </div>
 
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="border-t border-white/10 overflow-hidden"
-                  >
-                    <div className="p-6 bg-white/5">
-                      <h4 className="text-white font-semibold mb-4 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-cyan-400" />
-                        Chọn năm báo cáo
-                      </h4>
-                      
-                      {yearsList.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {yearsList.map(year => (
-                            <button
-                              key={year}
-                              onClick={() => handleOpenReport(company, year)}
-                              className="px-4 py-2 bg-white/10 hover:bg-cyan-500/30 border border-white/10 hover:border-cyan-500/50 rounded-lg text-white font-medium transition-all flex items-center gap-2"
-                            >
-                              <FileText className="w-4 h-4" />
-                              {year}
-                            </button>
-                          ))}
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">{years.length || 0} nam</Badge>
+                      <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{fieldCount || 0} cot</Badge>
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-blue-200/70" />
                       ) : (
-                        <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+                        <ChevronRight className="h-5 w-5 text-blue-200/70" />
                       )}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Card>
-          )
-        })}
+                  </div>
+                </button>
 
-        {filteredCompanies.length === 0 && (
-          <Card className="bg-white/5 border-white/10">
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden border-t border-blue-500/15"
+                    >
+                      <div className="space-y-3 bg-slate-900/50 p-5">
+                        <p className="mb-1 flex items-center gap-2 text-sm font-semibold text-blue-100">
+                          <Calendar className="h-4 w-4 text-blue-300" />
+                          Chon nam bao cao
+                        </p>
+
+                        {years.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {years.map((year) => (
+                              <button
+                                key={`${company.ticker}-${year}`}
+                                onClick={() => handleOpenYear(company, year)}
+                                className={cn(
+                                  'rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                                  highlightedYear === year
+                                    ? 'border-blue-400/45 bg-gradient-to-r from-blue-500/25 to-purple-500/25 text-blue-50'
+                                    : 'border-blue-500/25 bg-slate-950/60 text-blue-200/80 hover:bg-blue-500/10'
+                                )}
+                              >
+                                Nam {year}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-blue-200/55">Chua co du lieu nam cho cong ty nay.</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Card>
+            )
+          })}
+
+        {!loading && filteredCompanies.length === 0 && (
+          <Card className="border-blue-500/20 bg-slate-900/65">
             <CardContent className="p-12 text-center">
-              <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-400">Không tìm thấy công ty phù hợp</p>
+              <Database className="mx-auto mb-4 h-14 w-14 text-blue-300/40" />
+              <p className="text-blue-200/70">Khong tim thay cong ty phu hop.</p>
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Report Modal - hiển thị cả 3 loại báo cáo với tabs */}
       <ReportModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         company={selectedCompany}
         reports={selectedCompany?.reports}
         selectedYear={selectedYear}
+        selectedPeriod={selectedPeriod}
+        periodOptions={getQuarterOptionsByYear(selectedCompany?.reports, selectedYear)}
+        onSelectPeriod={handleSelectPeriodInModal}
       />
     </div>
   )

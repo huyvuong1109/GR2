@@ -8,7 +8,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SOURCE_FOLDER = os.path.join(SCRIPT_DIR, "new_db_from_kaggle")  # Nơi chứa file db tải từ Kaggle
 MASTER_DB_FOLDER = os.path.join(SCRIPT_DIR, "master_db")
-MASTER_DB_PATH = f"sqlite:///{os.path.join(MASTER_DB_FOLDER, 'master.db')}" # Database tổng
+MASTER_DB_PATH = f"sqlite:///{os.path.join(MASTER_DB_FOLDER, 'analytics(final).db')}" # Database tổng
 
 os.makedirs(MASTER_DB_FOLDER, exist_ok=True)
 os.makedirs(SOURCE_FOLDER, exist_ok=True)
@@ -201,7 +201,7 @@ def merge_databases():
             session_source.close()
 
     session_master.close()
-    print("\n🎉 TẤT CẢ HOÀN TẤT! Dữ liệu đã nằm trong 'master_db/master.db'")
+    print("\n🎉 TẤT CẢ HOÀN TẤT! Dữ liệu đã nằm trong 'master_db/analytics(final).db'")
 
 if __name__ == "__main__":
     merge_databases()

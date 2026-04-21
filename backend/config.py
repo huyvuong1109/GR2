@@ -8,8 +8,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Database settings
-DATABASE_URL = f"sqlite:///{BASE_DIR}/Database/master_db/master.db"
-DATABASE_PATH = BASE_DIR / "Database" / "master_db" / "master.db"
+DATABASE_URL = f"sqlite:///{BASE_DIR}/Database/master_db/analytics(final).db"
+DATABASE_PATH = BASE_DIR / "Database" / "master_db" / "analytics(final).db"
 
 # API settings
 API_HOST = "0.0.0.0"

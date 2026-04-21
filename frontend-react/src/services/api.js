@@ -40,6 +40,7 @@ export const companiesApi = {
   getByTicker: (ticker) => api.get(`/companies/${ticker}`),
   getFinancials: (ticker) => api.get(`/companies/${ticker}/financials`),
   search: (query) => api.get(`/companies/search`, { params: { q: query } }),
+  getTickerGroups: (limit = 4) => api.get('/ticker-groups', { params: { limit } }),
 }
 
 // ==================== Financial Data API ====================
@@ -86,18 +87,6 @@ export const screeningApi = {
     }
     return api.get('/screener/advanced', { params: presetFilters[criteria] || criteria })
   },
-}
-
-// ==================== Valuation API ====================
-export const valuationApi = {
-  graham: (ticker, params) => 
-    api.post(`/valuation/graham`, { ticker, ...params }),
-  
-  dcf: (ticker, params) => 
-    api.post(`/valuation/dcf`, { ticker, ...params }),
-  
-  comparables: (ticker) => 
-    api.get(`/valuation/${ticker}/comparables`),
 }
 
 // ==================== Market Overview API ====================

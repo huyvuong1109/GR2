@@ -315,7 +315,7 @@ calculated_metrics AS (
         ROUND(fm.net_profit * 100.0 / NULLIF(fm.total_assets, 0), 2) as roa,
         ROUND(fm.gross_profit * 100.0 / NULLIF(fm.revenue, 0), 2) as gross_margin,
         ROUND(fm.net_profit * 100.0 / NULLIF(fm.revenue, 0), 2) as net_margin,
-        -- Valuation
+        -- Market ratios
         fm.net_profit_to_shareholders / NULLIF(fm.shares_outstanding, 0) as eps,
         fm.total_equity / NULLIF(fm.shares_outstanding, 0) as bvps,
         -- Safety
@@ -336,7 +336,7 @@ SELECT
     industry,
     current_price,
     market_cap,
-    -- Valuation ratios
+    -- Market ratios
     ROUND(current_price / NULLIF(eps, 0), 2) as pe_ratio,
     ROUND(current_price / NULLIF(bvps, 0), 2) as pb_ratio,
     ROUND(dividend_per_share * 100.0 / NULLIF(current_price, 0), 2) as dividend_yield,

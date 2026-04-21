@@ -9,7 +9,7 @@ import os
 # ==============================================================================
 # CẤU HÌNH
 # ==============================================================================
-db_path        = r"D:\X1G8\GR2\FinancialApp\Database\master_db\master.db"   # ← Đổi đường dẫn
+db_path        = r"D:\X1G8\GR2\FinancialApp\Database\master_db\analytics(final).db"   # ← Đổi đường dẫn
 TICKER_TO_TEST = 'AAA'                                         # ← Đổi mã CK
 
 # ==============================================================================

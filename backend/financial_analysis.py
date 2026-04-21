@@ -24,7 +24,7 @@ def calculate_financial_ratios(
         Dict chứa tất cả ratios: ROE, ROA, P/E, P/B, D/E, margins, growth rates...
     """
     ratios = {
-        # Định giá
+        # Chi so thi truong
         'pe_ratio': None,
         'pb_ratio': None,
         'ps_ratio': None,
@@ -479,7 +479,7 @@ def detect_risk_warnings(
             'type': 'high_pe',
             'title': '🔵 P/E cao',
             'message': f'P/E = {pe_ratio:.1f}x (>25x)',
-            'recommendation': 'Định giá cao, có thể rủi ro nếu tăng trưởng không như kỳ vọng'
+            'recommendation': 'Muc gia thi truong cao, can theo doi ky vong tang truong'
         })
     
     # 8. Doanh thu giảm
@@ -506,7 +506,7 @@ def calculate_health_score(
     
     Dựa trên:
     - F-Score (40%)
-    - Định giá (20%)
+    - Chi so thi truong (20%)
     - Tăng trưởng (20%)
     - Warnings (20%)
     """
@@ -522,38 +522,38 @@ def calculate_health_score(
     }
     score += f_score_points
     
-    # 2. Định giá (20 điểm)
-    valuation_points = 0
+    # 2. Chi so thi truong (20 điểm)
+    market_ratio_points = 0
     pe = ratios.get('pe_ratio')
     pb = ratios.get('pb_ratio')
     
     if pe and pe > 0:
         if pe < 10:
-            valuation_points += 10
+            market_ratio_points += 10
         elif pe < 15:
-            valuation_points += 7
+            market_ratio_points += 7
         elif pe < 20:
-            valuation_points += 4
+            market_ratio_points += 4
         elif pe < 25:
-            valuation_points += 2
+            market_ratio_points += 2
     
     if pb and pb > 0:
         if pb < 1:
-            valuation_points += 10
+            market_ratio_points += 10
         elif pb < 1.5:
-            valuation_points += 7
+            market_ratio_points += 7
         elif pb < 2:
-            valuation_points += 4
+            market_ratio_points += 4
         elif pb < 3:
-            valuation_points += 2
+            market_ratio_points += 2
     
-    breakdown['valuation'] = {
-        'points': valuation_points,
+    breakdown['market_ratio'] = {
+        'points': market_ratio_points,
         'max': 20,
         'pe': pe,
         'pb': pb
     }
-    score += valuation_points
+    score += market_ratio_points
     
     # 3. Tăng trưởng (20 điểm)
     growth_points = 0

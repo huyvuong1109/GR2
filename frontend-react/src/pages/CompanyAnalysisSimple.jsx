@@ -3,6 +3,36 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import api from '../services/api'
 
+const toSafeNumber = (value) => {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+const formatVnd = (value) => {
+  const number = toSafeNumber(value)
+  if (number === null) return 'Chua co du lieu'
+  return `${number.toLocaleString('vi-VN')} VND`
+}
+
+const formatMarketCap = (value) => {
+  const number = toSafeNumber(value)
+  if (number === null) return 'Chua co du lieu'
+
+  if (number >= 1e12) return `${(number / 1e12).toFixed(2)} nghin ty VND`
+  if (number >= 1e9) return `${(number / 1e9).toFixed(2)} ty VND`
+  if (number >= 1e6) return `${(number / 1e6).toFixed(2)} trieu VND`
+  return `${number.toLocaleString('vi-VN')} VND`
+}
+
+const formatShares = (value) => {
+  const number = toSafeNumber(value)
+  if (number === null) return 'Chua co du lieu'
+
+  if (number >= 1e9) return `${(number / 1e9).toFixed(2)} ty cp`
+  if (number >= 1e6) return `${(number / 1e6).toFixed(2)} trieu cp`
+  return `${number.toLocaleString('vi-VN')} cp`
+}
+
 export default function CompanyAnalysisSimple() {
   const { ticker } = useParams()
   const [loading, setLoading] = useState(true)
@@ -20,9 +50,7 @@ export default function CompanyAnalysisSimple() {
     setError(null)
     
     try {
-      console.log('Fetching company:', ticker)
       const data = await api.get(`/companies/${ticker}`)
-      console.log('Company data:', data)
       setCompany(data)
     } catch (err) {
       console.error('Error:', err)
@@ -69,6 +97,13 @@ export default function CompanyAnalysisSimple() {
     )
   }
 
+  const displayTicker = String(company.ticker || ticker || '').toUpperCase() || 'N/A'
+  const displayName = company.name || `Cong ty ${displayTicker}`
+  const displayIndustry = company.industry || 'Chua co thong tin'
+  const displayPrice = formatVnd(company.current_price ?? company.price)
+  const displayMarketCap = formatMarketCap(company.market_cap)
+  const displaySharesOutstanding = formatShares(company.shares_outstanding)
+
   return (
     <div className="p-8 space-y-6">
       <Link to="/screener" className="inline-flex items-center text-gray-400 hover:text-white">
@@ -77,25 +112,25 @@ export default function CompanyAnalysisSimple() {
       </Link>
       
       <div className="bg-gray-800 rounded-xl p-6">
-        <h1 className="text-3xl font-bold text-white mb-2">{company.ticker}</h1>
-        <p className="text-xl text-gray-300">{company.name}</p>
+        <h1 className="text-3xl font-bold text-white mb-2">{displayTicker}</h1>
+        <p className="text-xl text-gray-300">{displayName}</p>
         
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="text-gray-400 text-sm">Ngành</div>
-            <div className="text-white font-medium">{company.industry || 'N/A'}</div>
+            <div className="text-white font-medium">{displayIndustry}</div>
           </div>
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="text-gray-400 text-sm">Giá hiện tại</div>
-            <div className="text-white font-medium">{company.current_price?.toLocaleString()} VNĐ</div>
+            <div className="text-white font-medium">{displayPrice}</div>
           </div>
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="text-gray-400 text-sm">Vốn hóa</div>
-            <div className="text-white font-medium">{(company.market_cap / 1e12)?.toFixed(2)} nghìn tỷ</div>
+            <div className="text-white font-medium">{displayMarketCap}</div>
           </div>
           <div className="bg-gray-700 rounded-lg p-4">
             <div className="text-gray-400 text-sm">KLCP lưu hành</div>
-            <div className="text-white font-medium">{(company.shares_outstanding / 1e6)?.toFixed(0)} triệu</div>
+            <div className="text-white font-medium">{displaySharesOutstanding}</div>
           </div>
         </div>
       </div>

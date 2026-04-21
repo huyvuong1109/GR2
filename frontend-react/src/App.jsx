@@ -1,28 +1,30 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import Screener from './pages/ScreenerNew'
-import CompanyAnalysis from './pages/CompanyAnalysisSimple'
-import Comparison from './pages/Comparison'
-import FinancialReports from './pages/FinancialReports'
-import CompanyReports from './pages/CompanyReports'
-import Valuation from './pages/Valuation'
-import NotFound from './pages/NotFound'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Screener = lazy(() => import('./pages/ScreenerNew'))
+const CompanyAnalysis = lazy(() => import('./pages/CompanyAnalysisSimple'))
+const Comparison = lazy(() => import('./pages/Comparison'))
+const FinancialReports = lazy(() => import('./pages/FinancialReports'))
+const CompanyReports = lazy(() => import('./pages/CompanyReports'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Layout />}>
-        <Route index element={<Dashboard />} />
-        <Route path="screener" element={<Screener />} />
-        <Route path="company/:ticker" element={<CompanyAnalysis />} />
-        <Route path="company/:ticker/reports" element={<CompanyReports />} />
-        <Route path="compare" element={<Comparison />} />
-        <Route path="reports" element={<FinancialReports />} />
-        <Route path="valuation" element={<Valuation />} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<div className="min-h-screen bg-[#06070b]" />}>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="screener" element={<Screener />} />
+          <Route path="company/:ticker" element={<CompanyAnalysis />} />
+          <Route path="company/:ticker/reports" element={<CompanyReports />} />
+          <Route path="compare" element={<Comparison />} />
+          <Route path="reports" element={<FinancialReports />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </Suspense>
   )
 }
 

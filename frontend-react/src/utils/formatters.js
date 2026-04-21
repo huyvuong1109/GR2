@@ -239,30 +239,6 @@ export const sortByFields = (array, fields) => {
   })
 }
 
-// ==================== Financial Calculations ====================
-
-/**
- * Calculate intrinsic value using Graham formula
- */
-export const calculateGrahamValue = (eps, bvps, growthRate = 0) => {
-  if (!eps || eps <= 0 || !bvps || bvps <= 0) return null
-  
-  // Graham formula: √(22.5 × EPS × BVPS)
-  const baseValue = Math.sqrt(22.5 * eps * bvps)
-  
-  // Adjusted for growth
-  const multiplier = 1 + growthRate / 100
-  return baseValue * multiplier
-}
-
-/**
- * Calculate margin of safety
- */
-export const calculateMarginOfSafety = (intrinsicValue, currentPrice) => {
-  if (!intrinsicValue || !currentPrice) return null
-  return ((intrinsicValue - currentPrice) / intrinsicValue) * 100
-}
-
 export default {
   formatCurrency,
   formatCompact,
@@ -276,6 +252,4 @@ export default {
   formatDate,
   calculateGrowth,
   calculateCAGR,
-  calculateGrahamValue,
-  calculateMarginOfSafety,
 }

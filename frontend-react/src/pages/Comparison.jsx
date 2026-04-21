@@ -12,7 +12,6 @@ import {
   Download,
   BarChart3,
   Activity,
-  DollarSign,
   Building2,
   Search,
   CheckCircle,
@@ -605,10 +604,10 @@ export default function Comparison() {
                 </tr>
               </thead>
               <tbody>
-                {/* Valuation */}
+                {/* Market Ratios */}
                 <tr className="bg-white/5">
                   <td colSpan={companies.length + 1} className="p-2 text-xs text-cyan-400 font-medium">
-                    ĐỊNH GIÁ
+                    CHI SO THI TRUONG
                   </td>
                 </tr>
                 <MetricRow metric="pe_ratio" companies={companies} />
@@ -664,21 +663,6 @@ export default function Comparison() {
                   <p className="text-sm text-gray-400">ROE cao nhất</p>
                   <p className="font-bold text-white">
                     {getWinner(companies, 'roe').ticker} ({getWinner(companies, 'roe').ratios?.roe?.toFixed(1)}%)
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {/* Best P/E */}
-            {getWinner(companies, 'pe_ratio', true) && (
-              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">P/E thấp nhất</p>
-                  <p className="font-bold text-white">
-                    {getWinner(companies, 'pe_ratio', true).ticker} ({getWinner(companies, 'pe_ratio', true).ratios?.pe_ratio?.toFixed(1)}x)
                   </p>
                 </div>
               </div>

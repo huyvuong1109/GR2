@@ -18,7 +18,6 @@ FinancialApp/
 │
 ├── Database/                   # Quản lý cơ sở dữ liệu
 │   ├── models.py              # ORM Models (SQLAlchemy)
-│   ├── seed_data.py           # Tạo dữ liệu mẫu
 │   ├── merge_tool.py          # Gộp database từ nhiều nguồn
 │   └── master_db/             # Database chính
 │
@@ -448,11 +447,11 @@ exportApi.exportCSV(ticker)
 
 ### 2. Công cụ gộp Database (`Database/merge_tool.py`)
 
-**Chức năng:** Gộp nhiều database từ các nguồn khác nhau (Kaggle, etc.) vào master.db.
+**Chức năng:** Gộp nhiều database từ các nguồn khác nhau (Kaggle, etc.) vào `Database/master_db/analytics(final).db`.
 
 **Quy trình:**
 1. Đọc các file `.db` từ thư mục `new_db_from_kaggle/`
-2. So sánh schema với master.db
+2. So sánh schema với analytics(final).db
 3. Đồng bộ dữ liệu Company (insert/update)
 4. Đồng bộ các báo cáo tài chính (balance_sheets, income_statements, cash_flows)
 
@@ -461,21 +460,6 @@ exportApi.exportCSV(ticker)
 cd Database
 python merge_tool.py
 ```
-
----
-
-### 3. Script tạo dữ liệu mẫu (`Database/seed_data.py`)
-
-**Chức năng:** Tạo dữ liệu mẫu cho 15 công ty với 10 năm báo cáo tài chính.
-
-**Danh sách công ty mẫu:**
-VNM, FPT, VCB, HPG, MWG, VHM, TCB, MSN, VIC, ACB, VRE, PNJ, REE, DHG, DGC
-
-**Hàm chính:**
-| Hàm | Mô tả |
-|-----|-------|
-| `generate_financial_data(company_id, ticker, industry)` | Sinh dữ liệu tài chính 10 năm |
-| `seed_database()` | Khởi tạo và đổ dữ liệu vào database |
 
 ---
 
@@ -546,10 +530,6 @@ pip install -r requirements.txt
 # 3. Cài đặt Frontend
 cd frontend-react
 npm install
-
-# 4. Tạo database mẫu (nếu chưa có)
-cd ../Database
-python seed_data.py
 ```
 
 ### Chạy ứng dụng
