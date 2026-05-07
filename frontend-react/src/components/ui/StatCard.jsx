@@ -51,7 +51,7 @@ export default function StatCard({
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-dark-400">{title}</span>
+          <span className="text-sm font-medium text-slate-600">{title}</span>
           {tooltip && (
             <div className="relative">
               <Info className="w-4 h-4 text-dark-500 cursor-help" />
@@ -63,13 +63,13 @@ export default function StatCard({
             'w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center',
             iconColors[iconColor]
           )}>
-            <Icon className="w-5 h-5 text-white" />
+            <Icon className="w-5 h-5 text-slate-900" />
           </div>
         )}
       </div>
 
       <div className="space-y-2">
-        <p className="text-3xl font-bold text-white font-display">
+        <p className="text-3xl font-bold text-slate-900 font-display">
           {formatValue(value)}
         </p>
         
@@ -79,7 +79,7 @@ export default function StatCard({
               'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold',
               change > 0 ? 'bg-success-500/20 text-success-400' :
               change < 0 ? 'bg-danger-500/20 text-danger-400' :
-              'bg-dark-700 text-dark-400'
+              'bg-slate-50 text-slate-600'
             )}>
               {getTrendIcon()}
               {formatPercent(Math.abs(change))}

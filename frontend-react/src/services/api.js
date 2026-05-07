@@ -2,9 +2,18 @@ import axios from 'axios'
 
 // Use direct backend URL during development if proxy doesn't work
 const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api'
+const USER_API_BASE_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:8001' : '')
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+const userApi = axios.create({
+  baseURL: USER_API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -24,6 +33,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+userApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
 // Response interceptor
 api.interceptors.response.use(
   (response) => response.data,
@@ -34,11 +54,21 @@ api.interceptors.response.use(
   }
 )
 
+userApi.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    const message = error.response?.data?.detail || error.message || 'Có lỗi xảy ra'
+    console.error('User API Error:', message)
+    return Promise.reject(error)
+  }
+)
+
 // ==================== Companies API ====================
 export const companiesApi = {
   getAll: () => api.get('/companies'),
   getByTicker: (ticker) => api.get(`/companies/${ticker}`),
   getFinancials: (ticker) => api.get(`/companies/${ticker}/financials`),
+  getBatch: (tickers) => api.get('/companies/batch', { params: { tickers: tickers.join(',') } }),
   search: (query) => api.get(`/companies/search`, { params: { q: query } }),
   getTickerGroups: (limit = 4) => api.get('/ticker-groups', { params: { limit } }),
 }
@@ -98,6 +128,10 @@ export const marketApi = {
   getSectorPerformance: () => api.get('/market/sectors'),
 }
 
+export const priceHistoryApi = {
+  getForTickers: (tickers, limit = 7) => api.get('/price-history', { params: { tickers: tickers.join(','), limit } }),
+}
+
 // ==================== Analysis API ====================
 export const analysisApi = {
   getRatios: (ticker) => api.get(`/analysis/${ticker}/ratios`),
@@ -121,14 +155,25 @@ export const advancedScreenerApi = {
 
 // ==================== Notifications API ====================
 export const notificationsApi = {
-  getAll: (unreadOnly = false, limit = 20) => 
-    api.get('/notifications', { params: { unread_only: unreadOnly, limit } }),
+  getAll: (unreadOnly = false) => 
+    userApi.get('/api/notifications', { params: { unread_only: unreadOnly } }),
   
   markAsRead: (id) => 
-    api.put(`/notifications/${id}/read`),
+    userApi.post('/api/notifications/mark-read', { id }),
   
   delete: (id) => 
-    api.delete(`/notifications/${id}`),
+    userApi.delete(`/api/notifications/${id}`),
+}
+
+export const watchlistApi = {
+  getAll: () => userApi.get('/api/watchlist'),
+  add: (ticker) => userApi.post('/api/watchlist/add', { ticker }),
+  remove: (ticker) => userApi.delete('/api/watchlist/remove', { data: { ticker } }),
+}
+
+export const userApiService = {
+  me: () => userApi.get('/api/user/me'),
+  updateMe: (payload) => userApi.put('/api/user/me', payload),
 }
 
 export default api

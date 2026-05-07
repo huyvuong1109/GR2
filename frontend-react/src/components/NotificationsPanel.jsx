@@ -11,12 +11,78 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('all') // 'all' or 'unread'
   const panelRef = useRef(null)
+  const wsRef = useRef(null)
+
+  const normalizeNotification = (notification) => {
+    let data = notification.data
+    if (typeof data === 'string' && data) {
+      try {
+        data = JSON.parse(data)
+      } catch (error) {
+        data = notification.data
+      }
+    }
+
+    return {
+      ...notification,
+      data,
+      ticker: notification.ticker || data?.ticker,
+    }
+  }
 
   useEffect(() => {
     if (isOpen) {
       fetchNotifications()
     }
   }, [isOpen, filter])
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token')
+    if (!isOpen || !token) {
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      return
+    }
+
+    const baseUrl = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:8001' : window.location.origin)
+    const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/ws/notifications?token=${encodeURIComponent(token)}`
+    const ws = new WebSocket(wsUrl)
+    wsRef.current = ws
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload.type === 'init' && Array.isArray(payload.notifications)) {
+          setNotifications(payload.notifications.map(normalizeNotification))
+          return
+        }
+        if (payload.type === 'notification' && payload.notification) {
+          setNotifications((prev) => [normalizeNotification(payload.notification), ...prev])
+          return
+        }
+        if (payload.type === 'read' && payload.id) {
+          setNotifications((prev) => prev.map((n) => n.id === payload.id ? { ...n, is_read: true } : n))
+          return
+        }
+        if (payload.type === 'delete' && payload.id) {
+          setNotifications((prev) => prev.filter((n) => n.id !== payload.id))
+        }
+      } catch (error) {
+        console.error('Invalid WS payload', error)
+      }
+    }
+
+    ws.onerror = () => {
+      ws.close()
+    }
+
+    return () => {
+      ws.close()
+      wsRef.current = null
+    }
+  }, [isOpen])
 
   // Close on click outside
   useEffect(() => {
@@ -39,7 +105,8 @@ export default function NotificationsPanel({ isOpen, onClose }) {
     try {
       setLoading(true)
       const data = await notificationsApi.getAll(filter === 'unread')
-      setNotifications(data.notifications || [])
+      const items = Array.isArray(data) ? data : []
+      setNotifications(items.map(normalizeNotification))
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
       toast.error('Không thể tải thông báo')
@@ -82,10 +149,10 @@ export default function NotificationsPanel({ isOpen, onClose }) {
 
   const getNotificationColor = (type) => {
     const colors = {
-      success: 'from-success-500/20 to-success-600/20 border-success-500/30',
-      warning: 'from-warning-500/20 to-warning-600/20 border-warning-500/30',
-      info: 'from-primary-500/20 to-primary-600/20 border-primary-500/30',
-      danger: 'from-danger-500/20 to-danger-600/20 border-danger-500/30',
+      success: 'bg-success-50 border-success-200',
+      warning: 'bg-warning-50 border-warning-200',
+      info: 'bg-primary-50 border-primary-200',
+      danger: 'bg-danger-50 border-danger-200',
     }
     return colors[type] || colors.info
   }
@@ -101,7 +168,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-dark-950/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-primary-900/40 backdrop-blur-sm z-40"
             onClick={onClose}
           />
 
@@ -112,38 +179,38 @@ export default function NotificationsPanel({ isOpen, onClose }) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 300 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed top-0 right-0 h-full w-full sm:w-96 bg-dark-900 border-l border-dark-800 z-50 flex flex-col"
+            className="fixed top-0 right-0 h-full w-full sm:w-96 bg-white border-l border-slate-200 shadow-2xl z-50 flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-dark-800">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-500/20 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-primary-400" />
+                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-primary-700" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Thông báo</h2>
-                  <p className="text-xs text-dark-400">
+                  <h2 className="text-lg font-semibold text-slate-900">Thông báo</h2>
+                  <p className="text-xs text-slate-600">
                     {unreadCount} chưa đọc
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-dark-800 text-dark-400 hover:text-white transition-colors"
+                className="p-2 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Filter tabs */}
-            <div className="flex gap-2 p-4 border-b border-dark-800">
+            <div className="flex gap-2 p-4 border-b border-slate-200">
               <button
                 onClick={() => setFilter('all')}
                 className={cn(
                   'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   filter === 'all'
-                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                    : 'text-dark-400 hover:text-white hover:bg-dark-800'
+                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 )}
               >
                 Tất cả
@@ -153,8 +220,8 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                 className={cn(
                   'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   filter === 'unread'
-                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                    : 'text-dark-400 hover:text-white hover:bg-dark-800'
+                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 )}
               >
                 Chưa đọc ({unreadCount})
@@ -168,7 +235,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-dark-500">
+                <div className="flex flex-col items-center justify-center h-full text-slate-500">
                   <Bell className="w-12 h-12 mb-3 opacity-50" />
                   <p className="text-sm">Không có thông báo nào</p>
                 </div>
@@ -182,14 +249,14 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -100 }}
                         className={cn(
-                          'relative p-4 rounded-xl border bg-gradient-to-br backdrop-blur-sm',
+                          'relative p-4 rounded-xl border',
                           getNotificationColor(notification.type),
-                          !notification.is_read && 'ring-2 ring-primary-500/20'
+                          !notification.is_read && 'ring-2 ring-primary-500/20 shadow-md shadow-primary-500/10'
                         )}
                       >
                         {/* Unread indicator */}
                         {!notification.is_read && (
-                          <div className="absolute top-2 right-2 w-2 h-2 bg-primary-500 rounded-full" />
+                          <div className="absolute top-2 right-2 w-2 h-2 bg-primary-600 rounded-full" />
                         )}
 
                         {/* Content */}
@@ -199,11 +266,11 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
-                              <h3 className="font-semibold text-white text-sm">
+                              <h3 className="font-semibold text-slate-900 text-sm">
                                 {notification.title}
                               </h3>
                             </div>
-                            <p className="text-xs text-dark-300 mb-2">
+                            <p className="text-xs text-slate-500 mb-2">
                               {notification.message}
                             </p>
                             
@@ -211,7 +278,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                             {notification.ticker && (
                               <Link
                                 to={`/company/${notification.ticker}`}
-                                className="inline-flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300"
+                                className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
                                 onClick={onClose}
                               >
                                 <span className="font-mono font-semibold">
@@ -222,18 +289,18 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                             )}
                             
                             {/* Timestamp */}
-                            <p className="text-xs text-dark-500 mt-2">
-                              {new Date(notification.timestamp).toLocaleString('vi-VN')}
+                            <p className="text-xs text-slate-500 mt-2">
+                              {new Date(notification.created_at).toLocaleString('vi-VN')}
                             </p>
                           </div>
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-dark-700">
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
                           {!notification.is_read && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-dark-800 hover:bg-dark-700 text-dark-300 hover:text-white transition-colors"
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
                             >
                               <Check className="w-3 h-3" />
                               Đánh dấu đã đọc
@@ -241,7 +308,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
                           )}
                           <button
                             onClick={() => handleDelete(notification.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-danger-500/20 hover:bg-danger-500/30 text-danger-400 transition-colors ml-auto"
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 transition-colors ml-auto"
                           >
                             <Trash2 className="w-3 h-3" />
                             Xóa

@@ -1,231 +1,254 @@
 """
-Dong bo thong tin cong ty vao bang companies tu API chung khoan.
+Dong bo thong tin co ban cong ty vao bang companies dung vnstock 3.x (source KBS).
 
 Nguon du lieu:
-- Gia realtime: SSI iBoard API
-- Ho so cong ty: VNDirect finfo API
+- listing.all_symbols()          : ten cong ty (1 request toan thi truong)
+- listing.symbols_by_industries(): nganh       (1 request toan thi truong)
+- company.overview() tung ticker : mo ta, charter_capital, shares_outstanding
+- ticker_type.json               : company_type, industry (uu tien hon API)
 
 Cap nhat cac cot:
-- name
-- industry
-- company_type (map tu ticker_type.json)
-- current_price
-- market_cap
-- shares_outstanding
+- name, industry, company_type
+- description, shares_outstanding, charter_capital
 - profile_updated_at
 
-Chay mot lan:
+Chay:
     python update_companies_from_api.py
-
-Chay dinh ky moi 60 phut:
-    python update_companies_from_api.py --interval-minutes 60
+    python update_companies_from_api.py --limit 10
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import requests
 from sqlalchemy import create_engine, text
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-DB_PATH = SCRIPT_DIR / "Database" / "master_db" / "analytics(final).db"
+try:
+    from vnstock import Vnstock
+except ImportError:
+    raise ImportError("Cai dat vnstock truoc: pip install vnstock")
+
+# ---------------------------------------------------------------------------
+# Paths & constants
+# ---------------------------------------------------------------------------
+SCRIPT_DIR       = Path(__file__).resolve().parent
+DB_PATH          = SCRIPT_DIR / "Database" / "master_db" / "analytics(final).db"
 TICKER_TYPE_PATH = SCRIPT_DIR / "ticker_type.json"
 
-SSI_API_URL = "https://iboard.ssi.com.vn/dchart/api/1.1/defaultAllStocks"
-VNDIRECT_STOCK_API = "https://finfo-api.vndirect.com.vn/v4/stocks"
+REQUEST_DELAY = 3.5  # giay giua cac ticker - KBS gioi han 20 req/phut (3s/req)
 
-REQUEST_TIMEOUT = 15
+DEFAULT_INDUSTRY_BY_TYPE: dict[str, str] = {
+    "bank":       "Ngan hang",
+    "securities": "Chung khoan",
+    "insurance":  "Bao hiem",
+}
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _normalize_ticker(value: Any) -> str:
     return str(value or "").strip().upper()
 
 
-def _to_number(value: Any) -> float | None:
+def _to_int(value: Any) -> int | None:
     try:
         if value is None:
             return None
-        if isinstance(value, str):
-            value = value.replace(",", "").strip()
-            if not value:
-                return None
-        number = float(value)
-        if number != number:
-            return None
-        return number
+        n = float(str(value).replace(",", "").strip())
+        return None if n != n else int(n)
     except Exception:
         return None
 
 
-def _normalize_price_vnd(raw_value: Any) -> float | None:
-    number = _to_number(raw_value)
-    if number is None or number <= 0:
+def _clean_text(value: Any) -> str | None:
+    if not value:
         return None
-
-    # Nhieu API tra gia theo nghin VND; trong DB can VND.
-    if number < 1000:
-        return number * 1000
-    return number
+    s = str(value).strip()
+    return s if s else None
 
 
-def load_ticker_type_map() -> dict[str, str]:
-    mapping: dict[str, str] = {}
+# ---------------------------------------------------------------------------
+# Load ticker_type.json
+# ---------------------------------------------------------------------------
+
+def load_ticker_type_map() -> tuple[dict[str, str], dict[str, str]]:
+    company_type_map: dict[str, str] = {}
+    industry_map:     dict[str, str] = {}
+
     if not TICKER_TYPE_PATH.exists():
-        return mapping
+        print(f"[WARN] Khong tim thay {TICKER_TYPE_PATH}")
+        return company_type_map, industry_map
 
-    import json
+    with open(TICKER_TYPE_PATH, "r", encoding="utf-8") as fh:
+        payload = json.load(fh)
 
-    with open(TICKER_TYPE_PATH, "r", encoding="utf-8") as file:
-        payload = json.load(file)
-
-    for company_type in ("bank", "securities", "insurance"):
-        tickers = payload.get(company_type, [])
-        if not isinstance(tickers, list):
-            continue
-        for ticker in tickers:
+    for ctype in ("bank", "securities", "insurance"):
+        for ticker in payload.get(ctype, []):
             code = _normalize_ticker(ticker)
             if code:
-                mapping[code] = company_type
+                company_type_map[code] = ctype
 
-    corporate_list = payload.get("corporate", [])
-    if isinstance(corporate_list, list):
-        for ticker in corporate_list:
+    for ticker in payload.get("corporate", []):
+        code = _normalize_ticker(ticker)
+        if code and code not in company_type_map:
+            company_type_map[code] = "corporate"
+
+    raw_industry = payload.get("industry_map", {})
+    if isinstance(raw_industry, dict):
+        for ticker, ind in raw_industry.items():
             code = _normalize_ticker(ticker)
-            if code and code not in mapping:
-                mapping[code] = "corporate"
+            if code and ind:
+                industry_map[code] = str(ind).strip()
 
-    return mapping
+    for code, ctype in company_type_map.items():
+        if code not in industry_map:
+            default_ind = DEFAULT_INDUSTRY_BY_TYPE.get(ctype)
+            if default_ind:
+                industry_map[code] = default_ind
 
+    print(
+        f"[INFO] ticker_type.json: {len(company_type_map)} ma co loai "
+        f"| {len(industry_map)} ma co nganh"
+    )
+    return company_type_map, industry_map
+
+
+# ---------------------------------------------------------------------------
+# Ensure DB columns
+# ---------------------------------------------------------------------------
 
 def ensure_company_columns(engine) -> None:
-    required_columns = {
-        "company_type": "TEXT NOT NULL DEFAULT 'corporate'",
-        "current_price": "REAL",
-        "market_cap": "BIGINT",
+    required = {
+        "company_type":       "TEXT NOT NULL DEFAULT 'corporate'",
+        "description":        "TEXT",
+        "market_cap":         "BIGINT",
         "shares_outstanding": "BIGINT",
+        "charter_capital":    "BIGINT",
         "profile_updated_at": "TEXT",
     }
-
     with engine.begin() as conn:
         existing = {
-            row[1] for row in conn.exec_driver_sql("PRAGMA table_info(companies)").fetchall()
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(companies)").fetchall()
         }
-
-        for column_name, column_ddl in required_columns.items():
-            if column_name in existing:
-                continue
-            conn.exec_driver_sql(
-                f"ALTER TABLE companies ADD COLUMN {column_name} {column_ddl}"
-            )
-
-
-def fetch_prices_from_ssi() -> dict[str, float]:
-    prices: dict[str, float] = {}
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json",
-    }
-
-    try:
-        response = requests.get(SSI_API_URL, headers=headers, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as error:
-        print(f"[WARN] Khong lay duoc gia tu SSI: {error}")
-        return prices
-
-    if isinstance(payload, dict):
-        iterable = payload.items()
-    elif isinstance(payload, list):
-        iterable = [(_normalize_ticker(item.get("symbol") or item.get("ticker")), item) for item in payload if isinstance(item, dict)]
-    else:
-        iterable = []
-
-    for key, info in iterable:
-        ticker = _normalize_ticker(key)
-        if not ticker or not isinstance(info, dict):
-            continue
-
-        raw_price = (
-            info.get("lastPrice")
-            or info.get("matchPrice")
-            or info.get("closePrice")
-            or info.get("price")
-        )
-        normalized = _normalize_price_vnd(raw_price)
-        if normalized is not None:
-            prices[ticker] = normalized
-
-    print(f"[INFO] SSI gia: {len(prices)} ma")
-    return prices
+        for col_name, col_ddl in required.items():
+            if col_name not in existing:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE companies ADD COLUMN {col_name} {col_ddl}"
+                )
+                print(f"[DB] Them cot: {col_name}")
 
 
-def fetch_profile_from_vndirect(ticker: str) -> dict[str, Any]:
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json",
-    }
+# ---------------------------------------------------------------------------
+# Load toan bo ten + nganh — chi 2 request, khong tinh vao rate limit ticker
+# ---------------------------------------------------------------------------
 
-    params = {
-        "q": f"code:{ticker}",
-        "fields": "code,companyName,name,industryName,icbName,marketCap,marketCapitalization,sharesOutstanding,listedShare,listedShares",
-        "size": 1,
-    }
+def load_market_data() -> dict[str, dict[str, str]]:
+    """
+    Goi 2 API toan thi truong:
+      listing.all_symbols()           -> symbol, organ_name (ten cong ty)
+      listing.symbols_by_industries() -> symbol, industry_name (nganh)
+
+    Tra ve: { 'VHM': {'name': 'CTCP Vinhomes', 'industry': 'Bat dong san'}, ... }
+    """
+    data: dict[str, dict[str, str]] = {}
 
     try:
-        response = requests.get(VNDIRECT_STOCK_API, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception:
-        return {}
+        listing = Vnstock().stock(symbol="VNM", source="KBS").listing
 
-    rows = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(rows, list) or not rows:
-        return {}
+        # Ten cong ty
+        df_names = listing.all_symbols()
+        if df_names is not None and not df_names.empty:
+            for _, row in df_names.iterrows():
+                ticker = _normalize_ticker(row.get("symbol"))
+                name   = _clean_text(row.get("organ_name"))
+                if ticker:
+                    data.setdefault(ticker, {})["name"] = name or ""
+            print(f"[INFO] all_symbols: {len(df_names)} ma")
 
-    row = rows[0] if isinstance(rows[0], dict) else {}
+        # Nganh
+        df_ind = listing.symbols_by_industries()
+        if df_ind is not None and not df_ind.empty:
+            for _, row in df_ind.iterrows():
+                ticker   = _normalize_ticker(row.get("symbol"))
+                industry = _clean_text(row.get("industry_name"))
+                if ticker:
+                    data.setdefault(ticker, {})["industry"] = industry or ""
+            print(f"[INFO] symbols_by_industries: {len(df_ind)} ma co nganh")
 
-    return {
-        "name": row.get("companyName") or row.get("name"),
-        "industry": row.get("industryName") or row.get("icbName"),
-        "market_cap": row.get("marketCap") or row.get("marketCapitalization"),
-        "shares_outstanding": row.get("sharesOutstanding") or row.get("listedShare") or row.get("listedShares"),
-    }
+    except Exception as err:
+        print(f"[WARN] load_market_data: {err}")
 
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Fetch overview tung ticker — mo ta, charter_capital, shares_outstanding
+# ---------------------------------------------------------------------------
+
+def fetch_company_info(ticker: str) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    try:
+        stock = Vnstock().stock(symbol=ticker, source="KBS")
+        df    = stock.company.overview()
+    except Exception as err:
+        print(f"  [WARN] {ticker}: {err}")
+        return result
+
+    if df is None or df.empty:
+        return result
+
+    row = df.iloc[0].to_dict()
+
+    result["description"]        = _clean_text(row.get("business_model") or row.get("history"))
+    result["charter_capital"]    = _to_int(row.get("charter_capital"))
+    result["shares_outstanding"] = _to_int(row.get("outstanding_shares"))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def update_companies(limit: int | None = None) -> None:
     if not DB_PATH.exists():
-        raise FileNotFoundError(f"Khong tim thay database: {DB_PATH}")
+        raise FileNotFoundError(f"Khong tim thay DB: {DB_PATH}")
 
     engine = create_engine(f"sqlite:///{DB_PATH}")
     ensure_company_columns(engine)
 
-    ticker_type_map = load_ticker_type_map()
-    prices = fetch_prices_from_ssi()
+    company_type_map, industry_map = load_ticker_type_map()
 
-    with engine.begin() as conn:
+    # Load ten + nganh toan thi truong (2 request, 1 lan)
+    print("[INFO] Dang tai danh sach ten va nganh toan thi truong...")
+    market_data = load_market_data()
+
+    with engine.connect() as conn:
         rows = conn.execute(
             text(
                 """
                 SELECT id, ticker, name, industry, company_type,
-                       current_price, market_cap, shares_outstanding
+                       description, market_cap, shares_outstanding, charter_capital
                 FROM companies
                 ORDER BY ticker
                 """
             )
         ).mappings().all()
 
-    if limit is not None and limit > 0:
+    if limit and limit > 0:
         rows = rows[:limit]
 
-    updated = 0
-    skipped = 0
+    print(f"[INFO] Tong so ma can cap nhat: {len(rows)}\n")
+
+    updated = skipped = desc_ok = desc_miss = 0
 
     with engine.begin() as conn:
         for row in rows:
@@ -234,85 +257,107 @@ def update_companies(limit: int | None = None) -> None:
                 skipped += 1
                 continue
 
-            profile = fetch_profile_from_vndirect(ticker)
-            current_price = prices.get(ticker)
-            if current_price is None:
-                current_price = _to_number(row.get("current_price"))
+            # Lay overview tung ticker (co rate limit)
+            info = fetch_company_info(ticker)
+            time.sleep(REQUEST_DELAY)
 
-            market_cap = _to_number(profile.get("market_cap")) or _to_number(row.get("market_cap"))
-            shares_outstanding = _to_number(profile.get("shares_outstanding")) or _to_number(row.get("shares_outstanding"))
+            # --- Ten: market_data -> DB cu -> ticker ---
+            name = (
+                market_data.get(ticker, {}).get("name")
+                or _clean_text(row.get("name"))
+                or ticker
+            )
 
-            if market_cap is None and current_price and shares_outstanding:
-                market_cap = current_price * shares_outstanding
-            if shares_outstanding is None and market_cap and current_price:
-                shares_outstanding = round(market_cap / current_price)
+            # --- Nganh: ticker_type.json -> market_data -> DB cu ---
+            industry = (
+                industry_map.get(ticker)
+                or market_data.get(ticker, {}).get("industry")
+                or _clean_text(row.get("industry"))
+            )
 
-            company_type = ticker_type_map.get(ticker) or row.get("company_type") or "corporate"
+            # --- Company type: ticker_type.json -> DB cu -> corporate ---
+            company_type = (
+                company_type_map.get(ticker)
+                or _clean_text(row.get("company_type"))
+                or "corporate"
+            )
             if company_type not in ("corporate", "bank", "insurance", "securities"):
                 company_type = "corporate"
 
-            name = profile.get("name") or row.get("name") or ticker
-            industry = profile.get("industry") or row.get("industry")
+            # --- Mo ta: API -> DB cu ---
+            description = info.get("description") or _clean_text(row.get("description"))
+            if info.get("description"):
+                desc_ok += 1
+            else:
+                desc_miss += 1
+
+            shares_outstanding = (
+                _to_int(info.get("shares_outstanding"))
+                or _to_int(row.get("shares_outstanding"))
+            )
+            charter_capital = (
+                _to_int(info.get("charter_capital"))
+                or _to_int(row.get("charter_capital"))
+            )
+            market_cap = _to_int(row.get("market_cap"))
 
             conn.execute(
                 text(
                     """
                     UPDATE companies
-                    SET name = :name,
-                        industry = :industry,
-                        company_type = :company_type,
-                        current_price = :current_price,
-                        market_cap = :market_cap,
-                        shares_outstanding = :shares_outstanding,
-                        profile_updated_at = :profile_updated_at
+                    SET name                = :name,
+                        industry            = :industry,
+                        company_type        = :company_type,
+                        description         = :description,
+                        market_cap          = :market_cap,
+                        shares_outstanding  = :shares_outstanding,
+                        charter_capital     = :charter_capital,
+                        profile_updated_at  = :profile_updated_at
                     WHERE UPPER(ticker) = :ticker
                     """
                 ),
                 {
-                    "name": name,
-                    "industry": industry,
-                    "company_type": company_type,
-                    "current_price": current_price,
-                    "market_cap": int(market_cap) if market_cap is not None else None,
-                    "shares_outstanding": int(shares_outstanding) if shares_outstanding is not None else None,
+                    "name":               name,
+                    "industry":           industry,
+                    "company_type":       company_type,
+                    "description":        description,
+                    "market_cap":         market_cap,
+                    "shares_outstanding": shares_outstanding,
+                    "charter_capital":    charter_capital,
                     "profile_updated_at": datetime.now().isoformat(timespec="seconds"),
-                    "ticker": ticker,
+                    "ticker":             ticker,
                 },
             )
+
             updated += 1
-            print(f"[OK] {ticker}: type={company_type}, price={current_price or 0:,.0f}")
-            time.sleep(0.12)
+            has_desc = "co mo ta" if description else "khong mo ta"
+            print(
+                f"[OK] {ticker:6s} | {company_type:10s} | {(industry or '—'):24s} "
+                f"| {(name or '—'):40s} | {has_desc}"
+            )
 
-    print(f"\n[SUMMARY] Da cap nhat {updated} ma | bo qua {skipped} ma")
+    print(
+        f"\n[SUMMARY] Cap nhat: {updated} | Bo qua: {skipped} | "
+        f"Co mo ta: {desc_ok} | Khong mo ta: {desc_miss}"
+    )
 
 
-def run_loop(interval_minutes: int, limit: int | None = None) -> None:
-    while True:
-        start = datetime.now()
-        print("=" * 72)
-        print(f"[RUN] Bat dau dong bo companies: {start.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 72)
-
-        try:
-            update_companies(limit=limit)
-        except Exception as error:
-            print(f"[ERROR] {error}")
-
-        if interval_minutes <= 0:
-            break
-
-        print(f"\n[WAIT] Ngu {interval_minutes} phut truoc lan cap nhat tiep theo...")
-        time.sleep(interval_minutes * 60)
-
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Dong bo thong tin companies tu API chung khoan")
-    parser.add_argument("--interval-minutes", type=int, default=0, help="Chu ky cap nhat (phut). 0 = chay mot lan")
-    parser.add_argument("--limit", type=int, default=0, help="Chi cap nhat N ma dau tien (phuc vu test)")
+    parser = argparse.ArgumentParser(description="Cap nhat thong tin co ban cong ty (vnstock KBS)")
+    parser.add_argument(
+        "--limit", type=int, default=0,
+        help="Chi cap nhat N ma dau (de test)"
+    )
     args = parser.parse_args()
 
-    limit = args.limit if args.limit and args.limit > 0 else None
-    run_loop(interval_minutes=args.interval_minutes, limit=limit)
+    print("=" * 80)
+    print(f"[RUN] Bat dau: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 80)
+    update_companies(limit=args.limit if args.limit > 0 else None)
 
 
 if __name__ == "__main__":

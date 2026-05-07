@@ -40,7 +40,7 @@ export default function Select({
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           className={cn(
-            'w-full flex items-center justify-between px-4 py-3 bg-dark-800/50 border border-dark-600 rounded-xl text-left transition-all',
+            'w-full flex items-center justify-between px-4 py-3 bg-white/50 border border-dark-600 rounded-xl text-left transition-all',
             'focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500',
             isOpen && 'ring-2 ring-primary-500/50 border-primary-500',
             error && 'border-danger-500',
@@ -49,12 +49,12 @@ export default function Select({
         >
           <span className={cn(
             'block truncate',
-            selectedOption ? 'text-white' : 'text-dark-400'
+            selectedOption ? 'text-slate-900' : 'text-slate-600'
           )}>
             {selectedOption?.label || placeholder}
           </span>
           <ChevronDown className={cn(
-            'w-4 h-4 text-dark-400 transition-transform',
+            'w-4 h-4 text-slate-600 transition-transform',
             isOpen && 'rotate-180'
           )} />
         </button>
@@ -66,7 +66,7 @@ export default function Select({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.15 }}
-              className="absolute z-[100] w-full mt-2 bg-dark-800 border border-dark-600 rounded-xl shadow-xl overflow-hidden"
+              className="absolute z-[100] w-full mt-2 bg-white border border-dark-600 rounded-xl shadow-xl overflow-hidden"
             >
               <div className="max-h-60 overflow-auto py-2">
                 {options.map((option) => (
@@ -83,7 +83,7 @@ export default function Select({
                     }}
                     className={cn(
                       'w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors',
-                      'hover:bg-dark-700',
+                      'hover:bg-slate-50',
                       option.value === value && 'bg-primary-500/10 text-primary-400'
                     )}
                   >

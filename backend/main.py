@@ -222,6 +222,7 @@ class CompanyResponse(BaseModel):
     id: int
     ticker: str
     name: str
+    description: Optional[str] = None
     industry: Optional[str]
     market_cap: Optional[int]
     shares_outstanding: Optional[int]
@@ -318,11 +319,10 @@ async def get_companies():
     result = []
     for _, row in df.iterrows():
         company = row.to_dict()
-        # Thêm price và change nếu chưa có
+        # Thêm price nếu chưa có
         if 'price' not in company or pd.isna(company.get('price')):
-            company['price'] = company.get('current_price', 0)
-        if 'change' not in company or pd.isna(company.get('change')):
-            company['change'] = round(np.random.uniform(-5, 8), 2)  # Mock change
+            company['price'] = company.get('current_price', None)
+        company['change'] = company.get('change') if not pd.isna(company.get('change')) else None
         # Đảm bảo có các trường cơ bản
         company['pe'] = company.get('pe_ratio', 0) or 0
         company['roe'] = company.get('roe', 0) or 0
@@ -332,6 +332,30 @@ async def get_companies():
     result.sort(key=lambda x: x.get('market_cap', 0) or 0, reverse=True)
     
     return result
+
+
+@app.get("/api/companies/batch")
+async def get_companies_batch(tickers: str = Query(..., description="Comma-separated tickers")):
+    symbols = [t.strip().upper() for t in tickers.split(',') if t.strip()]
+    df = db.get_companies_by_tickers(symbols)
+    if df.empty:
+        return []
+    return df.where(pd.notnull(df), None).to_dict(orient='records')
+
+
+@app.get("/api/price-history")
+async def get_price_history(tickers: str = Query(..., description="Comma-separated tickers"), limit: int = Query(7, ge=1, le=30)):
+    symbols = [t.strip().upper() for t in tickers.split(',') if t.strip()]
+    payload = {}
+    for symbol in symbols:
+        df = db.get_price_history(symbol, limit)
+        if df.empty:
+            payload[symbol] = []
+            continue
+        rows = df.where(pd.notnull(df), None).to_dict(orient='records')
+        rows = list(reversed(rows))
+        payload[symbol] = rows
+    return payload
 
 
 @app.get("/api/companies/search")
@@ -592,41 +616,15 @@ async def get_sector_distribution():
 @app.get("/api/market/top-gainers")
 async def get_top_gainers(limit: int = 10):
     """Top cổ phiếu tăng giá mạnh (mock data)"""
-    # This would require price history data
-    # For now, return companies sorted by market cap
-    companies_df = db.get_all_companies()
-    top = companies_df.nlargest(limit, 'market_cap')
-    
-    result = []
-    for _, row in top.iterrows():
-        result.append({
-            "ticker": row['ticker'],
-            "name": row['name'],
-            "industry": row['industry'],
-            "market_cap": int(row['market_cap']) if not pd.isna(row['market_cap']) else 0,
-            "change_percent": round(np.random.uniform(1, 10), 2)  # Mock data
-        })
-    
-    return result
+    df = db.get_top_movers(limit, direction="gainers")
+    return df.where(pd.notnull(df), None).to_dict(orient='records')
 
 
 @app.get("/api/market/top-losers")
 async def get_top_losers(limit: int = 10):
     """Top cổ phiếu giảm giá mạnh (mock data)"""
-    companies_df = db.get_all_companies()
-    top = companies_df.nsmallest(limit, 'market_cap')
-    
-    result = []
-    for _, row in top.iterrows():
-        result.append({
-            "ticker": row['ticker'],
-            "name": row['name'],
-            "industry": row['industry'],
-            "market_cap": int(row['market_cap']) if not pd.isna(row['market_cap']) else 0,
-            "change_percent": round(-np.random.uniform(1, 10), 2)  # Mock data
-        })
-    
-    return result
+    df = db.get_top_movers(limit, direction="losers")
+    return df.where(pd.notnull(df), None).to_dict(orient='records')
 
 
 @app.get("/api/screening/presets")
@@ -677,64 +675,10 @@ async def get_preset_filters():
 @app.get("/api/notifications")
 async def get_notifications(unread_only: bool = False, limit: int = 20):
     """Lấy danh sách thông báo"""
-    from datetime import datetime, timedelta
-    
-    # Mock notifications data
-    notifications = [
-        {
-            "id": 1,
-            "title": "Báo cáo tài chính mới",
-            "message": "VNM vừa công bố BCTC Q4/2025 với EPS tăng 15%",
-            "type": "success",
-            "timestamp": (datetime.now() - timedelta(hours=2)).isoformat(),
-            "is_read": False,
-            "ticker": "VNM"
-        },
-        {
-            "id": 2,
-            "title": "Canh bao thi truong",
-            "message": "FPT đang giao dịch trên giá trị nội tại 20%",
-            "type": "warning",
-            "timestamp": (datetime.now() - timedelta(hours=5)).isoformat(),
-            "is_read": False,
-            "ticker": "FPT"
-        },
-        {
-            "id": 3,
-            "title": "Cơ hội đầu tư",
-            "message": "HPG có ROE > 15% trong 5 năm liên tiếp",
-            "type": "info",
-            "timestamp": (datetime.now() - timedelta(days=1)).isoformat(),
-            "is_read": True,
-            "ticker": "HPG"
-        },
-        {
-            "id": 4,
-            "title": "Tin tức thị trường",
-            "message": "VN-Index tăng 1.2% trong phiên hôm nay",
-            "type": "info",
-            "timestamp": (datetime.now() - timedelta(days=1, hours=3)).isoformat(),
-            "is_read": True,
-            "ticker": None
-        },
-        {
-            "id": 5,
-            "title": "Cổ tức",
-            "message": "VCB chi trả cổ tức 2000đ/cp vào ngày 15/01",
-            "type": "success",
-            "timestamp": (datetime.now() - timedelta(days=2)).isoformat(),
-            "is_read": True,
-            "ticker": "VCB"
-        }
-    ]
-    
-    if unread_only:
-        notifications = [n for n in notifications if not n['is_read']]
-    
     return {
-        "total": len(notifications),
-        "unread": len([n for n in notifications if not n['is_read']]),
-        "notifications": notifications[:limit]
+        "total": 0,
+        "unread": 0,
+        "notifications": []
     }
 
 
@@ -1010,6 +954,221 @@ async def get_risk_warnings(ticker: str):
         }
     finally:
         session.close()
+
+
+# ============ Value Investing APIs ============
+
+def _trend_label(values: list[float], threshold: float = 0.08) -> str:
+    if len(values) < 2:
+        return "flat"
+    first = values[0]
+    last = values[-1]
+    if first in (None, 0) or pd.isna(first) or pd.isna(last):
+        return "flat"
+    change = (last - first) / abs(first)
+    if change > threshold:
+        return "increasing"
+    if change < -threshold:
+        return "decreasing"
+    return "flat"
+
+
+def _consistency_label(growth_series: list[float], threshold: float = 7.5) -> str:
+    values = [v for v in growth_series if v is not None and not pd.isna(v)]
+    if len(values) < 3:
+        return "insufficient"
+    return "consistent" if float(np.std(values)) <= threshold else "volatile"
+
+
+def _compute_intrinsic_value(fcf: float, growth_rate: float, discount_rate: float, years: int) -> float | None:
+    if fcf is None or fcf <= 0 or discount_rate <= 0 or years <= 0:
+        return None
+    growth = growth_rate / 100
+    discount = discount_rate / 100
+    intrinsic = 0.0
+    for year in range(1, years + 1):
+        projected = fcf * ((1 + growth) ** year)
+        intrinsic += projected / ((1 + discount) ** year)
+    return intrinsic
+
+
+@app.get("/api/value/companies/{ticker}/analysis")
+async def value_analysis(ticker: str, years: int = Query(10, ge=5, le=15)):
+    df = db.get_long_term_metrics(ticker.upper(), years)
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+    revenue_trend = _trend_label(df["revenue"].tolist())
+    profit_trend = _trend_label(df["net_profit"].tolist())
+    revenue_consistency = _consistency_label(df["revenue_growth"].tolist())
+    profit_consistency = _consistency_label(df["profit_growth"].tolist())
+
+    latest = df.iloc[-1]
+    debt_to_equity = None
+    if latest.get("total_equity") and latest.get("total_equity") != 0:
+        debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
+
+    summary = []
+    if revenue_consistency == "consistent" and profit_consistency == "consistent":
+        summary.append("Consistent growth over 5 years")
+    if profit_trend == "decreasing":
+        summary.append("Declining profitability")
+    if debt_to_equity and debt_to_equity > 1.5:
+        summary.append("High debt relative to equity")
+    if revenue_trend == "flat" and profit_trend == "flat":
+        summary.append("Flat growth trend")
+
+    return {
+        "ticker": ticker.upper(),
+        "time_series": df.where(pd.notnull(df), None).to_dict(orient="records"),
+        "summary": summary,
+        "trends": {
+            "revenue": revenue_trend,
+            "profit": profit_trend,
+        },
+        "consistency": {
+            "revenue_growth": revenue_consistency,
+            "profit_growth": profit_consistency,
+        },
+    }
+
+
+class IntrinsicValueRequest(BaseModel):
+    growth_rate: float
+    discount_rate: float
+    years: int = 5
+
+
+@app.post("/api/value/companies/{ticker}/intrinsic-value")
+async def intrinsic_value(ticker: str, payload: IntrinsicValueRequest):
+    df = db.get_long_term_metrics(ticker.upper(), max(payload.years, 5))
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+    latest = df.iloc[-1]
+    fcf = latest.get("free_cash_flow")
+    intrinsic_total = _compute_intrinsic_value(fcf, payload.growth_rate, payload.discount_rate, payload.years)
+    shares = latest.get("shares_outstanding")
+    intrinsic_per_share = None
+    if intrinsic_total is not None and shares and shares > 0:
+        intrinsic_per_share = intrinsic_total / shares
+
+    return {
+        "ticker": ticker.upper(),
+        "intrinsic_value": intrinsic_per_share,
+        "assumptions": {
+            "growth_rate": payload.growth_rate,
+            "discount_rate": payload.discount_rate,
+            "years": payload.years,
+            "base_free_cash_flow": fcf,
+        },
+    }
+
+
+@app.get("/api/value/companies/{ticker}/margin-of-safety")
+async def margin_of_safety(
+    ticker: str,
+    growth_rate: float = Query(8.0),
+    discount_rate: float = Query(12.0),
+    years: int = Query(5, ge=3, le=10),
+):
+    df = db.get_long_term_metrics(ticker.upper(), max(years, 5))
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+    latest = df.iloc[-1]
+    fcf = latest.get("free_cash_flow")
+    intrinsic_total = _compute_intrinsic_value(fcf, growth_rate, discount_rate, years)
+    shares = latest.get("shares_outstanding")
+    intrinsic_per_share = None
+    if intrinsic_total is not None and shares and shares > 0:
+        intrinsic_per_share = intrinsic_total / shares
+
+    market_price = latest.get("current_price")
+    margin = None
+    label = None
+    if intrinsic_per_share and market_price:
+        margin = (intrinsic_per_share - market_price) / intrinsic_per_share
+        if margin > 0.15:
+            label = "Undervalued"
+        elif margin < -0.15:
+            label = "Overvalued"
+        else:
+            label = "Fairly valued"
+
+    return {
+        "ticker": ticker.upper(),
+        "market_price": market_price,
+        "intrinsic_value": intrinsic_per_share,
+        "margin_of_safety": margin,
+        "label": label,
+        "assumptions": {
+            "growth_rate": growth_rate,
+            "discount_rate": discount_rate,
+            "years": years,
+        },
+    }
+
+
+@app.get("/api/value/companies/{ticker}/insights")
+async def investment_insights(ticker: str):
+    df = db.get_long_term_metrics(ticker.upper(), 10)
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+    insights = []
+    if (df["roe"].tail(5) >= 20).all():
+        insights.append("Company has maintained ROE above 20% for 5 years")
+
+    revenue_growth = df["revenue_growth"].dropna().tail(3).tolist()
+    if len(revenue_growth) == 3 and revenue_growth[2] < revenue_growth[0]:
+        insights.append("Revenue growth is slowing down")
+
+    debt_series = df["debt"].dropna().tolist()
+    if _trend_label(debt_series) == "increasing":
+        insights.append("Debt level is increasing significantly")
+
+    if not insights:
+        insights.append("No major long-term red flags detected")
+
+    return {
+        "ticker": ticker.upper(),
+        "insights": insights,
+    }
+
+
+@app.get("/api/value/companies/{ticker}/health-score")
+async def value_health_score(ticker: str):
+    df = db.get_long_term_metrics(ticker.upper(), 10)
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+    latest = df.iloc[-1]
+    roe = latest.get("roe") or 0
+    revenue_growth = latest.get("revenue_growth") or 0
+    profit_growth = latest.get("profit_growth") or 0
+    debt_to_equity = None
+    if latest.get("total_equity") and latest.get("total_equity") != 0:
+        debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
+    fcf = latest.get("free_cash_flow") or 0
+
+    profitability = min(10, max(0, roe / 2))
+    growth = min(10, max(0, (revenue_growth + profit_growth) / 4))
+    debt_score = 10 if debt_to_equity is None else max(0, 10 - (debt_to_equity * 4))
+    efficiency = 10 if fcf > 0 else 4
+
+    overall = round((profitability + growth + debt_score + efficiency) / 4, 2)
+
+    return {
+        "ticker": ticker.upper(),
+        "overall": overall,
+        "breakdown": {
+            "profitability": round(profitability, 2),
+            "growth": round(growth, 2),
+            "debt": round(debt_score, 2),
+            "efficiency": round(efficiency, 2),
+        },
+    }
 
 
 class CompareRequest(BaseModel):

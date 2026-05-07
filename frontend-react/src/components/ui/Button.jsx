@@ -5,17 +5,17 @@ import { Loader2 } from 'lucide-react'
 const variants = {
   primary: 'btn-primary',
   secondary: 'btn-secondary',
+  success: 'btn-success',
   ghost: 'btn-ghost',
-  danger: 'px-6 py-3 bg-danger-500 text-white font-semibold rounded-xl hover:bg-danger-600 active:scale-[0.98] transition-all duration-200',
-  success: 'px-6 py-3 bg-success-500 text-white font-semibold rounded-xl hover:bg-success-600 active:scale-[0.98] transition-all duration-200',
-  outline: 'px-6 py-3 bg-transparent border-2 border-primary-500 text-primary-400 font-semibold rounded-xl hover:bg-primary-500/10 active:scale-[0.98] transition-all duration-200',
+  danger: 'px-5 py-2.5 bg-red-700 text-slate-900 font-medium rounded-lg hover:bg-red-800 active:bg-red-900 transition-colors duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
+  outline: 'px-5 py-2.5 bg-transparent border border-navy-300 text-navy-700 font-medium rounded-lg hover:bg-navy-50 hover:border-navy-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2',
 }
 
 const sizes = {
-  sm: 'px-4 py-2 text-sm',
-  md: 'px-6 py-3 text-base',
-  lg: 'px-8 py-4 text-lg',
-  icon: 'p-2.5',
+  sm: 'px-3 py-1.5 text-sm',
+  md: 'px-5 py-2.5 text-base',
+  lg: 'px-6 py-3 text-lg',
+  icon: 'p-2',
 }
 
 const Button = forwardRef(({
@@ -36,7 +36,7 @@ const Button = forwardRef(({
         variants[variant],
         size !== 'md' && sizes[size],
         'inline-flex items-center justify-center gap-2',
-        (isLoading || disabled) && 'opacity-60 cursor-not-allowed',
+        (isLoading || disabled) && 'opacity-50 cursor-not-allowed',
         className
       )}
       disabled={isLoading || disabled}

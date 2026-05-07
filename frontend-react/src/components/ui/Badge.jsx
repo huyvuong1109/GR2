@@ -2,13 +2,13 @@ import { cn } from '../../utils/helpers'
 
 export function Badge({ children, variant = 'default', size = 'md', className, ...props }) {
   const variants = {
-    default: 'bg-dark-700 text-dark-200 border-dark-600',
+    default: 'badge-neutral',
     success: 'badge-success',
     danger: 'badge-danger',
     warning: 'badge-warning',
     info: 'badge-info',
-    primary: 'bg-primary-500/20 text-primary-400 border-primary-500/30',
-    secondary: 'bg-accent-500/20 text-accent-400 border-accent-500/30',
+    primary: 'bg-navy-100 text-navy-800 border-navy-300',
+    secondary: 'bg-paper-200 text-paper-700 border-paper-300',
   }
 
   const sizes = {
@@ -20,7 +20,7 @@ export function Badge({ children, variant = 'default', size = 'md', className, .
   return (
     <span
       className={cn(
-        'inline-flex items-center font-semibold rounded-lg border',
+        'inline-flex items-center font-semibold rounded-md border',
         variants[variant],
         sizes[size],
         className

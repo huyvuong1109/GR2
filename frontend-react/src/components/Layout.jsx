@@ -9,36 +9,32 @@ import {
   TrendingUp,
   Bell,
   Settings,
-  Moon,
-  Sun,
   Scale,
   FileText,
 } from 'lucide-react'
 import { cn } from '../utils/helpers'
 import NotificationsPanel from './NotificationsPanel'
 import SearchModal from './SearchModal'
+import WatchlistSidebar from './WatchlistSidebar'
 import { marketApi } from '../services/api'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Screener', href: '/screener', icon: Search },
-  { name: 'Compare', href: '/compare', icon: Scale },
-  { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Bảng điều khiển', href: '/', icon: LayoutDashboard },
+  { name: 'Bộ lọc cổ phiếu', href: '/screener', icon: Search },
+  { name: 'So sánh', href: '/compare', icon: Scale },
+  { name: 'Báo cáo tài chính', href: '/reports', icon: FileText },
 ]
 
 const pageTitles = {
-  '/': 'Dashboard',
-  '/screener': 'Screener',
-  '/compare': 'Comparison',
-  '/reports': 'Reports',
+  '/': 'Bảng điều khiển',
+  '/screener': 'Bộ lọc cổ phiếu',
+  '/compare': 'So sánh',
+  '/reports': 'Báo cáo tài chính',
+  '/settings': 'Cài đặt',
 }
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('theme')
-    return saved ? saved === 'dark' : true
-  })
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [marketStatus, setMarketStatus] = useState(null)
@@ -50,23 +46,11 @@ export default function Layout() {
     }
 
     if (location.pathname.startsWith('/company/')) {
-      return 'Company Detail'
+      return 'Chi tiết doanh nghiệp'
     }
 
-    return 'Dashboard'
+    return 'Bảng điều khiển'
   }, [location.pathname])
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-      document.documentElement.classList.remove('light')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.add('light')
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }, [darkMode])
 
   useEffect(() => {
     const fetchMarketStatus = async () => {
@@ -96,159 +80,171 @@ export default function Layout() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#06070b] text-white">
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(163,230,53,0.06),transparent_32%),radial-gradient(circle_at_85%_20%,rgba(56,189,248,0.07),transparent_30%),radial-gradient(circle_at_60%_100%,rgba(148,163,184,0.07),transparent_35%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(255,255,255,0.02)_0%,transparent_35%,transparent_65%,rgba(255,255,255,0.02)_100%)]" />
-      </div>
-
+    <div className="min-h-screen bg-slate-50">
+      {/* Mobile sidebar backdrop */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/65 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
+      {/* Sidebar */}
       <aside
         className={cn(
-          'fixed bottom-4 left-4 top-4 z-50 w-24 rounded-3xl border border-white/10 bg-black/45 p-3 backdrop-blur-2xl transition-transform duration-300',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-[120%] lg:translate-x-0'
+          'fixed left-0 top-0 z-50 h-full w-64 sidebar transition-transform duration-300 lg:translate-x-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-full flex-col items-center justify-between">
-          <div className="w-full space-y-6">
-            <div className="flex items-center justify-center">
-              <NavLink to="/" className="flex h-12 w-12 items-center justify-center rounded-xl bg-lime-400/20 text-lime-300">
+        <div className="flex h-full flex-col">
+          {/* Logo */}
+          <div className="sidebar-header">
+            <NavLink to="/" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary text-white shadow-lg shadow-primary-500/30">
                 <TrendingUp className="h-6 w-6" />
-              </NavLink>
-            </div>
-
-            <nav className="space-y-1">
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href
-                return (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={cn(
-                      'group flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-[10px] font-medium transition-all',
-                      isActive
-                        ? 'border-lime-300/35 bg-lime-300/10 text-lime-200'
-                        : 'border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-slate-200'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="tracking-wide">{item.name}</span>
-                  </NavLink>
-                )
-              })}
-            </nav>
+              </div>
+              <div>
+                <h1 className="text-lg font-serif font-bold text-white">Value Invest</h1>
+                <p className="text-xs text-slate-400">Đầu tư giá trị</p>
+              </div>
+            </NavLink>
           </div>
 
-          <div className="w-full space-y-2">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="flex w-full flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2 text-[10px] text-slate-300 transition-colors hover:bg-white/10"
-            >
-              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              Theme
-            </button>
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1 p-4">
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    'nav-link',
+                    isActive && 'active'
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </NavLink>
+              )
+            })}
+          </nav>
 
-            <button
-              className="flex w-full flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-2 text-[10px] text-slate-300 transition-colors hover:bg-white/10"
+          {/* Settings */}
+          <div className="border-t border-slate-200 p-4">
+            <NavLink
+              to="/settings"
+              className="nav-link"
             >
-              <Settings className="h-4 w-4" />
-              Settings
-            </button>
+              <Settings className="h-5 w-5" />
+              <span>Cài đặt</span>
+            </NavLink>
           </div>
         </div>
       </aside>
 
-      <div className="lg:pl-32">
-        <header className="sticky top-0 z-30 px-4 pt-4 lg:px-6">
-          <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between rounded-2xl border border-white/10 bg-black/35 px-4 backdrop-blur-xl lg:px-6">
-            <div className="flex items-center gap-3">
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Header */}
+        <header className="header sticky top-0 z-30">
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 lg:px-6">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="rounded-lg border border-white/15 p-2 text-slate-300 hover:bg-white/10 lg:hidden"
+                className="btn-ghost lg:hidden"
               >
                 <Menu className="h-5 w-5" />
               </button>
 
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Financial App</p>
-                <p className="text-sm font-semibold text-slate-100">{currentPageTitle}</p>
+                <p className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+                  Nền tảng phân tích tài chính
+                </p>
+                <h2 className="text-base font-serif font-bold text-white">
+                  {currentPageTitle}
+                </h2>
               </div>
             </div>
 
+            {/* Search bar */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="hidden min-w-[320px] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:border-white/25 hover:bg-white/[0.08] md:flex"
+              className="hidden min-w-[320px] items-center gap-3 rounded-xl border border-primary-700 bg-primary-800/50 px-4 py-2.5 text-left text-sm text-slate-300 transition-all hover:border-primary-500 hover:bg-primary-800 md:flex"
             >
               <Search className="h-4 w-4" />
-              <span className="flex-1">Search ticker...</span>
-              <kbd className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-slate-500">Ctrl K</kbd>
+              <span className="flex-1">Tìm mã cổ phiếu...</span>
             </button>
 
-            <div className="flex items-center gap-2.5">
+            {/* Right actions */}
+            <div className="flex items-center gap-3">
+              {/* Market status */}
               {marketStatus && (
                 <div
                   className={cn(
-                    'hidden items-center gap-2 rounded-full border px-2.5 py-1 text-xs sm:flex',
+                    'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium sm:flex',
                     marketStatus.is_open
-                      ? 'border-emerald-400/35 bg-emerald-400/10 text-emerald-300'
-                      : 'border-slate-400/25 bg-white/[0.03] text-slate-400'
+                      ? 'border-success-500/30 bg-success-500/10 text-success-400'
+                      : 'border-slate-700 bg-primary-800/50 text-slate-300'
                   )}
                 >
                   <span
                     className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      marketStatus.is_open ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                      'h-2 w-2 rounded-full',
+                      marketStatus.is_open ? 'bg-success-500 animate-pulse' : 'bg-slate-400'
                     )}
                   />
                   {marketStatus.message}
                 </div>
               )}
 
+              {/* Notifications */}
               <button
                 onClick={() => setNotificationsOpen(true)}
-                className="relative rounded-lg border border-white/10 p-2 text-slate-300 hover:bg-white/10"
+                className="relative btn-ghost"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-lime-400" />
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-danger-500" />
               </button>
 
+              {/* Mobile search */}
               <button
-                onClick={() => setSidebarOpen((value) => !value)}
-                className="rounded-lg border border-white/10 p-2 text-slate-300 hover:bg-white/10 lg:hidden"
+                onClick={() => setSearchOpen(true)}
+                className="btn-ghost md:hidden"
               >
-                <X className="h-5 w-5" />
+                <Search className="h-5 w-5" />
               </button>
             </div>
           </div>
         </header>
 
-        <main className="px-4 pb-6 pt-4 lg:px-6">
-          <div className="mx-auto max-w-[1500px]">
+        {/* Page content */}
+        <main className="px-4 py-6 lg:px-6">
+          <div className="mx-auto flex max-w-[1600px] gap-6">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
+              transition={{ duration: 0.2 }}
+              className="min-w-0 flex-1"
             >
               <Outlet />
             </motion.div>
+            
+            {/* Watchlist sidebar */}
+            <div className="hidden xl:block">
+              <WatchlistSidebar />
+            </div>
           </div>
         </main>
       </div>
 
+      {/* Modals */}
       <NotificationsPanel isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>

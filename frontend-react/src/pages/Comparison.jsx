@@ -18,7 +18,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '../components/ui'
-import { formatCurrency, formatPercent, formatRatio } from '../utils/formatters'
+import { formatCompact, formatCurrency, formatPercent, formatRatio } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 import {
@@ -42,16 +42,16 @@ const COLORS = ['#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444']
 
 // Metric configurations
 const METRIC_CONFIGS = {
-  pe_ratio: { name: 'P/E', unit: 'x', inverse: true, description: 'Price to Earnings' },
-  pb_ratio: { name: 'P/B', unit: 'x', inverse: true, description: 'Price to Book' },
-  roe: { name: 'ROE', unit: '%', inverse: false, description: 'Return on Equity' },
-  roa: { name: 'ROA', unit: '%', inverse: false, description: 'Return on Assets' },
-  debt_to_equity: { name: 'D/E', unit: 'x', inverse: true, description: 'Debt to Equity' },
-  current_ratio: { name: 'Current Ratio', unit: 'x', inverse: false, description: 'Khả năng thanh toán' },
-  gross_margin: { name: 'Biên LN gộp', unit: '%', inverse: false, description: 'Gross Margin' },
-  net_margin: { name: 'Biên LN ròng', unit: '%', inverse: false, description: 'Net Margin' },
-  revenue_growth: { name: 'TT Doanh thu', unit: '%', inverse: false, description: 'Revenue Growth YoY' },
-  profit_growth: { name: 'TT Lợi nhuận', unit: '%', inverse: false, description: 'Profit Growth YoY' },
+  pe_ratio: { name: 'P/E', unit: 'x', inverse: true, description: 'Gia tren loi nhuan' },
+  pb_ratio: { name: 'P/B', unit: 'x', inverse: true, description: 'Gia tren gia tri so sach' },
+  roe: { name: 'ROE', unit: '%', inverse: false, description: 'Ty suat sinh loi tren von chu' },
+  roa: { name: 'ROA', unit: '%', inverse: false, description: 'Ty suat sinh loi tren tong tai san' },
+  debt_to_equity: { name: 'D/E', unit: 'x', inverse: true, description: 'No tren von chu so huu' },
+  current_ratio: { name: 'Thanh toan hien hanh', unit: 'x', inverse: false, description: 'Kha nang thanh toan ngan han' },
+  gross_margin: { name: 'Bien LN gop', unit: '%', inverse: false, description: 'Bien loi nhuan gop' },
+  net_margin: { name: 'Bien LN rong', unit: '%', inverse: false, description: 'Bien loi nhuan rong' },
+  revenue_growth: { name: 'TT Doanh thu', unit: '%', inverse: false, description: 'Tang truong doanh thu theo nam' },
+  profit_growth: { name: 'TT Loi nhuan', unit: '%', inverse: false, description: 'Tang truong loi nhuan theo nam' },
 }
 
 // Radar chart data transformer
@@ -96,11 +96,11 @@ const MetricRow = ({ metric, companies }) => {
   const winner = getWinner(companies, metric, config.inverse)
   
   return (
-    <tr className="border-b border-white/5 hover:bg-white/5">
+    <tr className="border-b border-slate-100 hover:bg-white">
       <td className="p-3">
         <div>
-          <span className="text-white font-medium">{config.name}</span>
-          <p className="text-xs text-gray-500">{config.description}</p>
+          <span className="text-slate-900 font-medium">{config.name}</span>
+          <p className="text-xs text-slate-500">{config.description}</p>
         </div>
       </td>
       {companies.map((company, idx) => {
@@ -111,7 +111,7 @@ const MetricRow = ({ metric, companies }) => {
           <td key={company.ticker} className="p-3 text-center">
             <div className={cn(
               'font-mono text-lg',
-              isWinner ? 'text-green-400 font-bold' : 'text-white'
+              isWinner ? 'text-success-600 font-bold' : 'text-slate-900'
             )}>
               {value != null ? (
                 <>
@@ -119,7 +119,7 @@ const MetricRow = ({ metric, companies }) => {
                   {isWinner && <CheckCircle className="w-4 h-4 inline ml-1" />}
                 </>
               ) : (
-                <span className="text-gray-500">-</span>
+                <span className="text-slate-500">-</span>
               )}
             </div>
           </td>
@@ -237,7 +237,7 @@ export default function Comparison() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `comparison_${tickers.join('_')}.csv`
+    link.download = `so_sanh_${tickers.join('_')}.csv`
     link.click()
   }
 
@@ -248,43 +248,43 @@ export default function Comparison() {
   const barChartData = [
     { name: 'ROE', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.roe || 0])) },
     { name: 'ROA', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.roa || 0])) },
-    { name: 'Gross Margin', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.gross_margin || 0])) },
-    { name: 'Net Margin', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.net_margin || 0])) },
+    { name: 'Biên LN gộp', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.gross_margin || 0])) },
+    { name: 'Biên LN ròng', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.net_margin || 0])) },
   ]
 
   if (tickers.length < 2) {
     return (
       <div className="max-w-3xl mx-auto">
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white border-slate-200">
           <CardContent className="p-8 text-center">
-            <Scale className="w-16 h-16 mx-auto mb-4 text-cyan-400 opacity-50" />
-            <h2 className="text-2xl font-bold text-white mb-2">So sánh cổ phiếu</h2>
-            <p className="text-gray-400 mb-6">
+            <Scale className="w-16 h-16 mx-auto mb-4 text-primary-700 opacity-50" />
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">So sánh cổ phiếu</h2>
+            <p className="text-slate-600 mb-6">
               Chọn 2-5 mã cổ phiếu để so sánh các chỉ số tài chính
             </p>
             
             <div className="relative max-w-md mx-auto">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
               <Input
                 placeholder="Tìm kiếm mã cổ phiếu..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 bg-white/10 border-white/20 text-lg"
+                className="pl-10 bg-slate-50 border-slate-300 text-lg"
               />
               
               {searchResults.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-gray-800 border border-white/20 rounded-lg shadow-xl z-10 max-h-60 overflow-y-auto">
+                <div className="absolute top-full mt-2 w-full bg-white border border-slate-300 rounded-lg shadow-xl z-10 max-h-60 overflow-y-auto">
                   {searchResults.map(stock => (
                     <button
                       key={stock.ticker}
                       onClick={() => addCompany(stock.ticker)}
-                      className="w-full p-3 text-left hover:bg-white/10 flex justify-between items-center"
+                      className="w-full p-3 text-left hover:bg-slate-50 flex justify-between items-center"
                     >
                       <div>
-                        <span className="font-bold text-cyan-400">{stock.ticker}</span>
-                        <span className="text-gray-400 ml-2 text-sm">{stock.name}</span>
+                        <span className="font-bold text-primary-700">{stock.ticker}</span>
+                        <span className="text-slate-600 ml-2 text-sm">{stock.name}</span>
                       </div>
-                      <Plus className="w-4 h-4 text-gray-400" />
+                      <Plus className="w-4 h-4 text-slate-600" />
                     </button>
                   ))}
                 </div>
@@ -293,13 +293,13 @@ export default function Comparison() {
             
             {tickers.length === 1 && (
               <div className="mt-6">
-                <Badge className="bg-cyan-500/20 text-cyan-400">
+                <Badge className="bg-primary-50 text-primary-700">
                   {tickers[0]} đã chọn - Thêm ít nhất 1 mã nữa
                 </Badge>
               </div>
             )}
             
-            <div className="mt-8 text-sm text-gray-500">
+            <div className="mt-8 text-sm text-slate-500">
               <p>Gợi ý so sánh:</p>
               <div className="flex flex-wrap gap-2 justify-center mt-2">
                 <Button
@@ -336,11 +336,11 @@ export default function Comparison() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Scale className="w-8 h-8 text-cyan-400" />
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+            <Scale className="w-8 h-8 text-primary-700" />
             So sánh cổ phiếu
           </h1>
-          <p className="text-gray-400 mt-1">
+          <p className="text-slate-600 mt-1">
             Đang so sánh {companies.length} công ty
           </p>
         </div>
@@ -357,12 +357,12 @@ export default function Comparison() {
               </Button>
               
               {showSearch && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-gray-800 border border-white/20 rounded-lg shadow-xl z-10 p-3">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-300 rounded-lg shadow-xl z-10 p-3">
                   <Input
                     placeholder="Tìm mã cổ phiếu..."
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="bg-white/10 border-white/20"
+                    className="bg-slate-50 border-slate-300"
                     autoFocus
                   />
                   {searchResults.length > 0 && (
@@ -371,10 +371,10 @@ export default function Comparison() {
                         <button
                           key={stock.ticker}
                           onClick={() => addCompany(stock.ticker)}
-                          className="w-full p-2 text-left hover:bg-white/10 rounded flex justify-between items-center"
+                          className="w-full p-2 text-left hover:bg-slate-50 rounded flex justify-between items-center"
                         >
-                          <span className="font-bold text-cyan-400">{stock.ticker}</span>
-                          <Plus className="w-4 h-4 text-gray-400" />
+                          <span className="font-bold text-primary-700">{stock.ticker}</span>
+                          <Plus className="w-4 h-4 text-slate-600" />
                         </button>
                       ))}
                     </div>
@@ -393,23 +393,23 @@ export default function Comparison() {
 
       {/* Loading State */}
       {loading && (
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white border-slate-200">
           <CardContent className="p-12 text-center">
-            <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Đang tải dữ liệu so sánh...</p>
+            <div className="w-16 h-16 border-4 border-primary-300 border-t-primary-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600">Đang tải dữ liệu so sánh...</p>
           </CardContent>
         </Card>
       )}
 
       {/* Error State */}
       {error && !loading && (
-        <Card className="bg-red-500/10 border-red-500/20">
+        <Card className="bg-danger-50 border-danger-200">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-red-400" />
+              <AlertCircle className="w-6 h-6 text-danger-600" />
               <div>
-                <p className="text-red-400 font-medium">{error}</p>
-                <p className="text-sm text-gray-400 mt-1">
+                <p className="text-danger-600 font-medium">{error}</p>
+                <p className="text-sm text-slate-600 mt-1">
                   Vui lòng thử lại hoặc chọn mã khác
                 </p>
               </div>
@@ -420,11 +420,11 @@ export default function Comparison() {
 
       {/* No Data State */}
       {!loading && companies.length === 0 && tickers.length >= 2 && (
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white border-slate-200">
           <CardContent className="p-12 text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-yellow-400 opacity-50" />
-            <h3 className="text-xl font-bold text-white mb-2">Không có dữ liệu</h3>
-            <p className="text-gray-400">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-warning-600 opacity-50" />
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Không có dữ liệu</h3>
+            <p className="text-slate-600">
               Không tìm thấy dữ liệu cho các mã: {tickers.join(', ')}
             </p>
           </CardContent>
@@ -443,10 +443,10 @@ export default function Comparison() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
           >
-            <Card className="bg-white/5 border-white/10 relative group">
+            <Card className="bg-white border-slate-200 relative group">
               <button
                 onClick={() => removeCompany(company.ticker)}
-                className="absolute top-2 right-2 p-1 rounded-full bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 p-1 rounded-full bg-red-500/20 text-danger-600 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -458,36 +458,36 @@ export default function Comparison() {
                     style={{ backgroundColor: COLORS[idx] }}
                   />
                   <Link to={`/company/${company.ticker}`}>
-                    <span className="text-xl font-bold text-white hover:text-cyan-400">
+                    <span className="text-xl font-bold text-slate-900 hover:text-primary-700">
                       {company.ticker}
                     </span>
                   </Link>
                 </div>
                 
-                <p className="text-sm text-gray-400 mb-2 line-clamp-1">{company.name}</p>
+                <p className="text-sm text-slate-600 mb-2 line-clamp-1">{company.name}</p>
                 <Badge variant="outline" className="text-xs mb-3">
-                  {company.industry || 'N/A'}
+                  {company.industry || 'Khong co'}
                 </Badge>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Giá</span>
-                    <span className="text-white font-mono">
+                    <span className="text-slate-500">Giá</span>
+                    <span className="text-slate-900 font-mono">
                       {company.price ? `${company.price.toLocaleString()}đ` : '-'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Vốn hóa</span>
-                    <span className="text-white font-mono">
-                      {company.market_cap ? `${(company.market_cap / 1e9).toFixed(0)}B` : '-'}
+                    <span className="text-slate-500">Vốn hóa</span>
+                    <span className="text-slate-900 font-mono">
+                      {company.market_cap ? formatCompact(company.market_cap) : '-'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">F-Score</span>
+                    <span className="text-slate-500">F-Score</span>
                     <span className={cn(
                       'font-bold',
-                      company.f_score >= 7 ? 'text-green-400' :
-                      company.f_score >= 5 ? 'text-yellow-400' : 'text-red-400'
+                      company.f_score >= 7 ? 'text-success-600' :
+                      company.f_score >= 5 ? 'text-warning-600' : 'text-danger-600'
                     )}>
                       {company.f_score || '-'}/9
                     </span>
@@ -502,19 +502,19 @@ export default function Comparison() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Radar Chart */}
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white border-slate-200">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-cyan-400" />
+            <CardTitle className="text-slate-900 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary-700" />
               Biểu đồ Radar
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={350}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="#374151" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fill: '#9ca3af' }} />
+                <PolarGrid stroke="hsl(var(--chart-grid))" />
+                <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fill: 'hsl(var(--chart-axis))' }} />
                 {companies.map((company, idx) => (
                   <Radar
                     key={company.ticker}
@@ -528,8 +528,8 @@ export default function Comparison() {
                 <Legend />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: '1px solid #374151',
+                    backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+                    border: '1px solid hsl(var(--chart-tooltip-border))',
                     borderRadius: '8px',
                   }}
                 />
@@ -539,19 +539,19 @@ export default function Comparison() {
         </Card>
 
         {/* Bar Chart */}
-        <Card className="bg-white/5 border-white/10">
+        <Card className="bg-white border-slate-200">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-cyan-400" />
+            <CardTitle className="text-slate-900 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary-700" />
               So sánh sinh lợi
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="name" tick={{ fill: '#9ca3af' }} />
-                <YAxis tick={{ fill: '#9ca3af' }} unit="%" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
+                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--chart-axis))' }} />
+                <YAxis tick={{ fill: 'hsl(var(--chart-axis))' }} unit="%" />
                 {companies.map((company, idx) => (
                   <Bar
                     key={company.ticker}
@@ -563,8 +563,8 @@ export default function Comparison() {
                 <Legend />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1f2937',
-                    border: '1px solid #374151',
+                    backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+                    border: '1px solid hsl(var(--chart-tooltip-border))',
                     borderRadius: '8px',
                   }}
                   formatter={(value) => `${value.toFixed(1)}%`}
@@ -576,11 +576,11 @@ export default function Comparison() {
       </div>
 
       {/* Detailed Comparison Table */}
-      <Card className="bg-white/5 border-white/10">
+      <Card className="bg-white border-slate-200">
         <CardHeader>
-          <CardTitle className="text-white">So sánh chi tiết</CardTitle>
-          <p className="text-sm text-gray-400">
-            <CheckCircle className="w-4 h-4 inline mr-1 text-green-400" />
+          <CardTitle className="text-slate-900">So sánh chi tiết</CardTitle>
+          <p className="text-sm text-slate-600">
+            <CheckCircle className="w-4 h-4 inline mr-1 text-success-600" />
             = Tốt nhất trong nhóm
           </p>
         </CardHeader>
@@ -588,8 +588,8 @@ export default function Comparison() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="p-3 text-left text-gray-400 font-medium">Chỉ số</th>
+                <tr className="border-b border-slate-200">
+                  <th className="p-3 text-left text-slate-600 font-medium">Chỉ số</th>
                   {companies.map((company, idx) => (
                     <th key={company.ticker} className="p-3 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -597,7 +597,7 @@ export default function Comparison() {
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: COLORS[idx] }}
                         />
-                        <span className="text-white font-bold">{company.ticker}</span>
+                        <span className="text-slate-900 font-bold">{company.ticker}</span>
                       </div>
                     </th>
                   ))}
@@ -605,8 +605,8 @@ export default function Comparison() {
               </thead>
               <tbody>
                 {/* Market Ratios */}
-                <tr className="bg-white/5">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-cyan-400 font-medium">
+                <tr className="bg-white">
+                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
                     CHI SO THI TRUONG
                   </td>
                 </tr>
@@ -614,8 +614,8 @@ export default function Comparison() {
                 <MetricRow metric="pb_ratio" companies={companies} />
                 
                 {/* Profitability */}
-                <tr className="bg-white/5">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-cyan-400 font-medium">
+                <tr className="bg-white">
+                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
                     SINH LỢI
                   </td>
                 </tr>
@@ -625,8 +625,8 @@ export default function Comparison() {
                 <MetricRow metric="net_margin" companies={companies} />
                 
                 {/* Financial Health */}
-                <tr className="bg-white/5">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-cyan-400 font-medium">
+                <tr className="bg-white">
+                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
                     SỨC KHỎE TÀI CHÍNH
                   </td>
                 </tr>
@@ -634,8 +634,8 @@ export default function Comparison() {
                 <MetricRow metric="current_ratio" companies={companies} />
                 
                 {/* Growth */}
-                <tr className="bg-white/5">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-cyan-400 font-medium">
+                <tr className="bg-white">
+                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
                     TĂNG TRƯỞNG
                   </td>
                 </tr>
@@ -648,20 +648,20 @@ export default function Comparison() {
       </Card>
 
       {/* Summary */}
-      <Card className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/20">
+      <Card className="bg-gradient-to-r from-primary-500/10 to-blue-500/10 border-primary-200">
         <CardContent className="p-6">
-          <h3 className="text-lg font-bold text-white mb-4">📊 Tóm tắt so sánh</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-4">📊 Tóm tắt so sánh</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Best ROE */}
             {getWinner(companies, 'roe') && (
-              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-green-400" />
+              <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-success-50 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-success-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">ROE cao nhất</p>
-                  <p className="font-bold text-white">
+                  <p className="text-sm text-slate-600">ROE cao nhất</p>
+                  <p className="font-bold text-slate-900">
                     {getWinner(companies, 'roe').ticker} ({getWinner(companies, 'roe').ratios?.roe?.toFixed(1)}%)
                   </p>
                 </div>
@@ -670,13 +670,13 @@ export default function Comparison() {
             
             {/* Best D/E */}
             {getWinner(companies, 'debt_to_equity', true) && (
-              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-yellow-400" />
+              <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-warning-50 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-warning-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">D/E thấp nhất</p>
-                  <p className="font-bold text-white">
+                  <p className="text-sm text-slate-600">D/E thấp nhất</p>
+                  <p className="font-bold text-slate-900">
                     {getWinner(companies, 'debt_to_equity', true).ticker} ({getWinner(companies, 'debt_to_equity', true).ratios?.debt_to_equity?.toFixed(2)}x)
                   </p>
                 </div>

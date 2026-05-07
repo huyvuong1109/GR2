@@ -188,7 +188,7 @@ const getRecordByPeriod = (reports, reportTypeKey, periodSelection) => {
 const DynamicRecordTable = ({ record, metricQuery }) => {
   if (!record) {
     return (
-      <div className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-8 text-center text-blue-200/70">
+      <div className="rounded-xl border border-slate-200 bg-white/55 p-8 text-center text-slate-600">
         Khong tim thay du lieu cho ky nay.
       </div>
     )
@@ -207,32 +207,32 @@ const DynamicRecordTable = ({ record, metricQuery }) => {
 
   if (!visibleFields.length) {
     return (
-      <div className="rounded-xl border border-blue-500/20 bg-slate-950/55 p-8 text-center text-blue-200/70">
+      <div className="rounded-xl border border-slate-200 bg-white/55 p-8 text-center text-slate-600">
         Khong co cot phu hop voi tu khoa tim kiem.
       </div>
     )
   }
 
   return (
-    <div className="max-h-[60vh] overflow-auto rounded-xl border border-blue-500/25 bg-slate-950/55">
+    <div className="max-h-[60vh] overflow-auto rounded-xl border border-blue-500/25 bg-white/55">
       <table className="w-full min-w-[680px] text-sm">
         <thead className="sticky top-0 z-20">
-          <tr className="border-b border-blue-500/20 bg-gradient-to-r from-slate-900 via-blue-950/70 to-purple-950/70">
-            <th className="w-[45%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-200">Chi tieu</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-blue-200">Gia tri</th>
+          <tr className="border-b border-slate-200 bg-slate-100">
+            <th className="w-[45%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-900">Chi tieu</th>
+            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-900">Gia tri</th>
           </tr>
         </thead>
         <tbody>
           {visibleFields.map((field, index) => (
             <tr
               key={field}
-              className={cn('border-t border-white/5 transition-colors hover:bg-blue-500/[0.05]', index % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent')}
+              className={cn('border-t border-white/5 transition-colors hover:bg-blue-500/[0.05]', index % 2 === 0 ? 'bg-slate-50/50' : 'bg-white')}
             >
               <td className="px-4 py-3 align-top">
-                <p className="font-semibold text-blue-50">{humanizeFieldName(field)}</p>
-                <p className="text-xs text-blue-300/55">{field}</p>
+                <p className="font-semibold text-slate-900">{humanizeFieldName(field)}</p>
+                <p className="text-xs text-primary-700/55">{field}</p>
               </td>
-              <td className="px-4 py-3 text-right font-mono text-blue-100">{formatValue(record[field])}</td>
+              <td className="px-4 py-3 text-right font-mono text-slate-900">{formatValue(record[field])}</td>
             </tr>
           ))}
         </tbody>
@@ -278,7 +278,7 @@ const ReportModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -287,7 +287,7 @@ const ReportModal = ({
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ duration: 0.2 }}
           onClick={(event) => event.stopPropagation()}
-          className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-blue-500/30 bg-slate-950"
+          className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-blue-500/30 bg-white"
         >
           <div
             className="pointer-events-none absolute inset-0 opacity-30"
@@ -298,20 +298,20 @@ const ReportModal = ({
             }}
           />
 
-          <div className="relative border-b border-blue-500/20 px-6 py-5">
+          <div className="relative border-b border-slate-200 px-6 py-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-bold text-blue-50">{company.ticker}</h3>
-                <p className="mt-1 text-sm text-blue-200/70">{company.name}</p>
+                <h3 className="text-xl font-bold text-slate-900">{company.ticker}</h3>
+                <p className="mt-1 text-sm text-slate-600">{company.name}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">
+                <Badge className="border-blue-500/30 bg-slate-50 text-slate-700">
                   <Calendar className="mr-1.5 h-3.5 w-3.5" />
                   {selectedPeriodLabel}
                 </Badge>
                 <button
                   onClick={onClose}
-                  className="rounded-lg border border-blue-500/20 p-2 text-blue-200 transition-colors hover:bg-blue-500/15"
+                  className="rounded-lg border border-slate-200 p-2 text-slate-700 transition-colors hover:bg-blue-500/15"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -330,8 +330,8 @@ const ReportModal = ({
                     className={cn(
                       'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all',
                       isActive
-                        ? `border-blue-400/40 bg-gradient-to-r ${type.gradient} text-white shadow-lg shadow-blue-500/25`
-                        : 'border-blue-500/20 bg-slate-900/60 text-blue-200/80 hover:bg-blue-500/10'
+                        ? 'border-primary-900 bg-primary-900 text-accent-400 shadow-sm'
+                        : 'border-primary-900 bg-primary-900 text-white hover:bg-primary-800'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -341,7 +341,7 @@ const ReportModal = ({
               })}
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-blue-500/15 pt-3">
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
               {(periodOptions || []).map((periodOption) => {
                 const isActivePeriod =
                   Number(selectedPeriod?.year || 0) === Number(periodOption.year || 0) &&
@@ -355,8 +355,8 @@ const ReportModal = ({
                     className={cn(
                       'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all',
                       isActivePeriod
-                        ? 'border-blue-400/45 bg-blue-500/20 text-blue-50'
-                        : 'border-blue-500/25 bg-slate-900/60 text-blue-200/80 hover:bg-blue-500/10'
+                        ? 'border-primary-900 bg-primary-900 text-accent-400'
+                        : 'border-primary-900 bg-primary-900 text-white hover:bg-primary-800'
                     )}
                   >
                     {periodOption.label}
@@ -366,18 +366,16 @@ const ReportModal = ({
             </div>
           </div>
 
-          <div className="relative flex flex-wrap items-center gap-2 border-b border-blue-500/15 px-6 py-3">
-            <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{activeFieldCount} cot du lieu</Badge>
-            <Badge className="border-indigo-500/30 bg-indigo-500/10 text-indigo-200">Ky da chon theo nam -&gt; quy</Badge>
+          <div className="relative flex flex-wrap items-center gap-2 border-b border-slate-200 px-6 py-3">
 
             <div className="ml-auto w-full max-w-sm">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-200/50" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   value={metricQuery}
                   onChange={(event) => setMetricQuery(event.target.value)}
                   placeholder="Tim nhanh chi tieu..."
-                  className="border-blue-500/25 bg-slate-900/70 pl-9 text-blue-50 placeholder:text-blue-200/40"
+                  className="border-blue-500/25 bg-slate-50 pl-9 text-slate-900 placeholder:text-slate-700/40"
                 />
               </div>
             </div>
@@ -387,7 +385,7 @@ const ReportModal = ({
             <DynamicRecordTable record={activeRecord} metricQuery={metricQuery} />
           </div>
 
-          <div className="relative border-t border-blue-500/20 bg-slate-900/65 px-6 py-4 text-xs text-blue-200/60">
+          <div className="relative border-t border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-700/60">
             Bao cao hien thi toan bo cot cua ky duoc chon theo quy trinh: ma cong ty -&gt; nam -&gt; quy.
           </div>
         </motion.div>
@@ -496,7 +494,7 @@ export default function FinancialReports() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 bg-slate-950 p-6">
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 bg-white p-6">
         <div
           className="pointer-events-none absolute inset-0 opacity-35"
           style={{
@@ -508,24 +506,24 @@ export default function FinancialReports() {
         <div className="pointer-events-none absolute -left-16 top-0 h-44 w-44 rounded-full bg-blue-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 bottom-0 h-52 w-52 rounded-full bg-purple-500/20 blur-3xl" />
 
-        <h1 className="relative flex items-center gap-3 text-3xl font-bold text-blue-50">
-          <FileText className="h-8 w-8 text-blue-300" />
+        <h1 className="relative flex items-center gap-3 text-3xl font-bold text-slate-900">
+          <FileText className="h-8 w-8 text-primary-700" />
           Bao cao tai chinh
         </h1>
-          <p className="relative mt-2 text-blue-200/70">
+          <p className="relative mt-2 text-slate-600">
             Luong moi: Bam ma cong ty -&gt; chon nam bao cao -&gt; chon quy bao cao -&gt; xem full cot du lieu.
           </p>
       </div>
 
-      <Card className="border-blue-500/20 bg-slate-900/65">
+      <Card className="border-slate-200 bg-slate-50">
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-200/55" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700/55" />
             <Input
               placeholder="Tim ma co phieu hoac ten cong ty..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="border-blue-500/20 bg-slate-950/55 pl-10 text-blue-50 placeholder:text-blue-200/40"
+              className="border-slate-200 bg-white/55 pl-10 text-slate-900 placeholder:text-slate-700/40"
             />
           </div>
         </CardContent>
@@ -533,8 +531,8 @@ export default function FinancialReports() {
 
       <div className="space-y-3">
         {loading && (
-          <Card className="border-blue-500/20 bg-slate-900/65">
-            <CardContent className="p-8 text-center text-blue-200/70">Dang tai danh sach cong ty...</CardContent>
+          <Card className="border-slate-200 bg-slate-50">
+            <CardContent className="p-8 text-center text-slate-600">Dang tai danh sach cong ty...</CardContent>
           </Card>
         )}
 
@@ -549,30 +547,30 @@ export default function FinancialReports() {
             return (
               <Card
                 key={company.ticker}
-                className="overflow-hidden border-blue-500/20 bg-gradient-to-br from-slate-950/85 via-blue-950/20 to-purple-950/20"
+                className="overflow-hidden border-slate-200 bg-white"
               >
                 <button
                   onClick={() => handleCompanyClick(company.ticker)}
-                  className="w-full px-4 py-4 transition-colors hover:bg-blue-500/10"
+                  className="w-full px-4 py-4 transition-colors hover:bg-slate-50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-4 text-left">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 font-bold text-white shadow-lg shadow-blue-500/25">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 font-bold text-white shadow-lg shadow-primary-500/20">
                         {company.ticker?.slice(0, 2)}
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-blue-50">{company.ticker}</h3>
-                        <p className="text-sm text-blue-200/65">{company.name}</p>
+                        <h3 className="text-lg font-bold text-slate-900">{company.ticker}</h3>
+                        <p className="text-sm text-slate-600">{company.name}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">{years.length || 0} nam</Badge>
-                      <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{fieldCount || 0} cot</Badge>
+                      
+                      
                       {isExpanded ? (
-                        <ChevronDown className="h-5 w-5 text-blue-200/70" />
+                        <ChevronDown className="h-5 w-5 text-slate-600" />
                       ) : (
-                        <ChevronRight className="h-5 w-5 text-blue-200/70" />
+                        <ChevronRight className="h-5 w-5 text-slate-600" />
                       )}
                     </div>
                   </div>
@@ -584,11 +582,11 @@ export default function FinancialReports() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-blue-500/15"
+                      className="overflow-hidden border-t border-slate-200"
                     >
-                      <div className="space-y-3 bg-slate-900/50 p-5">
-                        <p className="mb-1 flex items-center gap-2 text-sm font-semibold text-blue-100">
-                          <Calendar className="h-4 w-4 text-blue-300" />
+                      <div className="space-y-3 bg-slate-50 p-5">
+                        <p className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <Calendar className="h-4 w-4 text-primary-700" />
                           Chon nam bao cao
                         </p>
 
@@ -601,8 +599,8 @@ export default function FinancialReports() {
                                 className={cn(
                                   'rounded-lg border px-3 py-2 text-sm font-medium transition-all',
                                   highlightedYear === year
-                                    ? 'border-blue-400/45 bg-gradient-to-r from-blue-500/25 to-purple-500/25 text-blue-50'
-                                    : 'border-blue-500/25 bg-slate-950/60 text-blue-200/80 hover:bg-blue-500/10'
+                                    ? 'border-primary-500 bg-primary-50 text-slate-900'
+                                    : 'border-blue-500/25 bg-white/60 text-slate-700/80 hover:bg-slate-50'
                                 )}
                               >
                                 Nam {year}
@@ -610,7 +608,7 @@ export default function FinancialReports() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-blue-200/55">Chua co du lieu nam cho cong ty nay.</p>
+                          <p className="text-sm text-slate-700/55">Chua co du lieu nam cho cong ty nay.</p>
                         )}
                       </div>
                     </motion.div>
@@ -621,10 +619,10 @@ export default function FinancialReports() {
           })}
 
         {!loading && filteredCompanies.length === 0 && (
-          <Card className="border-blue-500/20 bg-slate-900/65">
+          <Card className="border-slate-200 bg-slate-50">
             <CardContent className="p-12 text-center">
-              <Database className="mx-auto mb-4 h-14 w-14 text-blue-300/40" />
-              <p className="text-blue-200/70">Khong tim thay cong ty phu hop.</p>
+              <Database className="mx-auto mb-4 h-14 w-14 text-primary-700/40" />
+              <p className="text-slate-600">Khong tim thay cong ty phu hop.</p>
             </CardContent>
           </Card>
         )}

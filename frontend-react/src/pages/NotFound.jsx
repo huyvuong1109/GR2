@@ -21,10 +21,10 @@ export default function NotFound() {
       </div>
 
       {/* Message */}
-      <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+      <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
         Không tìm thấy trang
       </h2>
-      <p className="text-dark-400 max-w-md mb-8">
+      <p className="text-slate-600 max-w-md mb-8">
         Trang bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển. 
         Hãy kiểm tra lại URL hoặc quay về trang chủ.
       </p>

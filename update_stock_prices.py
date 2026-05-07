@@ -149,6 +149,7 @@ def update_database(prices: dict):
     
     engine = create_engine(f"sqlite:///{DB_PATH}")
     updated = 0
+    today = datetime.now().strftime("%Y-%m-%d")
     
     with engine.connect() as conn:
         # Lấy danh sách ticker trong DB
@@ -169,6 +170,39 @@ def update_database(prices: dict):
                             WHERE UPPER(ticker) = :ticker
                         """),
                         {"price": price, "ticker": ticker}
+                    )
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO price_history (ticker, trade_date, close_price, updated_at)
+                            VALUES (:ticker, :trade_date, :price, :updated_at)
+                            ON CONFLICT(ticker, trade_date)
+                            DO UPDATE SET close_price = excluded.close_price,
+                                         updated_at = excluded.updated_at
+                            """
+                        ),
+                        {
+                            "ticker": ticker,
+                            "trade_date": today,
+                            "price": price,
+                            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        },
+                    )
+                    conn.execute(
+                        text(
+                            """
+                            DELETE FROM price_history
+                            WHERE ticker = :ticker
+                              AND id NOT IN (
+                                SELECT id
+                                FROM price_history
+                                WHERE ticker = :ticker
+                                ORDER BY trade_date DESC, id DESC
+                                LIMIT 7
+                              )
+                            """
+                        ),
+                        {"ticker": ticker},
                     )
                     updated += 1
                     print(f"  ✓ {ticker}: {price:,.0f}đ")
@@ -213,6 +247,45 @@ def ensure_price_columns():
             conn.execute(text("ALTER TABLE companies ADD COLUMN price_updated_at TEXT"))
             conn.commit()
     
+    return ensure_price_history_table()
+
+
+def ensure_price_history_table():
+    """Đảm bảo bảng lưu lịch sử giá 7 phiên tồn tại"""
+    engine = create_engine(f"sqlite:///{DB_PATH}")
+
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    trade_date TEXT NOT NULL,
+                    close_price REAL NOT NULL,
+                    updated_at TEXT
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_price_history_ticker_date
+                ON price_history(ticker, trade_date)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS idx_price_history_ticker_date
+                ON price_history(ticker, trade_date)
+                """
+            )
+        )
+        conn.commit()
+
     return True
 
 

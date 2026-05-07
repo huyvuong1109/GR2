@@ -27,7 +27,7 @@ function SkeletonTable({ rows = 5, columns = 4, className }) {
   return (
     <div className={cn('glass-card overflow-hidden', className)}>
       {/* Header */}
-      <div className="flex gap-4 p-4 bg-dark-800/50 border-b border-dark-700">
+      <div className="flex gap-4 p-4 bg-white/50 border-b border-dark-700">
         {Array.from({ length: columns }).map((_, i) => (
           <Skeleton key={i} className="h-4 flex-1" />
         ))}

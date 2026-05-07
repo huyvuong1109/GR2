@@ -12,12 +12,12 @@ import {
 
 const FILTER_MODE_META = {
   by_index: {
-    title: 'Theo chi so',
-    hint: 'ROE, P/E, bien loi nhuan, don bay, tang truong.',
+    title: 'Theo chỉ số',
+    hint: 'ROE, P/E, biên lợi nhuận, đòn bẩy, tăng trưởng.',
   },
   by_method: {
-    title: 'Theo phuong phap',
-    hint: 'Value, CANSLIM, GARP, Quality Compounder.',
+    title: 'Theo phương pháp',
+    hint: 'Value, CANSLIM, GARP, chất lượng.',
   },
 }
 
@@ -106,7 +106,7 @@ export default function DynamicScreenerPanel({
   const resetAllDynamicFilters = () => {
     setSelectedMetricIds([])
     setConditionsByMetric({})
-    setStatusMessage('Da xoa toan bo bo loc dong')
+    setStatusMessage('Đã xoá toàn bộ bộ lọc động')
   }
 
   const notifyParent = async (eventType) => {
@@ -119,38 +119,29 @@ export default function DynamicScreenerPanel({
 
     if (eventType === 'apply' && onApplyFilters) {
       await onApplyFilters(data)
-      setStatusMessage(`Da gui ${payload.length} dieu kien loc den API`)
+      setStatusMessage(`Đã gửi ${payload.length} điều kiện lọc đến API`)
     }
 
     if (eventType === 'save' && onSaveFilters) {
       await onSaveFilters(data)
-      setStatusMessage(`Da luu ${payload.length} dieu kien loc`)
+      setStatusMessage(`Đã lưu ${payload.length} điều kiện lọc`)
     }
   }
 
   return (
-    <Card className={cn('relative overflow-hidden border-blue-500/20 bg-slate-900/70', className)}>
-      <div
-        className="pointer-events-none absolute inset-0 opacity-25"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
-          backgroundSize: '26px 26px',
-        }}
-      />
-
-      <CardHeader className="relative mb-0 flex flex-col gap-3">
+    <div className={cn('relative flex flex-col gap-6', className)}>
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <CardTitle className="text-white">Bo loc co phieu da tang mode</CardTitle>
-            <p className="mt-1 text-sm text-blue-200/70">
-              Tach 2 nhanh loc ro rang: Theo chi so hoac Theo phuong phap. Trong moi nhanh se chia nho them.
+            <h3 className="text-lg font-bold text-slate-900">Chi tiết bộ lọc đa tầng</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Chọn nhóm chỉ tiêu và thêm các điều kiện để tinh chỉnh bộ lọc.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge className="border-blue-500/30 bg-blue-500/10 text-blue-200">{selectedMetricIds.length} chi tieu</Badge>
-            <Badge className="border-purple-500/30 bg-purple-500/10 text-purple-200">{payload.length} dieu kien hop le</Badge>
+            <Badge className="border-slate-200 bg-primary-50 text-slate-700">{selectedMetricIds.length} chỉ tiêu</Badge>
+            <Badge className="border-slate-200 bg-purple-50 text-purple-700">{payload.length} điều kiện hợp lệ</Badge>
           </div>
         </div>
 
@@ -167,8 +158,8 @@ export default function DynamicScreenerPanel({
                 className={cn(
                   'rounded-xl border px-3 py-2 text-left transition-all',
                   active
-                    ? 'border-blue-400/45 bg-gradient-to-r from-blue-500/25 to-purple-500/25 text-blue-50'
-                    : 'border-blue-500/20 bg-slate-950/55 text-blue-200/75 hover:bg-blue-500/10'
+                    ? 'border-slate-200 bg-primary-50 text-primary-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-primary-50'
                 )}
               >
                 <p className="text-sm font-semibold">{modeMeta.title}</p>
@@ -177,13 +168,13 @@ export default function DynamicScreenerPanel({
             )
           })}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="relative pt-4">
+      <div className="relative">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="rounded-xl border border-blue-500/20 bg-slate-950/60 p-4 xl:col-span-5">
-            <p className="mb-1 text-sm font-semibold text-blue-100">Danh muc chi tieu</p>
-            <p className="mb-3 text-xs text-blue-200/60">{activeFilterGroup?.description}</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 xl:col-span-5">
+            <p className="mb-1 text-sm font-semibold text-slate-700">Danh mục chỉ tiêu</p>
+            <p className="mb-3 text-xs text-slate-600">{activeFilterGroup?.description}</p>
 
             <MetricTreeSelector
               tree={activeFilterGroup?.children || []}
@@ -192,12 +183,12 @@ export default function DynamicScreenerPanel({
             />
           </div>
 
-          <div className="rounded-xl border border-blue-500/20 bg-slate-950/60 p-4 xl:col-span-7">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 xl:col-span-7">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-blue-100">Khu vuc dieu kien loc</p>
+              <p className="text-sm font-semibold text-slate-700">Khu vực điều kiện lọc</p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" size="sm" variant="ghost" onClick={resetAllDynamicFilters}>
-                  Xoa tat ca
+                  Xoá tất cả
                 </Button>
                 <Button
                   type="button"
@@ -206,7 +197,7 @@ export default function DynamicScreenerPanel({
                   disabled={selectedMetricIds.length === 0}
                   onClick={() => notifyParent('save')}
                 >
-                  Luu bo loc
+                  Lưu bộ lọc
                 </Button>
                 <Button
                   type="button"
@@ -214,14 +205,14 @@ export default function DynamicScreenerPanel({
                   disabled={selectedMetricIds.length === 0}
                   onClick={() => notifyParent('apply')}
                 >
-                  Loc
+                  Lọc
                 </Button>
               </div>
             </div>
 
             {selectedMetrics.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-blue-500/25 bg-slate-900/55 px-4 py-8 text-center text-sm text-blue-200/60">
-                Chua co chi tieu nao duoc chon. Tick ben trai de tao cac Filter Block.
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
+                Chưa có chỉ tiêu nào được chọn. Tick bên trái để tạo các khối điều kiện.
               </div>
             ) : (
               <div className="space-y-3">
@@ -239,22 +230,10 @@ export default function DynamicScreenerPanel({
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-200">
-            Payload JSON gui xuong API
-          </p>
-          <pre className="max-h-56 overflow-auto text-xs text-blue-100">
-            {JSON.stringify(payload, null, 2)}
-          </pre>
-          <p className="mt-2 text-xs text-blue-300">
-            Nut Loc gui payload va map sang query params de tuong thich voi endpoint screener hien tai.
-          </p>
-        </div>
-
         {statusMessage && (
-          <p className="mt-3 text-xs text-emerald-300">{statusMessage}</p>
+          <p className="mt-3 text-xs text-success-600">{statusMessage}</p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -20,7 +20,7 @@ const Input = forwardRef(({
       )}
       <div className="relative">
         {leftIcon && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-dark-400">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
             {leftIcon}
           </div>
         )}
@@ -37,7 +37,7 @@ const Input = forwardRef(({
           {...props}
         />
         {rightIcon && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-dark-400">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600">
             {rightIcon}
           </div>
         )}
@@ -46,7 +46,7 @@ const Input = forwardRef(({
         <p className="mt-2 text-sm text-danger-400">{error}</p>
       )}
       {hint && !error && (
-        <p className="mt-2 text-sm text-dark-400">{hint}</p>
+        <p className="mt-2 text-sm text-slate-600">{hint}</p>
       )}
     </div>
   )

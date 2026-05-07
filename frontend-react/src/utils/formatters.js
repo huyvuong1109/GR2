@@ -37,10 +37,10 @@ export const formatCompact = (value) => {
   if (value === null || value === undefined) return '-'
   
   const absValue = Math.abs(value)
-  if (absValue >= 1e12) return numeral(value / 1e12).format('0.0') + 'T'
-  if (absValue >= 1e9) return numeral(value / 1e9).format('0.0') + 'B'
-  if (absValue >= 1e6) return numeral(value / 1e6).format('0.0') + 'M'
-  if (absValue >= 1e3) return numeral(value / 1e3).format('0.0') + 'K'
+  if (absValue >= 1e12) return numeral(value / 1e12).format('0.0') + ' nghin ty'
+  if (absValue >= 1e9) return numeral(value / 1e9).format('0.0') + ' ty'
+  if (absValue >= 1e6) return numeral(value / 1e6).format('0.0') + ' trieu'
+  if (absValue >= 1e3) return numeral(value / 1e3).format('0.0') + ' nghin'
   return numeral(value).format('0,0')
 }
 
@@ -111,26 +111,28 @@ export const getValueBadge = (value, thresholds = { high: 20, medium: 10 }) => {
 // ==================== Chart Colors ====================
 
 export const chartColors = {
-  primary: '#0ea5e9',
-  secondary: '#d946ef',
-  success: '#22c55e',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  info: '#06b6d4',
+  primary: 'hsl(var(--chart-primary))',
+  secondary: 'hsl(var(--chart-secondary))',
+  success: 'hsl(var(--chart-success))',
+  danger: 'hsl(var(--chart-danger))',
+  warning: 'hsl(var(--chart-warning))',
+  info: 'hsl(var(--chart-info))',
   
   // For multi-series charts
   series: [
-    '#0ea5e9', '#d946ef', '#22c55e', '#f59e0b', '#ef4444',
-    '#06b6d4', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
+    'hsl(var(--chart-series-1))', 'hsl(var(--chart-series-2))', 'hsl(var(--chart-series-3))',
+    'hsl(var(--chart-series-4))', 'hsl(var(--chart-series-5))', 'hsl(var(--chart-series-6))',
+    'hsl(var(--chart-series-7))', 'hsl(var(--chart-series-8))', 'hsl(var(--chart-series-9))',
+    'hsl(var(--chart-series-10))',
   ],
   
   // Gradient pairs
   gradients: {
-    blue: ['#0ea5e9', '#0284c7'],
-    purple: ['#d946ef', '#a21caf'],
-    green: ['#22c55e', '#16a34a'],
-    red: ['#ef4444', '#dc2626'],
-    orange: ['#f59e0b', '#d97706'],
+    blue: ['hsl(var(--chart-primary))', '#0284c7'],
+    purple: ['hsl(var(--chart-secondary))', '#a21caf'],
+    green: ['hsl(var(--chart-success))', '#16a34a'],
+    red: ['hsl(var(--chart-danger))', '#dc2626'],
+    orange: ['hsl(var(--chart-warning))', '#d97706'],
   },
 }
 
@@ -199,10 +201,10 @@ export const isInRange = (value, min, max) => {
  */
 export const getMarketCapClass = (marketCap) => {
   if (!marketCap) return 'N/A'
-  if (marketCap >= 1e13) return 'Large Cap'    // > 10,000 tỷ
-  if (marketCap >= 1e12) return 'Mid Cap'       // 1,000 - 10,000 tỷ
-  if (marketCap >= 1e11) return 'Small Cap'     // 100 - 1,000 tỷ
-  return 'Micro Cap'
+  if (marketCap >= 1e13) return 'Von hoa lon'
+  if (marketCap >= 1e12) return 'Von hoa trung binh'
+  if (marketCap >= 1e11) return 'Von hoa nho'
+  return 'Von hoa sieu nho'
 }
 
 // ==================== Array Utilities ====================

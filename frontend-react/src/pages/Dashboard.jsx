@@ -1,344 +1,328 @@
 import { motion } from 'framer-motion'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
+  Line,
+  LineChart as RechartsLineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  CartesianGrid,
 } from 'recharts'
 import {
   ArrowUpRight,
-  BellDot,
-  ChevronRight,
-  Landmark,
-  LineChart,
-  ShieldCheck,
-  Wallet,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Eye,
 } from 'lucide-react'
-
-const tickerTape = [
-  'VN-INDEX 1,250.32 (+1.5%)',
-  'HNX 237.14 (+0.8%)',
-  'UPCOM 92.77 (-0.2%)',
-  'Thanh khoan 20,000 ty',
-]
-
-const performanceData = [
-  { date: '01/04', nav: 281.2, vnindex: 1210 },
-  { date: '03/04', nav: 286.5, vnindex: 1218 },
-  { date: '05/04', nav: 289.8, vnindex: 1221 },
-  { date: '07/04', nav: 294.4, vnindex: 1226 },
-  { date: '09/04', nav: 300.6, vnindex: 1233 },
-  { date: '11/04', nav: 308.9, vnindex: 1241 },
-  { date: '13/04', nav: 314.7, vnindex: 1247 },
-  { date: '15/04', nav: 320.1, vnindex: 1250 },
-]
-
-const signalFeed = [
-  {
-    ticker: 'HPG',
-    filter: 'Bo loc Gia sinh vien',
-    time: '2 phut truoc',
-    status: 'Mua manh',
-  },
-  {
-    ticker: 'MBB',
-    filter: 'Bo loc An chac mac ben',
-    time: '8 phut truoc',
-    status: 'Theo doi',
-  },
-  {
-    ticker: 'FPT',
-    filter: 'Bo loc Tang truong ben vung',
-    time: '15 phut truoc',
-    status: 'Mua manh',
-  },
-  {
-    ticker: 'DGC',
-    filter: 'Bo loc Chat luong cao',
-    time: '27 phut truoc',
-    status: 'Theo doi',
-  },
-]
-
-const watchlist = [
-  { symbol: 'FPT', company: 'FPT', price: 124500, change: 2.35 },
-  { symbol: 'HPG', company: 'Hoa Phat', price: 30200, change: 1.42 },
-  { symbol: 'VCB', company: 'Vietcombank', price: 89500, change: -0.71 },
-  { symbol: 'MWG', company: 'The Gioi Di Dong', price: 68300, change: 3.16 },
-  { symbol: 'SSI', company: 'SSI Securities', price: 35400, change: -1.18 },
-]
-
-function formatVnd(value) {
-  return `${Number(value || 0).toLocaleString('vi-VN')} VND`
-}
+import { AuthContext } from '../contexts/AuthContext'
+import { WatchlistContext } from '../contexts/WatchlistContext'
+import { companiesApi, priceHistoryApi } from '../services/api'
 
 function formatCompactVnd(value) {
-  return `${Number(value || 0).toLocaleString('vi-VN')} VND`
-}
-
-function statusClass(status) {
-  if (status === 'Mua manh') {
-    return 'border-emerald-400/30 bg-emerald-400/15 text-emerald-200'
-  }
-
-  return 'border-sky-400/30 bg-sky-400/15 text-sky-200'
+  return `${Number(value || 0).toLocaleString('vi-VN')} ₫`
 }
 
 export default function Dashboard() {
-  const tickerLine = tickerTape.join('    |    ')
+  const { user } = useContext(AuthContext)
+  const { items: watchlistItems } = useContext(WatchlistContext)
+  const userName = user?.username || 'Khách'
+  const [watchlistCompanies, setWatchlistCompanies] = useState([])
+  const [priceHistory, setPriceHistory] = useState({})
+  const [chartData, setChartData] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const chartTickers = useMemo(
+    () => watchlistItems.map((item) => item.ticker).slice(0, 5),
+    [watchlistItems]
+  )
+
+  const lastUpdateDate = useMemo(() => {
+    const dates = new Set()
+    Object.values(priceHistory).forEach((series) => {
+      ;(series || []).forEach((point) => {
+        if (point?.trade_date) dates.add(point.trade_date)
+      })
+    })
+    const sorted = Array.from(dates).sort()
+    return sorted[sorted.length - 1] || null
+  }, [priceHistory])
+
+  useEffect(() => {
+    const fetchWatchlistData = async () => {
+      if (!chartTickers.length) {
+        setWatchlistCompanies([])
+        setPriceHistory({})
+        setChartData([])
+        return
+      }
+
+      setLoading(true)
+      try {
+        const [companies, history] = await Promise.all([
+          companiesApi.getBatch(chartTickers),
+          priceHistoryApi.getForTickers(chartTickers, 7),
+        ])
+
+        setWatchlistCompanies(Array.isArray(companies) ? companies : [])
+        setPriceHistory(history || {})
+
+        const dateSet = new Set()
+        chartTickers.forEach((ticker) => {
+          ;(history?.[ticker] || []).forEach((point) => {
+            if (point?.trade_date) dateSet.add(point.trade_date)
+          })
+        })
+
+        const sortedDates = Array.from(dateSet).sort()
+        const lastDates = sortedDates.slice(-7)
+
+        const seriesMap = {}
+        chartTickers.forEach((ticker) => {
+          seriesMap[ticker] = new Map(
+            (history?.[ticker] || []).map((point) => [point.trade_date, point.close_price])
+          )
+        })
+
+        const data = lastDates.map((date) => {
+          const row = { date }
+          chartTickers.forEach((ticker) => {
+            row[ticker] = seriesMap[ticker].get(date) ?? null
+          })
+          return row
+        })
+
+        setChartData(data)
+      } catch (error) {
+        console.error('Failed to load watchlist data', error)
+        setWatchlistCompanies([])
+        setPriceHistory({})
+        setChartData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchWatchlistData()
+  }, [chartTickers])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Welcome Section */}
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl"
+        className="card p-6"
       >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Good Morning</p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-100">Hello, Nguyen Anh</h1>
+            <p className="text-xs uppercase tracking-wider text-slate-500 font-medium">
+              Chào buổi sáng
+            </p>
+            <h1 className="mt-1 text-3xl font-serif font-bold text-slate-900">
+              Xin chào, {userName}
+            </h1>
           </div>
-
-          <button className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/40 text-slate-200 transition-colors hover:bg-white/10">
-            <BellDot className="h-5 w-5" />
-            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-lime-400" />
-          </button>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-cyan-500/10 via-blue-500/5 to-emerald-400/10 px-4 py-3">
-          <motion.div
-            className="flex whitespace-nowrap text-sm font-medium text-cyan-100/90"
-            animate={{ x: ['0%', '-50%'] }}
-            transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-          >
-            <span className="pr-10">{tickerLine}</span>
-            <span>{tickerLine}</span>
-          </motion.div>
+          
+          {lastUpdateDate && (
+            <div className="alert-info inline-flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                Cập nhật: {lastUpdateDate}
+              </span>
+            </div>
+          )}
         </div>
       </motion.section>
 
-      <div className="grid gap-5 xl:grid-cols-12">
-        <section className="space-y-5 xl:col-span-8">
+      <div className="grid gap-6 xl:grid-cols-12">
+        {/* Main Content */}
+        <section className="space-y-6 xl:col-span-8">
+          {/* Price Chart */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.03 }}
-            className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2438]/85 via-[#111827]/85 to-[#0d111a]/90 p-6 backdrop-blur-2xl"
+            transition={{ delay: 0.05 }}
+            className="panel"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tong quan tai san</p>
-                <p className="mt-3 text-3xl font-bold text-white md:text-4xl">{formatVnd(320126000)}</p>
-                <p className="mt-2 text-sm font-medium text-emerald-300">+15% from last month</p>
-              </div>
-
-              <div className="rounded-2xl border border-lime-300/30 bg-lime-300/10 p-3 text-lime-200">
-                <Landmark className="h-6 w-6" />
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.06 }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Performance Chart</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-100">Hieu qua danh muc</h2>
-              </div>
-              <LineChart className="h-5 w-5 text-cyan-300" />
-            </div>
-
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performanceData}>
-                  <defs>
-                    <linearGradient id="portfolioFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4ade80" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#4ade80" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="benchmarkFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.28} />
-                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid stroke="#1f2937" strokeDasharray="4 4" />
-                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 12 }} stroke="#64748b" />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} stroke="#64748b" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0b1220',
-                      border: '1px solid rgba(71, 85, 105, 0.65)',
-                      borderRadius: '12px',
-                    }}
-                    formatter={(value, name) => {
-                      if (name === 'nav') return [`${Number(value).toLocaleString('vi-VN')} trieu`, 'NAV']
-                      return [Number(value).toLocaleString('vi-VN'), 'VN-Index']
-                    }}
-                    labelFormatter={(label) => `Ngay: ${label}`}
-                  />
-
-                  <Area
-                    type="monotone"
-                    dataKey="nav"
-                    name="nav"
-                    stroke="#4ade80"
-                    strokeWidth={2.2}
-                    fill="url(#portfolioFill)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="vnindex"
-                    name="vnindex"
-                    stroke="#38bdf8"
-                    strokeWidth={2.2}
-                    fill="url(#benchmarkFill)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-xs">
-              <div className="inline-flex items-center gap-2 text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                Hieu qua danh muc
-              </div>
-              <div className="inline-flex items-center gap-2 text-sky-300">
-                <span className="h-2 w-2 rounded-full bg-sky-300" />
-                VN-INDEX benchmark
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.09 }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tin hieu moi nhat</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-100">Tu cac bo loc du lieu bao cao</h2>
-              </div>
-              <a href="/screener" className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:text-cyan-200">
-                Mo Screener
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </a>
-            </div>
-
-            <div className="space-y-2">
-              {signalFeed.map((item) => (
-                <div
-                  key={`${item.ticker}-${item.time}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-100">{item.ticker}</p>
-                    <p className="text-xs text-slate-400">{item.filter}</p>
-                  </div>
-
-                  <p className="text-xs text-slate-500">{item.time}</p>
-
-                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>
-                    [{item.status}]
-                  </span>
-
-                  <button className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-200 hover:bg-cyan-400/20">
-                    Xem chi tiet
-                  </button>
+            <div className="panel-header">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="section-title">Biểu đồ giá cổ phiếu</h2>
+                  <p className="section-subtitle">Biến động giá 7 ngày gần nhất</p>
                 </div>
-              ))}
+                <TrendingUp className="h-5 w-5 text-success-600" />
+              </div>
+            </div>
+
+            <div className="panel-body">
+              <div className="h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      stroke="#cbd5e1"
+                    />
+                    <YAxis
+                      tick={{ fill: '#64748b', fontSize: 12 }}
+                      stroke="#cbd5e1"
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                      }}
+                      formatter={(value) => [Number(value).toLocaleString('vi-VN') + ' ₫', '']}
+                      labelFormatter={(label) => `Ngày: ${label}`}
+                    />
+                    {chartTickers.map((ticker, index) => (
+                      <Line
+                        key={ticker}
+                        type="monotone"
+                        dataKey={ticker}
+                        stroke={['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7'][index % 5]}
+                        strokeWidth={3}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legend */}
+              <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-4">
+                {chartTickers.length === 0 ? (
+                  <p className="text-sm text-slate-600">Chưa có mã theo dõi để vẽ biểu đồ.</p>
+                ) : (
+                  chartTickers.map((ticker, index) => (
+                    <div key={ticker} className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <span
+                        className="h-3 w-3 rounded-full shadow-sm"
+                        style={{ backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7'][index % 5] }}
+                      />
+                      {ticker}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </motion.div>
-        </section>
 
-        <section className="space-y-5 xl:col-span-4">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Suc mua & Tai khoan</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-100">Thong tin giao dich</h2>
-              </div>
-              <Wallet className="h-5 w-5 text-lime-300" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <p className="text-xs text-slate-500">Tien mat co san (Cash)</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">{formatVnd(64500000)}</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <p className="text-xs text-slate-500">Suc mua toi da (Purchasing Power)</p>
-                <p className="mt-1 text-lg font-semibold text-cyan-200">{formatVnd(189600000)}</p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-slate-500">Ty le ky quy (Margin Ratio)</p>
-                  <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                </div>
-                <p className="mt-1 text-lg font-semibold text-emerald-300">31.5%</p>
-              </div>
-            </div>
-          </motion.div>
-
+          {/* Signals Section */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl"
+            className="panel"
           >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Watchlist</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-100">Danh muc quan tam</h2>
+            <div className="panel-header">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="section-title">Tín hiệu đầu tư</h2>
+                  <p className="section-subtitle">Từ các bộ lọc và phân tích</p>
+                </div>
+                <a 
+                  href="/screener" 
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                  Mở bộ lọc
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
               </div>
-              <ChevronRight className="h-4 w-4 text-slate-500" />
             </div>
 
-            <div className="space-y-2">
-              {watchlist.map((stock) => {
-                const positive = stock.change >= 0
+            <div className="panel-body">
+              <div className="alert-info text-center">
+                <p className="text-sm">Chưa có dữ liệu tín hiệu từ bộ lọc.</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Sử dụng bộ lọc cổ phiếu để tìm kiếm cơ hội đầu tư
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </section>
 
-                return (
-                  <div
-                    key={stock.symbol}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] text-xs font-semibold text-slate-100">
-                        {stock.symbol.slice(0, 2)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-100">{stock.symbol}</p>
-                        <p className="text-xs text-slate-500">{stock.company}</p>
-                      </div>
-                    </div>
+        {/* Watchlist Sidebar */}
+        <section className="space-y-6 xl:col-span-4">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="panel"
+          >
+            <div className="panel-header">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="section-title">Danh mục quan tâm</h2>
+                  <p className="section-subtitle">{watchlistCompanies.length} cổ phiếu</p>
+                </div>
+                <Eye className="h-5 w-5 text-primary-600" />
+              </div>
+            </div>
 
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-slate-100">{formatCompactVnd(stock.price)}</p>
-                      <p className={`text-xs font-medium ${positive ? 'text-emerald-300' : 'text-red-300'}`}>
-                        {positive ? '+' : ''}{stock.change.toFixed(2)}%
-                      </p>
-                    </div>
+            <div className="panel-body">
+              <div className="space-y-3">
+                {loading && (
+                  <div className="alert-info text-center text-sm">
+                    Đang tải danh sách theo dõi...
                   </div>
-                )
-              })}
+                )}
+
+                {!loading && watchlistCompanies.length === 0 && (
+                  <div className="alert-info text-center">
+                    <p className="text-sm">Chưa có mã theo dõi.</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Thêm cổ phiếu vào danh sách để theo dõi
+                    </p>
+                  </div>
+                )}
+
+                {!loading && watchlistCompanies.map((company) => {
+                  const symbol = company.ticker
+                  const history = priceHistory?.[symbol] || []
+                  const latest = history[history.length - 1]
+                  const previous = history[history.length - 2]
+                  const change = latest && previous && previous.close_price
+                    ? ((latest.close_price - previous.close_price) / previous.close_price) * 100
+                    : null
+                  const positive = change !== null ? change >= 0 : true
+
+                  return (
+                    <div
+                      key={symbol}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 hover:border-primary-300 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary-200 bg-gradient-to-br from-primary-50 to-slate-50 text-sm font-bold text-primary-700">
+                          {symbol.slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{symbol}</p>
+                          <p className="text-xs text-slate-600 truncate max-w-[120px]">
+                            {company.name || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-slate-900 font-mono">
+                          {company.current_price ? formatCompactVnd(company.current_price) : '—'}
+                        </p>
+                        <div className={`inline-flex items-center gap-1 text-xs font-semibold ${positive ? 'text-success-600' : 'text-danger-600'}`}>
+                          {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {change === null ? '—' : `${positive ? '+' : ''}${change.toFixed(2)}%`}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         </section>

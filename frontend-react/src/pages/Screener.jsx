@@ -49,10 +49,10 @@ const industries = [
 ]
 
 const presetFilters = [
-  { id: 'value', name: 'Value Stocks', desc: 'P/E < 15, P/B < 1.5, ROE > 15%', filters: { peMax: 15, pbMax: 1.5, roeMin: 15 } },
-  { id: 'growth', name: 'Growth Stocks', desc: 'Tăng trưởng > 20%', filters: { revenueGrowthMin: 20, profitGrowthMin: 20 } },
-  { id: 'dividend', name: 'Dividend Stocks', desc: 'Cổ tức > 5%', filters: { dividendYieldMin: 5, deMax: 1 } },
-  { id: 'quality', name: 'Quality Stocks', desc: 'ROE > 20%, D/E < 0.5', filters: { roeMin: 20, deMax: 0.5 } },
+  { id: 'value', name: 'Co phieu gia tri', desc: 'P/E < 15, P/B < 1.5, ROE > 15%', filters: { peMax: 15, pbMax: 1.5, roeMin: 15 } },
+  { id: 'growth', name: 'Co phieu tang truong', desc: 'Doanh thu va loi nhuan > 20%', filters: { revenueGrowthMin: 20, profitGrowthMin: 20 } },
+  { id: 'dividend', name: 'Co phieu co tuc', desc: 'Co tuc > 5%, D/E < 1', filters: { dividendYieldMin: 5, deMax: 1 } },
+  { id: 'quality', name: 'Co phieu chat luong', desc: 'ROE > 20%, D/E < 0.5', filters: { roeMin: 20, deMax: 0.5 } },
 ]
 
 const initialFilters = {
@@ -169,10 +169,10 @@ export default function Screener() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display text-white">
+          <h1 className="text-3xl font-bold font-display text-slate-900">
             Sàng lọc cổ phiếu
           </h1>
-          <p className="text-dark-400 mt-1">
+          <p className="text-slate-600 mt-1">
             Tìm kiếm cổ phiếu theo các tiêu chí đầu tư giá trị
           </p>
         </div>
@@ -194,11 +194,11 @@ export default function Screener() {
           >
             <div className="flex items-center gap-2 mb-2">
               <Star className="w-4 h-4 text-warning-400" />
-              <span className="font-semibold text-white group-hover:text-primary-400 transition-colors">
+              <span className="font-semibold text-slate-900 group-hover:text-primary-400 transition-colors">
                 {preset.name}
               </span>
             </div>
-            <p className="text-xs text-dark-400">{preset.desc}</p>
+            <p className="text-xs text-slate-600">{preset.desc}</p>
           </button>
         ))}
       </div>
@@ -246,7 +246,7 @@ export default function Screener() {
               onClick={resetFilters}
               leftIcon={<RotateCcw className="w-4 h-4" />}
             >
-              Reset
+              Dat lai
             </Button>
           </div>
 
@@ -343,7 +343,7 @@ export default function Screener() {
                     <th className="w-10">
                       <input
                         type="checkbox"
-                        className="rounded border-dark-600 bg-dark-800"
+                        className="rounded border-dark-600 bg-white"
                         checked={selectedStocks.length === filteredStocks.length}
                         onChange={() => {
                           if (selectedStocks.length === filteredStocks.length) {
@@ -438,7 +438,7 @@ export default function Screener() {
                       <td>
                         <input
                           type="checkbox"
-                          className="rounded border-dark-600 bg-dark-800"
+                          className="rounded border-dark-600 bg-white"
                           checked={selectedStocks.includes(stock.ticker)}
                           onChange={() => toggleSelectStock(stock.ticker)}
                         />
@@ -453,29 +453,29 @@ export default function Screener() {
                               {stock.ticker.slice(0, 2)}
                             </span>
                           </div>
-                          <span className="font-semibold text-white group-hover/link:text-primary-400 transition-colors">
+                          <span className="font-semibold text-slate-900 group-hover/link:text-primary-400 transition-colors">
                             {stock.ticker}
                           </span>
                         </Link>
                       </td>
-                      <td className="text-dark-300 max-w-[200px] truncate">
+                      <td className="text-slate-500 max-w-[200px] truncate">
                         {stock.name}
                       </td>
                       <td>
                         <Badge variant="default" size="sm">{stock.industry}</Badge>
                       </td>
-                      <td className="text-right font-mono font-medium text-white">
+                      <td className="text-right font-mono font-medium text-slate-900">
                         {stock.price.toLocaleString('vi-VN')}
                       </td>
                       <td className="text-right">
                         <span className={cn(
                           'inline-flex items-center gap-1 font-medium',
-                          stock.change > 0 ? 'text-success-400' : stock.change < 0 ? 'text-danger-400' : 'text-dark-400'
+                          stock.change > 0 ? 'text-success-400' : stock.change < 0 ? 'text-danger-400' : 'text-slate-600'
                         )}>
                           {stock.change > 0 ? '+' : ''}{formatPercent(stock.change)}
                         </span>
                       </td>
-                      <td className="text-right text-dark-300">
+                      <td className="text-right text-slate-500">
                         {formatCurrency(stock.marketCap)}
                       </td>
                       <td className="text-right font-mono">
@@ -507,20 +507,20 @@ export default function Screener() {
                           {formatRatio(stock.de)}
                         </span>
                       </td>
-                      <td className="text-right font-mono text-dark-300">
+                      <td className="text-right font-mono text-slate-500">
                         {formatPercent(stock.dividendYield)}
                       </td>
                       <td>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-2 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-white">
+                          <button className="p-2 rounded-lg hover:bg-slate-50 text-slate-600 hover:text-slate-900">
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button className="p-2 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-warning-400">
+                          <button className="p-2 rounded-lg hover:bg-slate-50 text-slate-600 hover:text-warning-400">
                             <Bookmark className="w-4 h-4" />
                           </button>
                           <Link 
                             to={`/company/${stock.ticker}`}
-                            className="p-2 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-primary-400"
+                            className="p-2 rounded-lg hover:bg-slate-50 text-slate-600 hover:text-primary-400"
                           >
                             <ArrowUpRight className="w-4 h-4" />
                           </Link>
@@ -536,14 +536,14 @@ export default function Screener() {
           {/* Empty state */}
           {!loading && filteredStocks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-dark-800 flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mb-4">
                 <Search className="w-8 h-8 text-dark-500" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
                 Không tìm thấy kết quả
               </h3>
-              <p className="text-dark-400 max-w-md">
-                Thử điều chỉnh các tiêu chí lọc hoặc sử dụng preset có sẵn
+              <p className="text-slate-600 max-w-md">
+                Thu dieu chinh cac tieu chi loc hoac su dung bo loc mau co san
               </p>
               <Button
                 variant="secondary"
@@ -551,7 +551,7 @@ export default function Screener() {
                 onClick={resetFilters}
                 leftIcon={<RotateCcw className="w-4 h-4" />}
               >
-                Reset bộ lọc
+                Dat lai bo loc
               </Button>
             </div>
           )}
@@ -565,9 +565,9 @@ export default function Screener() {
           animate={{ opacity: 1, y: 0 }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
         >
-          <div className="flex items-center gap-4 px-6 py-4 bg-dark-800/95 backdrop-blur-xl border border-dark-600 rounded-2xl shadow-2xl">
-            <span className="text-sm text-dark-300">
-              Đã chọn <span className="font-semibold text-white">{selectedStocks.length}</span> cổ phiếu
+          <div className="flex items-center gap-4 px-6 py-4 bg-white/95 backdrop-blur-xl border border-dark-600 rounded-2xl shadow-2xl">
+            <span className="text-sm text-slate-500">
+              Đã chọn <span className="font-semibold text-slate-900">{selectedStocks.length}</span> cổ phiếu
             </span>
             <div className="w-px h-6 bg-dark-600" />
             <Button variant="secondary" size="sm" leftIcon={<Download className="w-4 h-4" />}>
@@ -578,7 +578,7 @@ export default function Screener() {
             </Button>
             <button
               onClick={() => setSelectedStocks([])}
-              className="p-2 rounded-lg hover:bg-dark-700 text-dark-400 hover:text-white"
+              className="p-2 rounded-lg hover:bg-slate-50 text-slate-600 hover:text-slate-900"
             >
               <X className="w-4 h-4" />
             </button>

@@ -608,6 +608,9 @@ class DatabaseManager:
 
                 if "shares_outstanding" not in company_columns:
                     conn.exec_driver_sql("ALTER TABLE companies ADD COLUMN shares_outstanding BIGINT")
+                
+                if "description" not in company_columns:
+                    conn.exec_driver_sql("ALTER TABLE companies ADD COLUMN description TEXT")
 
                 conn.exec_driver_sql(
                     """
@@ -640,6 +643,30 @@ class DatabaseManager:
                     self._create_income_statement_view(conn)
                 if "cash_flows" not in objects:
                     self._create_cash_flow_view(conn)
+
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    trade_date TEXT NOT NULL,
+                    close_price REAL NOT NULL,
+                    updated_at TEXT
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_price_history_ticker_date
+                ON price_history(ticker, trade_date)
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS idx_price_history_ticker_date
+                ON price_history(ticker, trade_date)
+                """
+            )
         
     @contextmanager
     def get_session(self):
@@ -664,6 +691,114 @@ class DatabaseManager:
         ORDER BY c.ticker
         """
         return pd.read_sql(query, self.engine)
+
+    def get_companies_by_tickers(self, tickers: list[str]) -> pd.DataFrame:
+        """Lấy thông tin công ty theo danh sách mã"""
+        normalized = [str(t).strip().upper() for t in tickers if str(t).strip()]
+        if not normalized:
+            return pd.DataFrame()
+
+        placeholders = ", ".join([f":t{i}" for i in range(len(normalized))])
+        params = {f"t{i}": symbol for i, symbol in enumerate(normalized)}
+        query = f"""
+        SELECT
+            c.id, c.ticker, c.name, c.industry,
+            c.market_cap, c.shares_outstanding, c.current_price
+        FROM companies c
+        WHERE UPPER(c.ticker) IN ({placeholders})
+        """
+        return pd.read_sql(text(query), self.engine, params=params)
+
+    def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
+        """Lấy lịch sử giá gần nhất theo mã"""
+        query = """
+        SELECT trade_date, close_price
+        FROM price_history
+        WHERE UPPER(ticker) = :ticker
+        ORDER BY trade_date DESC, id DESC
+        LIMIT :limit
+        """
+        return pd.read_sql(text(query), self.engine, params={"ticker": ticker.upper(), "limit": limit})
+
+    def get_long_term_metrics(self, ticker: str, years: int = 10) -> pd.DataFrame:
+        """Lấy dữ liệu dài hạn (5-10 năm) phục vụ phân tích value investing."""
+        query = """
+        SELECT
+            i.period_year AS year,
+            i.revenue,
+            i.net_profit,
+            b.total_equity,
+            b.total_liabilities,
+            c.shares_outstanding,
+            cf.operating_cash_flow,
+            cf.capex,
+            c.current_price
+        FROM companies c
+        JOIN income_statements i ON c.id = i.company_id
+        JOIN balance_sheets b ON c.id = b.company_id
+            AND i.period_year = b.period_year
+            AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
+        LEFT JOIN cash_flows cf ON c.id = cf.company_id
+            AND i.period_year = cf.period_year
+            AND COALESCE(i.period_quarter, 0) = COALESCE(cf.period_quarter, 0)
+        WHERE c.ticker = :ticker
+          AND (i.period_type = 'annual' OR (i.period_type = 'quarterly' AND i.period_quarter = 4))
+        ORDER BY i.period_year DESC
+        LIMIT :limit
+        """
+        df = pd.read_sql(text(query), self.engine, params={"ticker": ticker.upper(), "limit": years})
+        if df.empty:
+            return df
+
+        df = df.sort_values("year")
+        df["eps"] = df["net_profit"] / df["shares_outstanding"].replace(0, float("nan"))
+        df["roe"] = (df["net_profit"] / df["total_equity"].replace(0, float("nan")) * 100).round(2)
+        df["debt"] = df["total_liabilities"]
+        df["free_cash_flow"] = (df["operating_cash_flow"].fillna(0) - df["capex"].fillna(0))
+        df["revenue_growth"] = df["revenue"].pct_change() * 100
+        df["profit_growth"] = df["net_profit"].pct_change() * 100
+
+        return df
+
+    def get_top_movers(self, limit: int = 10, direction: str = "gainers") -> pd.DataFrame:
+        """Lấy top tăng/giảm theo biến động 2 phiên gần nhất."""
+        query = """
+        WITH latest_dates AS (
+            SELECT DISTINCT trade_date
+            FROM price_history
+            ORDER BY trade_date DESC
+            LIMIT 2
+        ),
+        ranked AS (
+            SELECT ph.ticker, ph.trade_date, ph.close_price
+            FROM price_history ph
+            WHERE ph.trade_date IN (SELECT trade_date FROM latest_dates)
+        ),
+        piv AS (
+            SELECT
+                ticker,
+                MAX(CASE WHEN trade_date = (SELECT MIN(trade_date) FROM latest_dates) THEN close_price END) AS prev_price,
+                MAX(CASE WHEN trade_date = (SELECT MAX(trade_date) FROM latest_dates) THEN close_price END) AS last_price
+            FROM ranked
+            GROUP BY ticker
+        )
+        SELECT
+            c.ticker,
+            c.name,
+            c.industry,
+            c.market_cap,
+            CASE
+                WHEN piv.prev_price > 0 THEN ROUND((piv.last_price - piv.prev_price) * 100.0 / piv.prev_price, 2)
+                ELSE NULL
+            END AS change_percent
+        FROM piv
+        JOIN companies c ON UPPER(c.ticker) = UPPER(piv.ticker)
+        WHERE piv.last_price IS NOT NULL
+        ORDER BY change_percent {order}
+        LIMIT :limit
+        """.format(order="DESC" if direction == "gainers" else "ASC")
+
+        return pd.read_sql(text(query), self.engine, params={"limit": limit})
     
     def get_company_by_ticker(self, ticker: str) -> dict:
         """Lấy thông tin công ty theo mã CK"""
@@ -674,6 +809,7 @@ class DatabaseManager:
                     "id": company.id,
                     "ticker": company.ticker,
                     "name": company.name,
+                    "description": getattr(company, 'description', None),
                     "industry": company.industry,
                     "market_cap": company.market_cap,
                     "shares_outstanding": company.shares_outstanding,

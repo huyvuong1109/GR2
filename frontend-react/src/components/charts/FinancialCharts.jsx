@@ -22,8 +22,14 @@ const CustomTooltip = ({ active, payload, label, valueFormatter = formatCompact 
   if (!active || !payload?.length) return null
 
   return (
-    <div className="bg-dark-800/95 backdrop-blur-sm border border-dark-600 rounded-xl p-4 shadow-xl">
-      <p className="text-sm font-medium text-dark-300 mb-2">{label}</p>
+    <div
+      className="backdrop-blur-sm rounded-xl p-4 shadow-xl"
+      style={{
+        backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+        border: '1px solid hsl(var(--chart-tooltip-border))',
+      }}
+    >
+      <p className="text-sm font-medium mb-2" style={{ color: 'hsl(var(--chart-text))' }}>{label}</p>
       <div className="space-y-1">
         {payload.map((entry, index) => (
           <div key={index} className="flex items-center gap-2">
@@ -31,8 +37,8 @@ const CustomTooltip = ({ active, payload, label, valueFormatter = formatCompact 
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-sm text-dark-400">{entry.name}:</span>
-            <span className="text-sm font-semibold text-white">
+            <span className="text-sm" style={{ color: 'hsl(var(--chart-text))' }}>{entry.name}:</span>
+            <span className="text-sm font-semibold text-slate-900">
               {valueFormatter(entry.value)}
             </span>
           </div>
@@ -57,17 +63,17 @@ export function RevenueChart({ data }) {
             <stop offset="100%" stopColor={chartColors.success} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
         <XAxis 
           dataKey="year" 
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
         />
         <YAxis 
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
           tickFormatter={formatCompact}
         />
         <Tooltip content={<CustomTooltip />} />
@@ -101,12 +107,12 @@ export function RatiosChart({ data }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} layout="vertical">
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" horizontal={false} />
         <XAxis 
           type="number"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
           tickFormatter={(val) => `${val}%`}
         />
         <YAxis 
@@ -114,7 +120,7 @@ export function RatiosChart({ data }) {
           dataKey="name"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
           width={100}
         />
         <Tooltip 
@@ -157,9 +163,15 @@ export function SectorPieChart({ data }) {
             if (!active || !payload?.length) return null
             const data = payload[0].payload
             return (
-              <div className="bg-dark-800/95 backdrop-blur-sm border border-dark-600 rounded-xl p-3 shadow-xl">
-                <p className="text-sm font-medium text-white">{data.name}</p>
-                <p className="text-sm text-dark-400">{formatPercent(data.value)}</p>
+              <div
+                className="backdrop-blur-sm rounded-xl p-3 shadow-xl"
+                style={{
+                  backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+                  border: '1px solid hsl(var(--chart-tooltip-border))',
+                }}
+              >
+                <p className="text-sm font-medium text-slate-900">{data.name}</p>
+                <p className="text-sm" style={{ color: 'hsl(var(--chart-text))' }}>{formatPercent(data.value)}</p>
               </div>
             )
           }}
@@ -181,17 +193,17 @@ export function PerformanceChart({ data }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
         <XAxis 
           dataKey="year" 
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
         />
         <YAxis 
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
           tickFormatter={(val) => `${val}%`}
         />
         <Tooltip content={<CustomTooltip valueFormatter={formatPercent} />} />
@@ -233,17 +245,17 @@ export function CashFlowChart({ data }) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
         <XAxis 
           dataKey="year"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
         />
         <YAxis 
           axisLine={false}
           tickLine={false}
-          tick={{ fill: '#94a3b8', fontSize: 12 }}
+          tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }}
           tickFormatter={formatCompact}
         />
         <Tooltip content={<CustomTooltip />} />
