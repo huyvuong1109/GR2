@@ -1,34 +1,24 @@
 import { useState, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Search,
   Filter,
-  SlidersHorizontal,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  X,
-  ChevronDown,
   RotateCcw,
+  X,
   Star,
   Eye,
   AlertTriangle,
   Scale,
-  Percent,
-  DollarSign,
-  Building2,
   RefreshCw,
+  SlidersHorizontal,
+  ArrowUpRight,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Badge, SkeletonTable } from '../components/ui'
+import { Button, Badge, SkeletonTable } from '../components/ui'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 import DynamicScreenerPanel from '../components/screener/DynamicScreenerPanel'
 import StarButton from '../components/StarButton'
-
-
-
-// Presets removed as per request
 
 const initialFilters = {
   search: '',
@@ -38,80 +28,38 @@ const initialFilters = {
   min_pb: '',
   max_pb: '',
   min_roe: '',
-  max_roe: '',
-  min_roa: '',
-  max_de: '',
-  min_current_ratio: '',
-  min_gross_margin: '',
-  min_net_margin: '',
+  max_roa: '',
   min_revenue_growth: '',
   min_profit_growth: '',
   min_f_score: '',
 }
 
-// Health Score badge component
-const HealthScoreBadge = ({ score }) => {
-  if (score === null || score === undefined) return <span className="text-slate-500">-</span>
-  
-  let color = 'bg-slate-500'
-  if (score >= 8) color = 'bg-green-500'
-  else if (score >= 6) color = 'bg-blue-500'
-  else if (score >= 4) color = 'bg-yellow-500'
-  else if (score >= 2) color = 'bg-orange-500'
-  else color = 'bg-red-500'
-  
-  return (
-    <span className={`${color} text-slate-900 text-xs font-bold px-2 py-0.5 rounded-full`}>
-      {score}/9
-    </span>
-  )
+const ratioTone = {
+  good: 'text-emerald-300',
+  ok: 'text-sky-300',
+  mid: 'text-amber-300',
+  weak: 'text-orange-300',
+  bad: 'text-red-300',
 }
 
-// Ratio display with color coding
-const RatioValue = ({ value, type, inverse = false }) => {
-  if (value === null || value === undefined || isNaN(value)) {
-    return <span className="text-slate-500">-</span>
-  }
-  
-  let colorClass = 'text-slate-900'
-  
-  switch(type) {
-    case 'pe':
-      if (value < 10) colorClass = 'text-success-600'
-      else if (value < 15) colorClass = 'text-primary-600'
-      else if (value < 25) colorClass = 'text-warning-600'
-      else colorClass = 'text-danger-600'
-      break
-    case 'pb':
-      if (value < 1) colorClass = 'text-success-600'
-      else if (value < 2) colorClass = 'text-primary-600'
-      else if (value < 3) colorClass = 'text-warning-600'
-      else colorClass = 'text-danger-600'
-      break
-    case 'roe':
-    case 'roa':
-    case 'margin':
-      if (value >= 20) colorClass = 'text-success-600'
-      else if (value >= 15) colorClass = 'text-primary-600'
-      else if (value >= 10) colorClass = 'text-warning-600'
-      else if (value > 0) colorClass = 'text-orange-400'
-      else colorClass = 'text-danger-600'
-      break
-    case 'de':
-      if (value < 0.5) colorClass = 'text-success-600'
-      else if (value < 1) colorClass = 'text-primary-600'
-      else if (value < 2) colorClass = 'text-warning-600'
-      else colorClass = 'text-danger-600'
-      break
-    case 'growth':
-      if (value >= 20) colorClass = 'text-success-600'
-      else if (value >= 10) colorClass = 'text-primary-600'
-      else if (value >= 0) colorClass = 'text-warning-600'
-      else colorClass = 'text-danger-600'
-      break
-  }
-  
-  return <span className={colorClass}>{value.toFixed(1)}</span>
+function HealthScoreBadge({ score }) {
+  if (score === null || score === undefined) return <span className="text-slate-500">-</span>
+  const tone = score >= 8 ? 'badge-success' : score >= 6 ? 'badge-info' : score >= 4 ? 'badge-warning' : 'badge-danger'
+  return <span className={cn('badge', tone)}>{score}/9</span>
+}
+
+function RatioValue({ value, type }) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return <span className="text-slate-500">-</span>
+  const number = Number(value)
+  let colorClass = 'text-slate-200'
+
+  if (type === 'pe') colorClass = number < 10 ? ratioTone.good : number < 15 ? ratioTone.ok : number < 25 ? ratioTone.mid : ratioTone.bad
+  if (type === 'pb') colorClass = number < 1 ? ratioTone.good : number < 2 ? ratioTone.ok : number < 3 ? ratioTone.mid : ratioTone.bad
+  if (['roe', 'roa', 'margin'].includes(type)) colorClass = number >= 20 ? ratioTone.good : number >= 15 ? ratioTone.ok : number >= 10 ? ratioTone.mid : number > 0 ? ratioTone.weak : ratioTone.bad
+  if (type === 'de') colorClass = number < 0.5 ? ratioTone.good : number < 1 ? ratioTone.ok : number < 2 ? ratioTone.mid : ratioTone.bad
+  if (type === 'growth') colorClass = number >= 20 ? ratioTone.good : number >= 10 ? ratioTone.ok : number >= 0 ? ratioTone.mid : ratioTone.bad
+
+  return <span className={cn('font-mono font-bold', colorClass)}>{number.toFixed(1)}</span>
 }
 
 export default function Screener() {
@@ -124,54 +72,34 @@ export default function Screener() {
   const [error, setError] = useState(null)
   const [dynamicPayload, setDynamicPayload] = useState([])
   const [dynamicNotice, setDynamicNotice] = useState('')
+
   const groupOptions = useMemo(() => {
-    const industries = [...new Set(stocks.map(s => s.industry).filter(Boolean))]
-    industries.sort()
-    return [
-      { value: '', label: 'Tất cả mã ngành' },
-      ...industries.map((ind) => ({
-        value: ind,
-        label: ind,
-      })),
-    ]
+    const industries = [...new Set(stocks.map((s) => s.industry).filter(Boolean))].sort()
+    return [{ value: '', label: 'Tất cả ngành' }, ...industries.map((industry) => ({ value: industry, label: industry }))]
   }, [stocks])
 
-  // Fetch stocks with filters
   const fetchStocks = async (filterParams = {}, activeDynamicPayload = []) => {
     setLoading(true)
     setError(null)
-    
     try {
-      // Build query params
       const params = new URLSearchParams()
-      
       Object.entries(filterParams).forEach(([key, value]) => {
-        if (value !== '' && value !== null && value !== undefined) {
-          params.append(key, value)
-        }
+        if (value !== '' && value !== null && value !== undefined) params.append(key, value)
       })
-
-      if (activeDynamicPayload.length > 0) {
-        params.append('dynamic_filters', JSON.stringify(activeDynamicPayload))
-      }
-      
+      if (activeDynamicPayload.length > 0) params.append('dynamic_filters', JSON.stringify(activeDynamicPayload))
       params.append('sort_by', sortConfig.key)
       params.append('sort_order', sortConfig.direction)
-      params.append('limit', '2000') // fetch all up to 2000
-      
+      params.append('limit', '2000')
+
       const response = await api.get(`/screener/advanced?${params.toString()}`)
-      // Note: api interceptor returns response.data directly
-      // /screener/advanced returns {total, limit, filters_applied, results}
       setStocks(response.results || [])
     } catch (err) {
       console.error('Error fetching stocks:', err)
       setError('Không thể tải dữ liệu. Vui lòng thử lại.')
-      // Fallback to basic endpoint
       try {
         const response = await api.get('/companies')
-        // Note: api interceptor returns response.data directly
         setStocks(Array.isArray(response) ? response : [])
-      } catch (e) {
+      } catch {
         setStocks([])
       }
     } finally {
@@ -179,38 +107,22 @@ export default function Screener() {
     }
   }
 
-  // Initial load
   useEffect(() => {
     fetchStocks()
   }, [])
 
-
-
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-  }
+  const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
 
   const buildApiFiltersFromQuickInputs = () => {
     const apiFilters = {}
-
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== '' && key !== 'search' && key !== 'ticker_group') {
-        apiFilters[key] = value
-      }
+      if (value !== '' && key !== 'search' && key !== 'ticker_group') apiFilters[key] = value
     })
-
     return apiFilters
   }
 
-  // Apply filters
-  const applyFilters = () => {
-    const apiFilters = buildApiFiltersFromQuickInputs()
-    fetchStocks(apiFilters, dynamicPayload)
-  }
+  const applyFilters = () => fetchStocks(buildApiFiltersFromQuickInputs(), dynamicPayload)
 
-
-
-  // Reset filters
   const resetFilters = () => {
     setFilters(initialFilters)
     setDynamicPayload([])
@@ -218,70 +130,47 @@ export default function Screener() {
     fetchStocks()
   }
 
-  // Sort handler
   const handleSort = (key) => {
-    setSortConfig(prev => ({
+    setSortConfig((prev) => ({
       key,
-      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
     }))
   }
 
-  // Client-side search filter
   const filteredStocks = useMemo(() => {
-    let result = stocks.filter((stock) => {
-      if (filters.ticker_group && stock.industry !== filters.ticker_group) {
-        return false
-      }
-
-      if (!filters.search) {
-        return true
-      }
-
+    const result = stocks.filter((stock) => {
+      if (filters.ticker_group && stock.industry !== filters.ticker_group) return false
+      if (!filters.search) return true
       const search = filters.search.toLowerCase()
       return stock.ticker?.toLowerCase().includes(search) || stock.name?.toLowerCase().includes(search)
     })
-    
-    // Sort local result
+
     result.sort((a, b) => {
       const aVal = a[sortConfig.key] ?? 0
       const bVal = b[sortConfig.key] ?? 0
-      if (aVal === bVal) return 0;
-      if (sortConfig.direction === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
+      if (aVal === bVal) return 0
+      return sortConfig.direction === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1)
     })
-    
+
     return result
   }, [stocks, filters.search, filters.ticker_group, sortConfig])
 
-  // Compare selected stocks
   const handleCompare = () => {
-    if (selectedStocks.length >= 2) {
-      navigate(`/compare?tickers=${selectedStocks.join(',')}`)
-    }
+    if (selectedStocks.length >= 2) navigate(`/compare?tickers=${selectedStocks.join(',')}`)
   }
 
-  // Toggle stock selection
   const toggleStockSelection = (ticker) => {
-    setSelectedStocks(prev =>
+    setSelectedStocks((prev) =>
       prev.includes(ticker)
-        ? prev.filter(t => t !== ticker)
+        ? prev.filter((item) => item !== ticker)
         : prev.length < 5 ? [...prev, ticker] : prev
     )
   }
 
   const pushDynamicPayloadToApi = async (payload, queryParams) => {
-    if (!payload || payload.length === 0) {
-      return
-    }
-
+    if (!payload || payload.length === 0) return
     try {
-      await api.post('/screener', {
-        dynamic_filters: payload,
-        mapped_filters: queryParams,
-      })
+      await api.post('/screener', { dynamic_filters: payload, mapped_filters: queryParams })
     } catch (postError) {
       console.warn('Dynamic payload endpoint chưa xử lý đầy đủ:', postError)
     }
@@ -290,267 +179,193 @@ export default function Screener() {
   const handleDynamicApply = async ({ payload, queryParams }) => {
     setDynamicPayload(payload)
     setDynamicNotice(`Đã tạo payload ${payload.length} điều kiện và gửi API lọc.`)
-
-    const mergedFilters = {
-      ...buildApiFiltersFromQuickInputs(),
-      ...queryParams,
-    }
-
+    const mergedFilters = { ...buildApiFiltersFromQuickInputs(), ...queryParams }
     await pushDynamicPayloadToApi(payload, queryParams)
     fetchStocks(mergedFilters, payload)
   }
 
   const handleDynamicSave = async ({ payload, queryParams }) => {
     setDynamicPayload(payload)
-
-    const saveSnapshot = {
-      savedAt: new Date().toISOString(),
-      payload,
-      queryParams,
-    }
-
-    localStorage.setItem('dynamic_screener_snapshot', JSON.stringify(saveSnapshot))
+    localStorage.setItem('dynamic_screener_snapshot', JSON.stringify({ savedAt: new Date().toISOString(), payload, queryParams }))
     await pushDynamicPayloadToApi(payload, queryParams)
     setDynamicNotice(`Đã lưu ${payload.length} điều kiện lọc động.`)
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Bộ lọc cổ phiếu</h1>
-          <p className="text-slate-600 mt-1">Tìm kiếm cổ phiếu phù hợp với chiến lược đầu tư của bạn</p>
+          <h1 className="text-4xl font-black tracking-tight text-slate-100 md:text-5xl">Bộ lọc cổ phiếu</h1>
+          <p className="mt-3 max-w-3xl text-lg leading-8 text-slate-400">
+            Lọc các doanh nghiệp theo chất lượng vốn, tăng trưởng, định giá và rủi ro tài chính.
+          </p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          {selectedStocks.length >= 2 && (
-            <Button
-              onClick={handleCompare}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              <Scale className="w-4 h-4 mr-2" />
-              So sánh ({selectedStocks.length})
-            </Button>
-          )}
-        </div>
-      </div>
 
-      <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        {/* Top bar: Quick Filters */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-wrap gap-4 items-end">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Tìm kiếm</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Mã CK hoặc tên công ty..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-10 bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:ring-primary-500/20"
-              />
+        {selectedStocks.length >= 2 && (
+          <button type="button" onClick={handleCompare} className="btn-primary flex items-center justify-center gap-2 px-5 py-3">
+            <Scale className="h-4 w-4" />
+            So sánh ({selectedStocks.length})
+          </button>
+        )}
+      </section>
+
+      <section className="glass-card overflow-hidden">
+        <div className="border-b border-white/10 p-5">
+          <div className="grid gap-4 lg:grid-cols-[1fr_260px_auto_auto] lg:items-end">
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">Tìm kiếm</label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  placeholder="Mã CK hoặc tên công ty..."
+                  className="input-primary py-3 pl-11 pr-4"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Ticker Group */}
-          <div className="w-48">
-            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Mã ngành</label>
-            <Select
-              value={filters.ticker_group}
-              onChange={(e) => handleFilterChange('ticker_group', e.target.value)}
-              options={groupOptions}
-              className="bg-white border-slate-200 text-slate-900 focus:border-primary-500 focus:ring-primary-500/20"
-            />
-          </div>
-
-          <Button onClick={applyFilters} className="bg-primary-600 hover:bg-primary-700 text-white shadow-sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Lọc
-          </Button>
-
-          <Button variant="outline" onClick={resetFilters} className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
-          </Button>
-        </div>
-
-        {/* Dynamic Panel */}
-        <div className="p-4 sm:p-6">
-          <DynamicScreenerPanel
-            onApplyFilters={handleDynamicApply}
-            onSaveFilters={handleDynamicSave}
-          />
-          {dynamicNotice && (
-            <p className="mt-3 text-xs text-primary-700 font-medium">{dynamicNotice}</p>
-          )}
-        </div>
-      </Card>
-
-      {/* Results */}
-      <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between p-6">
-          <div>
-            <CardTitle className="text-slate-900">Kết quả</CardTitle>
-            <p className="text-sm text-slate-600">
-              Tìm thấy {filteredStocks.length} cổ phiếu
-            </p>
-          </div>
-          
-          {selectedStocks.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span>Đã chọn: {selectedStocks.join(', ')}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedStocks([])}
-                className="text-danger-600 hover:text-danger-600"
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">Ngành</label>
+              <select
+                value={filters.ticker_group}
+                onChange={(e) => handleFilterChange('ticker_group', e.target.value)}
+                className="input-primary py-3 pl-3 pr-8"
               >
-                <X className="w-4 h-4" />
-              </Button>
+                {groupOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-[#191c1e] text-slate-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button type="button" onClick={applyFilters} className="btn-primary flex items-center justify-center gap-2 px-5 py-3">
+              <Filter className="h-4 w-4" />
+              Lọc
+            </button>
+
+            <button type="button" onClick={resetFilters} className="btn-outline flex items-center justify-center gap-2 px-5 py-3">
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <DynamicScreenerPanel onApplyFilters={handleDynamicApply} onSaveFilters={handleDynamicSave} />
+          {dynamicNotice && <p className="mt-3 text-xs font-bold text-emerald-300">{dynamicNotice}</p>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <SlidersHorizontal className="h-5 w-5 text-emerald-300" />
+              <h2 className="section-title">Kết quả lọc</h2>
+              <span className="text-sm font-bold text-slate-500">({filteredStocks.length} cổ phiếu)</span>
+            </div>
+            <p className="section-subtitle">Click tiêu đề cột để sắp xếp, chọn tối đa 5 mã để so sánh.</p>
+          </div>
+
+          {selectedStocks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+              <span>Đã chọn: {selectedStocks.join(', ')}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedStocks([])}
+                className="btn-ghost p-2 text-red-300"
+                aria-label="Xóa lựa chọn"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           )}
-        </CardHeader>
-        
-        <CardContent className="p-0">
+        </div>
+
+        <div className="p-0">
           {loading ? (
             <SkeletonTable rows={10} cols={12} />
           ) : error ? (
-            <div className="p-8 text-center text-danger-600">
-              <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <div className="p-10 text-center text-red-300">
+              <AlertTriangle className="mx-auto mb-4 h-12 w-12 opacity-70" />
               <p>{error}</p>
               <Button onClick={() => fetchStocks()} className="mt-4" variant="outline">
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Thử lại
               </Button>
             </div>
           ) : filteredStocks.length === 0 ? (
-            <div className="p-8 text-center text-slate-600">
-              <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Không tìm thấy cổ phiếu phù hợp với tiêu chí</p>
-              <Button onClick={resetFilters} className="mt-4" variant="outline">
-                Reset bộ lọc
-              </Button>
+            <div className="p-10 text-center text-slate-400">
+              <Search className="mx-auto mb-4 h-12 w-12 opacity-60" />
+              <p>Không tìm thấy cổ phiếu phù hợp với tiêu chí.</p>
+              <Button onClick={resetFilters} className="mt-4" variant="outline">Reset bộ lọc</Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="table-financial min-w-[1120px]">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left">
-                    <th className="p-3 text-slate-600 font-medium w-8">
+                  <tr>
+                    <th className="w-10">
                       <input
                         type="checkbox"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedStocks(filteredStocks.slice(0, 5).map(s => s.ticker))
-                          } else {
-                            setSelectedStocks([])
-                          }
-                        }}
+                        onChange={(e) => setSelectedStocks(e.target.checked ? filteredStocks.slice(0, 5).map((s) => s.ticker) : [])}
                         checked={selectedStocks.length > 0}
-                        className="rounded bg-slate-50 border-white/30"
+                        className="rounded border-white/20 bg-black/30 text-emerald-400"
                       />
                     </th>
-                    <th className="p-3 text-slate-600 font-medium">Mã CK</th>
-                    <th className="p-3 text-slate-600 font-medium text-center">Theo dõi</th>
-                    <th className="p-3 text-slate-600 font-medium">Mã ngành</th>
-                    <th className="p-3 text-slate-600 font-medium text-right cursor-pointer hover:text-slate-900" onClick={() => handleSort('price')}>
-                      Giá {sortConfig.key === 'price' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-right cursor-pointer hover:text-slate-900" onClick={() => handleSort('market_cap')}>
-                      Vốn hóa {sortConfig.key === 'market_cap' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('pe_ratio')}>
-                      P/E {sortConfig.key === 'pe_ratio' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('pb_ratio')}>
-                      P/B {sortConfig.key === 'pb_ratio' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('roe')}>
-                      ROE {sortConfig.key === 'roe' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('debt_to_equity')}>
-                      D/E {sortConfig.key === 'debt_to_equity' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('gross_margin')}>
-                      GM% {sortConfig.key === 'gross_margin' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center cursor-pointer hover:text-slate-900" onClick={() => handleSort('revenue_growth')}>
-                      TT DT% {sortConfig.key === 'revenue_growth' && (sortConfig.direction === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th className="p-3 text-slate-600 font-medium text-center">F-Score</th>
-                    <th className="p-3 text-slate-600 font-medium text-center">Action</th>
+                    <SortHead label="Mã CK" sortKey="ticker" sortConfig={sortConfig} onSort={handleSort} />
+                    <th className="text-center"><Star className="mx-auto h-4 w-4" /></th>
+                    <th>Ngành</th>
+                    <SortHead label="Giá" sortKey="price" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="Vốn hóa" sortKey="market_cap" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="P/E" sortKey="pe_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="P/B" sortKey="pb_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="ROE" sortKey="roe" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="D/E" sortKey="debt_to_equity" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="TT DT" sortKey="revenue_growth" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <th className="text-center">F-Score</th>
+                    <th className="text-center">Xem</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStocks.map((stock, idx) => (
                     <motion.tr
                       key={stock.ticker}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.02 }}
-                      className={cn(
-                        'border-b border-slate-100 hover:bg-white transition-colors',
-                        selectedStocks.includes(stock.ticker) && 'bg-primary-50'
-                      )}
+                      transition={{ delay: Math.min(idx * 0.01, 0.2) }}
+                      className={cn(selectedStocks.includes(stock.ticker) && 'bg-emerald-400/[0.06]')}
                     >
-                      <td className="p-3">
+                      <td>
                         <input
                           type="checkbox"
                           checked={selectedStocks.includes(stock.ticker)}
                           onChange={() => toggleStockSelection(stock.ticker)}
-                          className="rounded bg-slate-50 border-white/30"
+                          className="rounded border-white/20 bg-black/30 text-emerald-400"
                         />
                       </td>
-                      <td className="p-3">
-                        <Link to={`/company/${stock.ticker}`} className="flex items-center gap-2 group">
-                          <span className="font-bold text-primary-700 group-hover:text-primary-700">
-                            {stock.ticker}
-                          </span>
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <td>
+                        <Link to={`/company/${stock.ticker}`} className="group flex items-center gap-2">
+                          <span className="font-black text-emerald-300 group-hover:text-emerald-200">{stock.ticker}</span>
+                          <ArrowUpRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                         </Link>
-                        <span className="text-xs text-slate-500 line-clamp-1">{stock.name}</span>
+                        <p className="max-w-[220px] truncate text-xs text-slate-500">{stock.name}</p>
                       </td>
-                      <td className="p-3 text-center">
-                        <StarButton ticker={stock.ticker} />
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="text-xs">
-                          {stock.industry || 'N/A'}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-900">
-                        {stock.price ? `${stock.price.toLocaleString()}đ` : '-'}
-                      </td>
-                      <td className="p-3 text-right font-mono text-slate-900">
-                        {stock.market_cap ? `${(stock.market_cap / 1e9).toFixed(0)}B` : '-'}
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.pe_ratio} type="pe" />
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.pb_ratio} type="pb" />
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.roe} type="roe" />%
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.debt_to_equity} type="de" />
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.gross_margin} type="margin" />%
-                      </td>
-                      <td className="p-3 text-center font-mono">
-                        <RatioValue value={stock.revenue_growth} type="growth" />%
-                      </td>
-                      <td className="p-3 text-center">
-                        <HealthScoreBadge score={stock.f_score} />
-                      </td>
-                      <td className="p-3 text-center">
-                        <Link to={`/company/${stock.ticker}`}>
-                          <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                      <td className="text-center"><StarButton ticker={stock.ticker} /></td>
+                      <td><Badge variant="outline">{stock.industry || 'N/A'}</Badge></td>
+                      <td className="text-right font-mono text-slate-100">{stock.price ? `${stock.price.toLocaleString('vi-VN')}₫` : '-'}</td>
+                      <td className="text-right font-mono text-slate-100">{stock.market_cap ? `${(stock.market_cap / 1e9).toFixed(0)}B` : '-'}</td>
+                      <td className="text-center"><RatioValue value={stock.pe_ratio} type="pe" /></td>
+                      <td className="text-center"><RatioValue value={stock.pb_ratio} type="pb" /></td>
+                      <td className="text-center"><RatioValue value={stock.roe} type="roe" />%</td>
+                      <td className="text-center"><RatioValue value={stock.debt_to_equity} type="de" /></td>
+                      <td className="text-center"><RatioValue value={stock.revenue_growth} type="growth" />%</td>
+                      <td className="text-center"><HealthScoreBadge score={stock.f_score} /></td>
+                      <td className="text-center">
+                        <Link to={`/company/${stock.ticker}`} className="btn-ghost inline-flex p-2">
+                          <Eye className="h-4 w-4" />
                         </Link>
                       </td>
                     </motion.tr>
@@ -559,37 +374,41 @@ export default function Screener() {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Legend */}
-      <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <CardContent className="p-6">
-          <h4 className="text-sm font-medium text-slate-700 mb-3">Chú thích màu sắc</h4>
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-success-600 font-bold">■</span>
-              <span className="text-slate-600">Tốt / Rẻ</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-primary-600 font-bold">■</span>
-              <span className="text-slate-600">Khá</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-warning-600 font-bold">■</span>
-              <span className="text-slate-600">Trung bình</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-orange-400 font-bold">■</span>
-              <span className="text-slate-600">Cần xem xét</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-danger-600 font-bold">■</span>
-              <span className="text-slate-600">Rủi ro / Đắt</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="glass-card p-5">
+        <h4 className="mb-4 text-sm font-black uppercase tracking-widest text-slate-300">Chú thích màu sắc</h4>
+        <div className="flex flex-wrap gap-5 text-sm text-slate-400">
+          <Legend color="text-emerald-300" text="Tốt / Rẻ" />
+          <Legend color="text-sky-300" text="Khá" />
+          <Legend color="text-amber-300" text="Trung bình" />
+          <Legend color="text-orange-300" text="Cần xem xét" />
+          <Legend color="text-red-300" text="Rủi ro / Đắt" />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SortHead({ label, sortKey, sortConfig, onSort, align = 'left' }) {
+  const active = sortConfig.key === sortKey
+  const arrow = active ? (sortConfig.direction === 'desc' ? '↓' : '↑') : ''
+  return (
+    <th
+      className={cn('cursor-pointer hover:text-emerald-300', align === 'right' && 'text-right', align === 'center' && 'text-center')}
+      onClick={() => onSort(sortKey)}
+    >
+      {label} {arrow}
+    </th>
+  )
+}
+
+function Legend({ color, text }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={cn('text-lg leading-none', color)}>■</span>
+      <span>{text}</span>
     </div>
   )
 }

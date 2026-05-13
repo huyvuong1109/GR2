@@ -31,7 +31,7 @@ export default function Select({
   return (
     <div className={cn('w-full', className)} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-dark-200 mb-2">
+        <label className="block text-sm font-semibold text-slate-300 mb-2">
           {label}
         </label>
       )}
@@ -40,21 +40,21 @@ export default function Select({
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           className={cn(
-            'w-full flex items-center justify-between px-4 py-3 bg-white/50 border border-dark-600 rounded-xl text-left transition-all',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500',
-            isOpen && 'ring-2 ring-primary-500/50 border-primary-500',
-            error && 'border-danger-500',
+            'w-full flex items-center justify-between px-4 py-3 bg-black/30 border border-white/10 rounded-lg text-left transition-all',
+            'focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-300/60',
+            isOpen && 'ring-2 ring-emerald-400/20 border-emerald-300/60',
+            error && 'border-red-300/60',
             disabled && 'opacity-50 cursor-not-allowed',
           )}
         >
           <span className={cn(
             'block truncate',
-            selectedOption ? 'text-slate-900' : 'text-slate-600'
+            selectedOption ? 'text-slate-100' : 'text-slate-500'
           )}>
             {selectedOption?.label || placeholder}
           </span>
           <ChevronDown className={cn(
-            'w-4 h-4 text-slate-600 transition-transform',
+            'w-4 h-4 text-slate-500 transition-transform',
             isOpen && 'rotate-180'
           )} />
         </button>
@@ -66,7 +66,7 @@ export default function Select({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.15 }}
-              className="absolute z-[100] w-full mt-2 bg-white border border-dark-600 rounded-xl shadow-xl overflow-hidden"
+              className="absolute z-[100] w-full mt-2 bg-[#191c1e] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
             >
               <div className="max-h-60 overflow-auto py-2">
                 {options.map((option) => (
@@ -82,14 +82,14 @@ export default function Select({
                       setIsOpen(false)
                     }}
                     className={cn(
-                      'w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors',
-                      'hover:bg-slate-50',
-                      option.value === value && 'bg-primary-500/10 text-primary-400'
+                      'w-full flex items-center justify-between px-4 py-2.5 text-left text-slate-300 transition-colors',
+                      'hover:bg-white/5',
+                      option.value === value && 'bg-emerald-400/10 text-emerald-300'
                     )}
                   >
                     <span className="text-sm">{option.label}</span>
                     {option.value === value && (
-                      <Check className="w-4 h-4 text-primary-400" />
+                      <Check className="w-4 h-4 text-emerald-300" />
                     )}
                   </button>
                 ))}
@@ -99,7 +99,7 @@ export default function Select({
         </AnimatePresence>
       </div>
       {error && (
-        <p className="mt-2 text-sm text-danger-400">{error}</p>
+        <p className="mt-2 text-sm text-red-300">{error}</p>
       )}
     </div>
   )

@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, Loader } from 'lucide-react'
+import { Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, Loader, LineChart } from 'lucide-react'
 import { AuthContext } from '../contexts/AuthContext'
 
 export default function Register() {
@@ -19,33 +19,19 @@ export default function Register() {
 
   const validateForm = () => {
     const errors = {}
-    
-    if (!email.trim()) {
-      errors.email = 'Email không được để trống'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'Email không hợp lệ'
-    }
-    
-    if (!username.trim()) {
-      errors.username = 'Tên đăng nhập không được để trống'
-    } else if (username.length < 3) {
-      errors.username = 'Tên đăng nhập phải ít nhất 3 ký tự'
-    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      errors.username = 'Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới'
-    }
-    
-    if (!password.trim()) {
-      errors.password = 'Mật khẩu không được để trống'
-    } else if (password.length < 6) {
-      errors.password = 'Mật khẩu phải ít nhất 6 ký tự'
-    }
-    
-    if (!confirmPassword.trim()) {
-      errors.confirmPassword = 'Xác nhận mật khẩu không được để trống'
-    } else if (password !== confirmPassword) {
-      errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
-    }
-    
+    if (!email.trim()) errors.email = 'Email không được để trống'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Email không hợp lệ'
+
+    if (!username.trim()) errors.username = 'Tên đăng nhập không được để trống'
+    else if (username.length < 3) errors.username = 'Tên đăng nhập phải ít nhất 3 ký tự'
+    else if (!/^[a-zA-Z0-9_]+$/.test(username)) errors.username = 'Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới'
+
+    if (!password.trim()) errors.password = 'Mật khẩu không được để trống'
+    else if (password.length < 6) errors.password = 'Mật khẩu phải ít nhất 6 ký tự'
+
+    if (!confirmPassword.trim()) errors.confirmPassword = 'Xác nhận mật khẩu không được để trống'
+    else if (password !== confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
+
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -54,201 +40,190 @@ export default function Register() {
     e.preventDefault()
     setError(null)
     setSuccess(false)
-    
-    if (!validateForm()) {
-      return
-    }
-    
+    if (!validateForm()) return
+
     setLoading(true)
     try {
       await register({ email, username, password })
       setSuccess(true)
-      setTimeout(() => {
-        navigate('/login')
-      }, 1500)
+      setTimeout(() => navigate('/login'), 1500)
     } catch (e) {
-      const errorMsg = e.response?.data?.detail || e.message || 'Đăng ký thất bại. Vui lòng thử lại'
-      setError(errorMsg)
+      setError(e.response?.data?.detail || e.message || 'Đăng ký thất bại. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
   }
 
+  const clearError = (field) => {
+    if (validationErrors[field]) setValidationErrors({ ...validationErrors, [field]: null })
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
-      {/* Background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-100 rounded-full blur-3xl opacity-50" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-100 rounded-full blur-3xl opacity-50" />
-      </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app-radial px-5 py-10 text-slate-100">
+      <div className="pointer-events-none absolute -right-32 bottom-0 h-96 w-96 rounded-full bg-indigo-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-32 top-0 h-96 w-96 rounded-full bg-emerald-300/10 blur-3xl" />
 
-      {/* Card */}
-      <div className="relative w-full max-w-md">
-        <div className="absolute inset-0 bg-white rounded-2xl blur-xl" />
-        
-        <div className="relative bg-white border border-slate-200 rounded-2xl p-8 shadow-xl">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded-xl mb-4">
-              <User className="w-8 h-8 text-primary-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Tạo tài khoản</h1>
-            <p className="text-slate-600">Tham gia nhà đầu tư thông minh</p>
+      <section className="glass-card relative z-10 w-full max-w-[480px] p-8 md:p-10">
+        <div className="text-center">
+          <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] shadow-inner">
+            <LineChart className="h-7 w-7 text-emerald-300" />
           </div>
-
-          {/* Success Message */}
-          {success && (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-emerald-500 font-medium">Đăng ký thành công!</p>
-                <p className="text-emerald-500/70 text-sm">Đang chuyển hướng đến trang đăng nhập...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-danger-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-danger-600 font-medium">Có lỗi xảy ra</p>
-                <p className="text-danger-600/70 text-sm">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={submit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                    if (validationErrors.email) setValidationErrors({ ...validationErrors, email: null })
-                  }}
-                  placeholder="your@email.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-              </div>
-              {validationErrors.email && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.email}</p>
-              )}
-            </div>
-
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Tên đăng nhập</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value)
-                    if (validationErrors.username) setValidationErrors({ ...validationErrors, username: null })
-                  }}
-                  placeholder="username_123"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-              </div>
-              {validationErrors.username && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.username}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Mật khẩu</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    if (validationErrors.password) setValidationErrors({ ...validationErrors, password: null })
-                  }}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {validationErrors.password && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.password}</p>
-              )}
-            </div>
-
-            {/* Confirm Password */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Xác nhận mật khẩu</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showConfirm ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value)
-                    if (validationErrors.confirmPassword) setValidationErrors({ ...validationErrors, confirmPassword: null })
-                  }}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {validationErrors.confirmPassword && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.confirmPassword}</p>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading || success}
-              className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 mt-6"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : success ? (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  Thành công!
-                </>
-              ) : (
-                'Tạo tài khoản'
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <p className="text-center text-slate-600 text-sm mt-6">
-            Đã có tài khoản?{' '}
-            <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium transition-colors">
-              Đăng nhập
-            </Link>
-          </p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-100">Tạo tài khoản mới</h1>
+          <p className="mt-2 text-base text-slate-400">Bắt đầu hành trình đầu tư giá trị.</p>
         </div>
+
+        {success && (
+          <div className="alert-success mt-8 flex items-start gap-3">
+            <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">Đăng ký thành công</p>
+              <p className="mt-1 text-sm text-emerald-100/80">Đang chuyển hướng đến trang đăng nhập...</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="alert-danger mt-8 flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">Có lỗi xảy ra</p>
+              <p className="mt-1 text-sm text-red-200/80">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="mt-8 space-y-5">
+          <Field
+            label="Email"
+            icon={<Mail className="h-5 w-5" />}
+            type="email"
+            value={email}
+            placeholder="name@example.com"
+            error={validationErrors.email}
+            onChange={(value) => {
+              setEmail(value)
+              clearError('email')
+            }}
+          />
+
+          <Field
+            label="Tên đăng nhập"
+            icon={<User className="h-5 w-5" />}
+            value={username}
+            placeholder="username_123"
+            error={validationErrors.username}
+            onChange={(value) => {
+              setUsername(value)
+              clearError('username')
+            }}
+          />
+
+          <PasswordField
+            label="Mật khẩu"
+            value={password}
+            show={showPassword}
+            setShow={setShowPassword}
+            error={validationErrors.password}
+            onChange={(value) => {
+              setPassword(value)
+              clearError('password')
+            }}
+          />
+
+          <PasswordField
+            label="Xác nhận mật khẩu"
+            value={confirmPassword}
+            show={showConfirm}
+            setShow={setShowConfirm}
+            error={validationErrors.confirmPassword}
+            onChange={(value) => {
+              setConfirmPassword(value)
+              clearError('confirmPassword')
+            }}
+          />
+
+          <label className="flex cursor-pointer items-start gap-3 pt-1 text-xs leading-5 text-slate-400">
+            <input required type="checkbox" className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/30 text-emerald-400 focus:ring-emerald-400/30" />
+            <span>
+              Tôi đồng ý với <a href="#" className="text-emerald-300 hover:text-emerald-200">Điều khoản dịch vụ</a> và{' '}
+              <a href="#" className="text-emerald-300 hover:text-emerald-200">Chính sách bảo mật</a>.
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading || success}
+            className="btn-primary flex w-full items-center justify-center gap-2 px-4 py-3.5 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader className="h-5 w-5 animate-spin" />
+                Đang xử lý...
+              </>
+            ) : success ? (
+              <>
+                <CheckCircle className="h-5 w-5" />
+                Thành công
+              </>
+            ) : (
+              'Đăng ký tài khoản'
+            )}
+          </button>
+        </form>
+
+        <div className="mt-8 text-center text-sm text-slate-400">
+          Đã có tài khoản?{' '}
+          <Link to="/login" className="font-bold text-slate-100 transition hover:text-emerald-300">
+            Đăng nhập ngay
+          </Link>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function Field({ label, icon, value, onChange, error, type = 'text', placeholder }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">{label}</label>
+      <div className="relative">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">{icon}</div>
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="input-primary py-3 pl-12 pr-4"
+        />
       </div>
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+    </div>
+  )
+}
+
+function PasswordField({ label, value, onChange, show, setShow, error }) {
+  return (
+    <div>
+      <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">{label}</label>
+      <div className="relative">
+        <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="••••••••"
+          className="input-primary py-3 pl-12 pr-12"
+        />
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-200"
+          aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+        >
+          {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
     </div>
   )
 }

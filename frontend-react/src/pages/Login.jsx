@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Mail, Lock, AlertCircle, Eye, EyeOff, Loader, ArrowRight } from 'lucide-react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { Mail, Lock, AlertCircle, Eye, EyeOff, Loader, ArrowRight, LineChart } from 'lucide-react'
 import { AuthContext } from '../contexts/AuthContext'
 
 export default function Login() {
@@ -12,18 +12,13 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [validationErrors, setValidationErrors] = useState({})
   const navigate = useNavigate()
+  const location = useLocation()
+  const redirectTo = location.state?.from?.pathname || '/'
 
   const validateForm = () => {
     const errors = {}
-    
-    if (!identifier.trim()) {
-      errors.identifier = 'Email hoặc tên đăng nhập không được để trống'
-    }
-    
-    if (!password.trim()) {
-      errors.password = 'Mật khẩu không được để trống'
-    }
-    
+    if (!identifier.trim()) errors.identifier = 'Email hoặc tên đăng nhập không được để trống'
+    if (!password.trim()) errors.password = 'Mật khẩu không được để trống'
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -31,157 +26,130 @@ export default function Login() {
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
-    
-    if (!validateForm()) {
-      return
-    }
-    
+    if (!validateForm()) return
+
     setLoading(true)
     try {
       await login(identifier, password)
-      navigate('/')
+      navigate(redirectTo, { replace: true })
     } catch (e) {
-      const errorMsg = e.response?.data?.detail || e.message || 'Đăng nhập thất bại. Kiểm tra lại email/username và mật khẩu'
-      setError(errorMsg)
+      setError(e.response?.data?.detail || e.message || 'Đăng nhập thất bại. Kiểm tra lại email/username và mật khẩu.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
-      {/* Background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-100 rounded-full blur-3xl opacity-50" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-100 rounded-full blur-3xl opacity-50" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app-radial px-5 py-12 text-slate-100">
+      <div className="absolute inset-0 opacity-45">
+        <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(11,15,16,0.95)_0%,rgba(16,20,21,0.76)_48%,rgba(16,20,21,0.96)_100%)]" />
+        <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_50%_0%,rgba(190,198,224,0.18),transparent_55%)]" />
       </div>
 
-      {/* Card */}
-      <div className="relative w-full max-w-md">
-        <div className="absolute inset-0 bg-white rounded-2xl blur-xl" />
-        
-        <div className="relative bg-white border border-slate-200 rounded-2xl p-8 shadow-xl">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded-xl mb-4">
-              <Lock className="w-8 h-8 text-primary-600" />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Đăng nhập</h1>
-            <p className="text-slate-600">Quay lại với tài khoản của bạn</p>
+      <section className="glass-card relative z-10 w-full max-w-[480px] overflow-hidden p-8 md:p-10">
+        <div className="pointer-events-none absolute -left-20 -top-20 h-44 w-44 rounded-full bg-emerald-300/10 blur-3xl" />
+
+        <div className="relative text-center">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] shadow-inner">
+            <LineChart className="h-8 w-8 text-emerald-300" />
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-danger-50 border border-danger-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-danger-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-danger-600 font-medium">Đăng nhập thất bại</p>
-                <p className="text-danger-600/70 text-sm">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={submit} className="space-y-4">
-            {/* Identifier (Email or Username) */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email hoặc tên đăng nhập</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => {
-                    setIdentifier(e.target.value)
-                    if (validationErrors.identifier) setValidationErrors({ ...validationErrors, identifier: null })
-                  }}
-                  placeholder="your@email.com hoặc username"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-              </div>
-              {validationErrors.identifier && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.identifier}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-slate-700">Mật khẩu</label>
-                <Link to="#" className="text-primary-600 hover:text-primary-700 text-xs font-medium transition-colors">
-                  Quên mật khẩu?
-                </Link>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    if (validationErrors.password) setValidationErrors({ ...validationErrors, password: null })
-                  }}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {validationErrors.password && (
-                <p className="text-danger-600 text-sm mt-1">{validationErrors.password}</p>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 mt-6"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  Đăng nhập
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-slate-500">Hoặc</span>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <p className="text-center text-slate-600 text-sm">
-            Chưa có tài khoản?{' '}
-            <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium transition-colors">
-              Đăng ký ngay
-            </Link>
-          </p>
-
-          {/* Demo credentials hint */}
-          <div className="mt-6 p-3 bg-primary-50 border border-primary-100 rounded-lg">
-            <p className="text-xs text-primary-700">
-              <span className="font-medium">HD dùng thử:</span> Hãy đăng ký tài khoản mới hoặc liên hệ bộ phận hỗ trợ
-            </p>
-          </div>
+          <h1 className="text-3xl font-black tracking-tight text-slate-100">Chào mừng quay lại</h1>
+          <p className="mt-2 text-base text-slate-400">Đăng nhập để truy cập phân tích chuyên sâu.</p>
         </div>
-      </div>
-    </div>
+
+        {error && (
+          <div className="alert-danger mt-8 flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">Đăng nhập thất bại</p>
+              <p className="mt-1 text-sm text-red-200/80">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="relative mt-8 space-y-6">
+          <div>
+            <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-300">
+              Email hoặc tên đăng nhập
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value)
+                  if (validationErrors.identifier) setValidationErrors({ ...validationErrors, identifier: null })
+                }}
+                placeholder="name@domain.com hoặc username"
+                className="input-primary py-3 pl-12 pr-4"
+              />
+            </div>
+            {validationErrors.identifier && <p className="mt-2 text-sm text-red-300">{validationErrors.identifier}</p>}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-xs font-black uppercase tracking-widest text-slate-300">Mật khẩu</label>
+              <Link to="#" className="text-xs font-bold text-emerald-300 transition hover:text-emerald-200">
+                Quên mật khẩu?
+              </Link>
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (validationErrors.password) setValidationErrors({ ...validationErrors, password: null })
+                }}
+                placeholder="••••••••"
+                className="input-primary py-3 pl-12 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-200"
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            {validationErrors.password && <p className="mt-2 text-sm text-red-300">{validationErrors.password}</p>}
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3 pt-1 text-sm text-slate-400">
+            <input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-black/30 text-emerald-400 focus:ring-emerald-400/30" />
+            Ghi nhớ đăng nhập
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary flex w-full items-center justify-center gap-2 px-4 py-4 text-lg disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader className="h-5 w-5 animate-spin" />
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                Đăng nhập
+                <ArrowRight className="h-5 w-5" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-8 border-t border-white/10 pt-6 text-center text-sm text-slate-400">
+          Chưa có tài khoản?{' '}
+          <Link to="/register" className="font-bold text-slate-100 transition hover:text-emerald-300">
+            Đăng ký ngay
+          </Link>
+        </div>
+      </section>
+    </main>
   )
 }

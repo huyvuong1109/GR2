@@ -1,7 +1,7 @@
 """
 FastAPI Backend - REST API for Financial Analysis App
 """
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -17,6 +17,19 @@ import json
 
 from backend.database import get_db
 from backend.config import APP_NAME, APP_VERSION, APP_DESCRIPTION, API_HOST, API_PORT, DATABASE_URL
+from backend.fastapi_auth.app.db import Base as UserBase
+from backend.fastapi_auth.app.db import SessionLocal as UserSessionLocal
+from backend.fastapi_auth.app.db import engine as user_engine
+from backend.fastapi_auth.app.auth import decode_token
+from backend.fastapi_auth.app import crud as user_crud
+from backend.fastapi_auth.app.routes.auth_router import router as auth_router
+from backend.fastapi_auth.app.routes.user_router import router as user_router
+from backend.fastapi_auth.app.routes.watchlist_router import router as watchlist_router
+from backend.fastapi_auth.app.routes.notifications_router import router as notifications_router
+from backend.fastapi_auth.app.routes.value_router import router as value_router
+from backend.fastapi_auth.app.routes.saved_filter_router import router as saved_filter_router
+from backend.fastapi_auth.app.ws import manager as notification_manager
+from backend.fastapi_auth.app.ws import serialize_notification
 
 # Global variable to track background task
 price_update_task = None
@@ -115,7 +128,7 @@ def run_price_update_sync():
                 [sys.executable, script_path],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=240,
                 cwd=project_root,
                 env=env,
                 encoding='utf-8',
@@ -127,7 +140,7 @@ def run_price_update_sync():
                 output = result.stdout.strip()
                 # Tìm dòng "HOÀN TẤT" để lấy số liệu
                 import re
-                match = re.search(r'Đã cập nhật (\d+)/(\d+) mã', output)
+                match = re.search(r'(\d+)/(\d+)', output)
                 if match:
                     updated, total = match.groups()
                     print(f"✅ [Background] Cập nhật giá thành công! ({updated}/{total} mã)")
@@ -147,7 +160,7 @@ def run_price_update_sync():
                 error_msg = result.stderr[:300] if result.stderr else "Unknown error"
                 print(f"⚠️ [Background] Cập nhật giá có lỗi: {error_msg}")
         except subprocess.TimeoutExpired:
-            print("⚠️ [Background] Cập nhật giá quá thời gian (2 phút), bỏ qua...")
+            print("⚠️ [Background] Cập nhật giá quá thời gian (4 phút), bỏ qua...")
         except Exception as e:
             print(f"⚠️ [Background] Lỗi cập nhật giá: {e}")
     else:
@@ -214,6 +227,61 @@ app.add_middleware(
 
 # Database instance
 db = get_db()
+
+# User/auth database and routers live in backend.fastapi_auth, but the app should run
+# from one ASGI entrypoint so auth and market data stay on the same localhost port.
+UserBase.metadata.create_all(bind=user_engine)
+app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(watchlist_router)
+app.include_router(notifications_router)
+app.include_router(value_router)
+app.include_router(saved_filter_router)
+
+
+@app.websocket("/ws/notifications")
+async def notifications_ws(websocket: WebSocket):
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    payload = decode_token(token)
+    if not payload or not payload.get("sub"):
+        await websocket.close(code=1008)
+        return
+
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        await websocket.close(code=1008)
+        return
+
+    user_db = UserSessionLocal()
+    try:
+        user = user_crud.get_user(user_db, user_id)
+        if not user:
+            await websocket.close(code=1008)
+            return
+
+        await notification_manager.connect(user_id, websocket)
+        notifications = user_crud.list_notifications(user_db, user_id=user_id, unread_only=False)
+        await websocket.send_json(
+            {
+                "type": "init",
+                "notifications": [serialize_notification(n) for n in notifications],
+            }
+        )
+
+        while True:
+            message = await websocket.receive_text()
+            if message == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass
+    finally:
+        notification_manager.disconnect(user_id, websocket)
+        user_db.close()
 
 
 # ============ Pydantic Models ============
@@ -1625,10 +1693,11 @@ async def trigger_price_update():
     try:
         # Run the update script
         result = subprocess.run(
-            ["python", "update_stock_prices.py"],
+            [sys.executable, os.path.join(get_project_root(), "update_stock_prices.py")],
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=240,
+            cwd=get_project_root(),
         )
         
         return {
@@ -1638,7 +1707,7 @@ async def trigger_price_update():
             "errors": result.stderr[-500:] if result.stderr else None
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "message": "Update timeout (>120s)"}
+        return {"success": False, "message": "Update timeout (>240s)"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -1647,7 +1716,7 @@ async def trigger_price_update():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "backend.main:app",
         host=API_HOST,
         port=API_PORT,
         reload=True

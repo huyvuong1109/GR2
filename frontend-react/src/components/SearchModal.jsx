@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, TrendingUp, Clock, ArrowRight } from 'lucide-react'
-import { companiesApi } from '../services/api'
-import { cn } from '../utils/helpers'
-import { Link, useNavigate } from 'react-router-dom'
-import { formatCurrency } from '../utils/formatters'
+import { ArrowRight, Clock, Search, TrendingUp, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { companiesApi } from '../services/api'
+import { formatCurrency } from '../utils/formatters'
 
 export default function SearchModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('')
@@ -18,9 +17,7 @@ export default function SearchModal({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus()
-      // Load recent searches from localStorage
-      const recent = JSON.parse(localStorage.getItem('recentSearches') || '[]')
-      setRecentSearches(recent)
+      setRecentSearches(JSON.parse(localStorage.getItem('recentSearches') || '[]'))
     } else {
       setQuery('')
       setResults([])
@@ -28,43 +25,42 @@ export default function SearchModal({ isOpen, onClose }) {
   }, [isOpen])
 
   useEffect(() => {
-    // Search with debounce
-    if (query.trim().length > 0) {
-      const timeoutId = setTimeout(() => {
-        handleSearch(query)
-      }, 300)
-      return () => clearTimeout(timeoutId)
-    } else {
+    if (!query.trim()) {
       setResults([])
+      return undefined
     }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setLoading(true)
+        const data = await companiesApi.search(query)
+        setResults(data.results || [])
+      } catch (error) {
+        console.error('Search error:', error)
+        toast.error('Lỗi tìm kiếm')
+      } finally {
+        setLoading(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
   }, [query])
 
-  const handleSearch = async (searchQuery) => {
-    if (!searchQuery.trim()) return
+  useEffect(() => {
+    if (!isOpen) return undefined
 
-    try {
-      setLoading(true)
-      const data = await companiesApi.search(searchQuery)
-      setResults(data.results || [])
-    } catch (error) {
-      console.error('Search error:', error)
-      toast.error('Lỗi tìm kiếm')
-    } finally {
-      setLoading(false)
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
     }
-  }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   const handleSelectCompany = (company) => {
-    // Save to recent searches
     const recent = JSON.parse(localStorage.getItem('recentSearches') || '[]')
-    const newRecent = [
-      company,
-      ...recent.filter(c => c.ticker !== company.ticker)
-    ].slice(0, 5) // Keep only 5 recent searches
-    
-    localStorage.setItem('recentSearches', JSON.stringify(newRecent))
-    
-    // Navigate to company page
+    const nextRecent = [company, ...recent.filter((item) => item.ticker !== company.ticker)].slice(0, 5)
+    localStorage.setItem('recentSearches', JSON.stringify(nextRecent))
     navigate(`/company/${company.ticker}`)
     onClose()
   }
@@ -75,204 +71,121 @@ export default function SearchModal({ isOpen, onClose }) {
     toast.success('Đã xóa lịch sử tìm kiếm')
   }
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-      // Ctrl/Cmd + K to open search
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        if (!isOpen) {
-          // Trigger from parent
-        }
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen, onClose])
+  const list = query.trim() ? results : recentSearches
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-primary-900/40 backdrop-blur-sm z-50"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
 
-          {/* Search Modal */}
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
+          <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[10vh]">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              initial={{ opacity: 0, scale: 0.96, y: -12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="w-full max-w-2xl bg-slate-50 rounded-2xl border border-slate-200 shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96, y: -12 }}
+              transition={{ duration: 0.18 }}
+              className="glass-card w-full max-w-2xl overflow-hidden"
             >
-              {/* Search input */}
-              <div className="flex items-center gap-3 p-4 border-b border-slate-200">
-                <Search className="w-5 h-5 text-slate-600 flex-shrink-0" />
+              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+                <Search className="h-5 w-5 flex-none text-emerald-300" />
                 <input
                   ref={inputRef}
                   type="text"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Tìm mã cổ phiếu hoặc tên công ty... (VNM, FPT, Vinamilk)"
-                  className="flex-1 bg-transparent text-slate-900 placeholder-slate-400 focus:outline-none text-lg"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Tìm mã cổ phiếu hoặc tên công ty..."
+                  className="min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-100 placeholder:text-slate-500 focus:outline-none"
                 />
                 {query && (
                   <button
+                    type="button"
                     onClick={() => setQuery('')}
-                    className="p-1 rounded-lg hover:bg-slate-50 text-slate-600 hover:text-slate-900"
+                    className="btn-ghost p-2"
+                    aria-label="Xóa từ khóa"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </button>
                 )}
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                >
-                  <X className="w-5 h-5" />
+                <button type="button" onClick={onClose} className="btn-ghost p-2" aria-label="Đóng tìm kiếm">
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
-              {/* Results */}
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-[28rem] overflow-y-auto p-4">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-300 border-r-transparent" />
                   </div>
-                ) : query.trim() === '' ? (
-                  // Recent searches
-                  recentSearches.length > 0 ? (
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
+                ) : !query.trim() && recentSearches.length === 0 ? (
+                  <EmptySearchState text="Nhập tên hoặc mã cổ phiếu để tìm kiếm." />
+                ) : query.trim() && results.length === 0 ? (
+                  <EmptySearchState text={`Không tìm thấy kết quả cho "${query}".`} />
+                ) : (
+                  <div className="space-y-3">
+                    {!query.trim() && (
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-bold text-slate-400">
+                          <Clock className="h-4 w-4" />
                           Tìm kiếm gần đây
-                        </h3>
-                        <button
-                          onClick={clearRecentSearches}
-                          className="text-xs text-slate-500 hover:text-danger-400 transition-colors"
-                        >
+                        </div>
+                        <button type="button" onClick={clearRecentSearches} className="text-xs font-bold text-slate-500 hover:text-emerald-300">
                           Xóa tất cả
                         </button>
                       </div>
-                      <div className="space-y-2">
-                        {recentSearches.map((company) => (
-                          <button
-                            key={company.ticker}
-                            onClick={() => handleSelectCompany(company)}
-                            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-left transition-colors group"
-                          >
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500/20 to-accent-500/20 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-primary-400">
-                                {company.ticker.slice(0, 2)}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-slate-900">
-                                  {company.ticker}
-                                </span>
-                                <span className="text-xs text-slate-500">•</span>
-                                <span className="text-sm text-slate-600 truncate">
-                                  {company.name}
-                                </span>
-                              </div>
-                              {company.market_cap && (
-                                <p className="text-xs text-slate-500">
-                                  {formatCurrency(company.market_cap)}
-                                </p>
-                              )}
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-primary-400 transition-colors" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                      <Search className="w-12 h-12 mb-3 opacity-50" />
-                      <p className="text-sm">Nhập tên hoặc mã cổ phiếu để tìm kiếm</p>
-                    </div>
-                  )
-                ) : results.length > 0 ? (
-                  <div className="p-4 space-y-2">
-                    <p className="text-xs text-slate-500 mb-3">
-                      Tìm thấy {results.length} kết quả
-                    </p>
-                    {results.map((company) => (
-                      <motion.button
-                        key={company.ticker}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onClick={() => handleSelectCompany(company)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-left transition-colors group"
-                      >
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary-500/20 to-accent-500/20 flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-primary-400">
-                            {company.ticker.slice(0, 2)}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-slate-900">
-                              {company.ticker}
-                            </span>
-                            {company.industry && (
-                              <>
-                                <span className="text-xs text-slate-400">•</span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">
-                                  {company.industry}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <p className="text-sm text-slate-600 truncate mb-1">
-                            {company.name}
-                          </p>
-                          {company.market_cap && (
-                            <p className="text-xs text-slate-500">
-                              Vốn hóa: {formatCurrency(company.market_cap)}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-success-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary-400 transition-colors" />
-                        </div>
-                      </motion.button>
+                    )}
+                    {query.trim() && <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Tìm thấy {results.length} kết quả</p>}
+                    {list.map((company) => (
+                      <SearchResult key={company.ticker} company={company} onSelect={handleSelectCompany} />
                     ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                    <Search className="w-12 h-12 mb-3 opacity-50" />
-                    <p className="text-sm">Không tìm thấy kết quả cho "{query}"</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Thử tìm kiếm với mã CK hoặc tên khác
-                    </p>
                   </div>
                 )}
               </div>
-
-              {/* Footer removed per user request */}
             </motion.div>
           </div>
         </>
       )}
     </AnimatePresence>
+  )
+}
+
+function EmptySearchState({ text }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/12 bg-white/[0.025] px-6 py-12 text-center">
+      <Search className="mb-3 h-11 w-11 text-slate-600" />
+      <p className="text-sm text-slate-400">{text}</p>
+    </div>
+  )
+}
+
+function SearchResult({ company, onSelect }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(company)}
+      className="group flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:border-emerald-300/25 hover:bg-white/[0.06]"
+    >
+      <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 text-sm font-black text-emerald-300">
+        {company.ticker?.slice(0, 2)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="font-mono text-sm font-black text-slate-100">{company.ticker}</span>
+          {company.industry && <span className="truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-slate-400">{company.industry}</span>}
+        </div>
+        <p className="mt-1 truncate text-sm text-slate-400">{company.name}</p>
+        {company.market_cap && <p className="mt-1 text-xs text-slate-500">Vốn hóa: {formatCurrency(company.market_cap)}</p>}
+      </div>
+      <div className="flex items-center gap-2 text-slate-500 transition group-hover:text-emerald-300">
+        <TrendingUp className="h-4 w-4 opacity-0 transition group-hover:opacity-100" />
+        <ArrowRight className="h-5 w-5" />
+      </div>
+    </button>
   )
 }

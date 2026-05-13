@@ -7,8 +7,8 @@ const variants = {
   secondary: 'btn-secondary',
   success: 'btn-success',
   ghost: 'btn-ghost',
-  danger: 'px-5 py-2.5 bg-red-700 text-slate-900 font-medium rounded-lg hover:bg-red-800 active:bg-red-900 transition-colors duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
-  outline: 'px-5 py-2.5 bg-transparent border border-navy-300 text-navy-700 font-medium rounded-lg hover:bg-navy-50 hover:border-navy-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2',
+  danger: 'px-5 py-2.5 bg-red-500/15 text-red-200 font-semibold rounded-lg border border-red-300/20 hover:bg-red-500/25 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-300/40',
+  outline: 'btn-outline',
 }
 
 const sizes = {

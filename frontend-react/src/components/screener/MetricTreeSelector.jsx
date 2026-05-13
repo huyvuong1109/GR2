@@ -37,21 +37,21 @@ export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMe
           key={node.id}
           className={cn(
             'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 transition-colors',
-            isChecked ? 'border-cyan-500/40 bg-primary-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+            isChecked ? 'border-emerald-300/35 bg-emerald-400/10' : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
           )}
           style={{ marginLeft: `${depth * 12}px` }}
         >
           <input
             type="checkbox"
-            className="mt-1 rounded border-white/30 bg-slate-50"
+            className="mt-1 rounded border-white/20 bg-black/30 text-emerald-400"
             checked={isChecked}
             onChange={(event) => onToggleMetric(node, event.target.checked)}
           />
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-900">{node.label}</p>
+            <p className="text-sm font-semibold text-slate-100">{node.label}</p>
             {node.description && (
-              <p className="mt-0.5 text-xs text-slate-600">{node.description}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{node.description}</p>
             )}
           </div>
 
@@ -69,7 +69,7 @@ export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMe
         <button
           type="button"
           onClick={() => toggleExpandNode(node.id)}
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold text-slate-300 hover:bg-white/[0.05]"
           style={{ marginLeft: `${depth * 12}px` }}
         >
           <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />

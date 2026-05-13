@@ -612,6 +612,9 @@ class DatabaseManager:
                 if "description" not in company_columns:
                     conn.exec_driver_sql("ALTER TABLE companies ADD COLUMN description TEXT")
 
+                if "price_updated_at" not in company_columns:
+                    conn.exec_driver_sql("ALTER TABLE companies ADD COLUMN price_updated_at TEXT")
+
                 conn.exec_driver_sql(
                     """
                     UPDATE companies
@@ -667,6 +670,32 @@ class DatabaseManager:
                 ON price_history(ticker, trade_date)
                 """
             )
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS company_officers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    position TEXT,
+                    position_en TEXT,
+                    from_date INTEGER,
+                    owner_code TEXT,
+                    officer_own_percent REAL,
+                    quantity BIGINT,
+                    update_date TEXT,
+                    source TEXT NOT NULL DEFAULT 'KBS',
+                    display_order INTEGER,
+                    raw_json TEXT,
+                    fetched_at TEXT
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS idx_company_officers_ticker
+                ON company_officers(ticker)
+                """
+            )
         
     @contextmanager
     def get_session(self):
@@ -686,7 +715,7 @@ class DatabaseManager:
         query = """
         SELECT 
             c.id, c.ticker, c.name, c.industry,
-            c.market_cap, c.shares_outstanding, c.current_price
+            c.market_cap, c.shares_outstanding, c.current_price, c.price_updated_at
         FROM companies c
         ORDER BY c.ticker
         """
@@ -703,7 +732,7 @@ class DatabaseManager:
         query = f"""
         SELECT
             c.id, c.ticker, c.name, c.industry,
-            c.market_cap, c.shares_outstanding, c.current_price
+            c.market_cap, c.shares_outstanding, c.current_price, c.price_updated_at
         FROM companies c
         WHERE UPPER(c.ticker) IN ({placeholders})
         """
@@ -712,7 +741,7 @@ class DatabaseManager:
     def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
         """Lấy lịch sử giá gần nhất theo mã"""
         query = """
-        SELECT trade_date, close_price
+        SELECT trade_date, close_price, updated_at
         FROM price_history
         WHERE UPPER(ticker) = :ticker
         ORDER BY trade_date DESC, id DESC
@@ -802,20 +831,56 @@ class DatabaseManager:
     
     def get_company_by_ticker(self, ticker: str) -> dict:
         """Lấy thông tin công ty theo mã CK"""
-        with self.get_session() as session:
-            company = session.query(Company).filter(Company.ticker == ticker).first()
-            if company:
-                return {
-                    "id": company.id,
-                    "ticker": company.ticker,
-                    "name": company.name,
-                    "description": getattr(company, 'description', None),
-                    "industry": company.industry,
-                    "market_cap": company.market_cap,
-                    "shares_outstanding": company.shares_outstanding,
-                    "current_price": company.current_price
-                }
+        query = text(
+            """
+            SELECT
+                id,
+                ticker,
+                name,
+                description,
+                industry,
+                company_type,
+                market_cap,
+                shares_outstanding,
+                current_price,
+                price_updated_at
+            FROM companies
+            WHERE UPPER(ticker) = :ticker
+            LIMIT 1
+            """
+        )
+        with self.engine.connect() as conn:
+            row = conn.execute(query, {"ticker": ticker.upper()}).mappings().first()
+
+        if not row:
             return None
+
+        company = dict(row)
+        company["officers"] = self.get_company_officers(ticker)
+        return company
+
+    def get_company_officers(self, ticker: str) -> list[dict[str, Any]]:
+        """Lay danh sach ban lanh dao cong ty."""
+        query = text(
+            """
+            SELECT
+                name,
+                position,
+                position_en,
+                from_date,
+                owner_code,
+                officer_own_percent,
+                quantity,
+                update_date,
+                source
+            FROM company_officers
+            WHERE UPPER(ticker) = :ticker
+            ORDER BY COALESCE(display_order, 999999), name
+            """
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(query, {"ticker": ticker.upper()}).mappings().all()
+        return [dict(row) for row in rows]
 
     def _get_company_profile(self, ticker: str) -> dict[str, Any] | None:
         """Lấy metadata công ty từ bảng companies (bao gồm company_type)."""

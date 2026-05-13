@@ -14,13 +14,13 @@ const Input = forwardRef(({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-dark-200 mb-2">
+        <label className="block text-sm font-semibold text-slate-300 mb-2">
           {label}
         </label>
       )}
       <div className="relative">
         {leftIcon && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
             {leftIcon}
           </div>
         )}
@@ -37,16 +37,16 @@ const Input = forwardRef(({
           {...props}
         />
         {rightIcon && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
             {rightIcon}
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-sm text-danger-400">{error}</p>
+        <p className="mt-2 text-sm text-red-300">{error}</p>
       )}
       {hint && !error && (
-        <p className="mt-2 text-sm text-slate-600">{hint}</p>
+        <p className="mt-2 text-sm text-slate-500">{hint}</p>
       )}
     </div>
   )

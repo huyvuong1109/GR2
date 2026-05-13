@@ -22,18 +22,18 @@ import { cn } from '../utils/helpers'
 
 // Mock data - sẽ thay bằng API
 const mockStocks = [
-  { id: 1, ticker: 'VNM', name: 'Công ty CP Sữa Việt Nam', industry: 'Thực phẩm', exchange: 'HOSE', price: 82500, change: 3.2, marketCap: 164000000000000, pe: 18.5, pb: 4.2, roe: 28.4, roa: 18.2, de: 0.3, dividendYield: 3.8, revenueGrowth: 12.5, profitGrowth: 15.2 },
-  { id: 2, ticker: 'FPT', name: 'FPT Corporation', industry: 'Công nghệ', exchange: 'HOSE', price: 121000, change: 2.8, marketCap: 132000000000000, pe: 22.3, pb: 5.1, roe: 24.1, roa: 12.5, de: 0.5, dividendYield: 2.1, revenueGrowth: 25.3, profitGrowth: 22.1 },
-  { id: 3, ticker: 'VIC', name: 'Tập đoàn Vingroup', industry: 'Bất động sản', exchange: 'HOSE', price: 43200, change: -1.2, marketCap: 185000000000000, pe: 45.2, pb: 1.8, roe: 8.5, roa: 3.2, de: 1.8, dividendYield: 0, revenueGrowth: 18.5, profitGrowth: -5.2 },
-  { id: 4, ticker: 'VHM', name: 'Vinhomes', industry: 'Bất động sản', exchange: 'HOSE', price: 38500, change: 1.5, marketCap: 167000000000000, pe: 12.8, pb: 2.1, roe: 15.2, roa: 8.5, de: 0.8, dividendYield: 1.5, revenueGrowth: 22.1, profitGrowth: 18.5 },
-  { id: 5, ticker: 'HPG', name: 'Tập đoàn Hòa Phát', industry: 'Thép', exchange: 'HOSE', price: 25800, change: -0.8, marketCap: 116000000000000, pe: 8.5, pb: 1.2, roe: 12.8, roa: 8.1, de: 0.6, dividendYield: 2.5, revenueGrowth: -8.5, profitGrowth: -15.2 },
-  { id: 6, ticker: 'MSN', name: 'Masan Group', industry: 'Đa ngành', exchange: 'HOSE', price: 67800, change: 2.1, marketCap: 78000000000000, pe: 35.2, pb: 2.8, roe: 18.5, roa: 5.2, de: 1.2, dividendYield: 0, revenueGrowth: 28.5, profitGrowth: 32.1 },
-  { id: 7, ticker: 'MWG', name: 'Thế Giới Di Động', industry: 'Bán lẻ', exchange: 'HOSE', price: 52300, change: 1.8, marketCap: 76000000000000, pe: 15.2, pb: 3.5, roe: 22.5, roa: 10.2, de: 0.4, dividendYield: 1.8, revenueGrowth: 15.2, profitGrowth: 12.5 },
-  { id: 8, ticker: 'VCB', name: 'Vietcombank', industry: 'Ngân hàng', exchange: 'HOSE', price: 92500, change: 0.5, marketCap: 432000000000000, pe: 14.2, pb: 3.2, roe: 25.2, roa: 1.8, de: 8.5, dividendYield: 1.2, revenueGrowth: 18.5, profitGrowth: 22.5 },
-  { id: 9, ticker: 'TCB', name: 'Techcombank', industry: 'Ngân hàng', exchange: 'HOSE', price: 35200, change: 1.2, marketCap: 124000000000000, pe: 8.5, pb: 1.5, roe: 18.5, roa: 2.8, de: 6.2, dividendYield: 0, revenueGrowth: 25.2, profitGrowth: 28.5 },
-  { id: 10, ticker: 'ACB', name: 'ACB', industry: 'Ngân hàng', exchange: 'HOSE', price: 24500, change: 0.8, marketCap: 92000000000000, pe: 7.2, pb: 1.8, roe: 24.5, roa: 2.5, de: 7.8, dividendYield: 0, revenueGrowth: 22.5, profitGrowth: 25.2 },
-  { id: 11, ticker: 'REE', name: 'Cơ điện lạnh REE', industry: 'Công nghiệp', exchange: 'HOSE', price: 62500, change: -0.5, marketCap: 24000000000000, pe: 11.5, pb: 1.6, roe: 15.2, roa: 8.5, de: 0.5, dividendYield: 5.2, revenueGrowth: 8.5, profitGrowth: 12.2 },
-  { id: 12, ticker: 'PNJ', name: 'Vàng bạc đá quý Phú Nhuận', industry: 'Bán lẻ', exchange: 'HOSE', price: 98500, change: 2.5, marketCap: 32000000000000, pe: 16.5, pb: 4.2, roe: 28.5, roa: 15.2, de: 0.3, dividendYield: 2.8, revenueGrowth: 18.5, profitGrowth: 22.5 },
+  { id: 1, ticker: 'VNM', name: 'Công ty CP Sữa Việt Nam', industry: 'Thực phẩm', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 2, ticker: 'FPT', name: 'FPT Corporation', industry: 'Công nghệ', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 3, ticker: 'VIC', name: 'Tập đoàn Vingroup', industry: 'Bất động sản', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 4, ticker: 'VHM', name: 'Vinhomes', industry: 'Bất động sản', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 5, ticker: 'HPG', name: 'Tập đoàn Hòa Phát', industry: 'Thép', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 6, ticker: 'MSN', name: 'Masan Group', industry: 'Đa ngành', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 7, ticker: 'MWG', name: 'Thế Giới Di Động', industry: 'Bán lẻ', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 8, ticker: 'VCB', name: 'Vietcombank', industry: 'Ngân hàng', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 9, ticker: 'TCB', name: 'Techcombank', industry: 'Ngân hàng', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 10, ticker: 'ACB', name: 'ACB', industry: 'Ngân hàng', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 11, ticker: 'REE', name: 'Cơ điện lạnh REE', industry: 'Công nghiệp', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
+  { id: 12, ticker: 'PNJ', name: 'Vàng bạc đá quý Phú Nhuận', industry: 'Bán lẻ', exchange: 'HOSE', price: 0, change: 0, marketCap: 0, pe: 0, pb: 0, roe: 0, roa: 0, de: 0, dividendYield: 0, revenueGrowth: 0, profitGrowth: 0 },
 ]
 
 const industries = [

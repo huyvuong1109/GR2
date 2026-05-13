@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -8,32 +8,32 @@ import {
   X,
   TrendingUp,
   Bell,
-  Settings,
   Scale,
   FileText,
 } from 'lucide-react'
 import { cn } from '../utils/helpers'
+import { AuthContext } from '../contexts/AuthContext'
 import NotificationsPanel from './NotificationsPanel'
 import SearchModal from './SearchModal'
-import WatchlistSidebar from './WatchlistSidebar'
 import { marketApi } from '../services/api'
 
 const navigation = [
   { name: 'Bảng điều khiển', href: '/', icon: LayoutDashboard },
   { name: 'Bộ lọc cổ phiếu', href: '/screener', icon: Search },
   { name: 'So sánh', href: '/compare', icon: Scale },
-  { name: 'Báo cáo tài chính', href: '/reports', icon: FileText },
+  { name: 'Báo cáo', href: '/reports', icon: FileText },
 ]
 
 const pageTitles = {
   '/': 'Bảng điều khiển',
   '/screener': 'Bộ lọc cổ phiếu',
-  '/compare': 'So sánh',
+  '/compare': 'So sánh cổ phiếu',
   '/reports': 'Báo cáo tài chính',
   '/settings': 'Cài đặt',
 }
 
 export default function Layout() {
+  const { user } = useContext(AuthContext)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -41,16 +41,13 @@ export default function Layout() {
   const location = useLocation()
 
   const currentPageTitle = useMemo(() => {
-    if (pageTitles[location.pathname]) {
-      return pageTitles[location.pathname]
-    }
-
-    if (location.pathname.startsWith('/company/')) {
-      return 'Chi tiết doanh nghiệp'
-    }
-
+    if (pageTitles[location.pathname]) return pageTitles[location.pathname]
+    if (location.pathname.startsWith('/company/')) return 'Phân tích chi tiết công ty'
     return 'Bảng điều khiển'
   }, [location.pathname])
+
+  const displayName = user?.full_name || user?.username || user?.email || 'Người dùng'
+  const displayInitial = displayName.trim().slice(0, 1).toUpperCase() || 'U'
 
   useEffect(() => {
     const fetchMarketStatus = async () => {
@@ -79,153 +76,158 @@ export default function Layout() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const statusText = marketStatus?.message || 'Đang cập nhật'
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Mobile sidebar backdrop */}
+    <div className="app-compact min-h-screen bg-app-radial text-slate-100">
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 h-full w-64 sidebar transition-transform duration-300 lg:translate-x-0',
+          'group fixed left-0 top-0 z-50 h-full w-72 sidebar transition-all duration-300 lg:w-24 lg:translate-x-0 lg:hover:w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="sidebar-header">
-            <NavLink to="/" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary text-white shadow-lg shadow-primary-500/30">
+        <div className="flex h-full flex-col px-4 py-5">
+          <div className="sidebar-header pb-5">
+            <NavLink to="/" className="flex min-h-14 items-center gap-3 overflow-hidden rounded-xl">
+              <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-emerald-300/25 bg-emerald-400/10 text-emerald-300 shadow-lg shadow-emerald-900/20">
                 <TrendingUp className="h-6 w-6" />
               </div>
-              <div>
-                <h1 className="text-lg font-serif font-bold text-white">Value Invest</h1>
-                <p className="text-xs text-slate-400">Đầu tư giá trị</p>
+              <div className="min-w-0 transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
+                <h1 className="truncate text-base font-black tracking-tight text-slate-100">WealthArch</h1>
+                <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-500">Phân tích tài chính</p>
               </div>
             </NavLink>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    'nav-link',
-                    isActive && 'active'
-                  )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </NavLink>
-              )
-            })}
+          <nav className="mt-5 flex-1 space-y-2">
+            {navigation.map((item) => (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                end={item.href === '/'}
+                onClick={() => setSidebarOpen(false)}
+                title={item.name}
+                className={({ isActive }) => cn('nav-link min-h-11 overflow-hidden lg:justify-center lg:group-hover:justify-start', isActive && 'active')}
+              >
+                <item.icon className="h-5 w-5 flex-none" />
+                <span className="truncate whitespace-nowrap transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
+                  {item.name}
+                </span>
+              </NavLink>
+            ))}
           </nav>
 
-          {/* Settings */}
-          <div className="border-t border-slate-200 p-4">
+          <div className="border-t border-white/10 pt-4">
             <NavLink
               to="/settings"
-              className="nav-link"
+              title="Cài đặt tài khoản"
+              className="flex items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
             >
-              <Settings className="h-5 w-5" />
-              <span>Cài đặt</span>
+              <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-400/10 text-sm font-black text-emerald-300">
+                {displayInitial}
+              </div>
+              <div className="min-w-0 transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
+                <p className="truncate text-sm font-bold text-slate-100">{displayName}</p>
+                <p className="truncate text-xs text-slate-500">Cài đặt tài khoản</p>
+              </div>
             </NavLink>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Header */}
+      <div className="lg:pl-24">
         <header className="header sticky top-0 z-30">
-          <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 lg:px-6">
-            <div className="flex items-center gap-4">
+          <div className="grid h-14 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-4 px-4 md:px-6">
+            <div className="flex min-w-0 items-center gap-3">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="btn-ghost lg:hidden"
+                className="btn-ghost p-2 lg:hidden"
+                aria-label="Mở menu"
               >
                 <Menu className="h-5 w-5" />
               </button>
-
-              <div>
-                <p className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+              <div className="min-w-0">
+                <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-500">
                   Nền tảng phân tích tài chính
                 </p>
-                <h2 className="text-base font-serif font-bold text-white">
-                  {currentPageTitle}
-                </h2>
+                <h2 className="truncate text-sm font-black text-slate-100 md:text-base">{currentPageTitle}</h2>
               </div>
             </div>
 
-            {/* Search bar */}
             <button
+              type="button"
               onClick={() => setSearchOpen(true)}
-              className="hidden min-w-[320px] items-center gap-3 rounded-xl border border-primary-700 bg-primary-800/50 px-4 py-2.5 text-left text-sm text-slate-300 transition-all hover:border-primary-500 hover:bg-primary-800 md:flex"
+              className="hidden w-[340px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-left text-sm text-slate-400 transition hover:border-emerald-300/35 hover:text-slate-200 md:flex"
             >
-              <Search className="h-4 w-4" />
-              <span className="flex-1">Tìm mã cổ phiếu...</span>
+              <Search className="h-4 w-4 flex-none" />
+              <span className="min-w-0 flex-1 truncate">Tìm mã cổ phiếu...</span>
+              <span className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-slate-500">Ctrl K</span>
             </button>
 
-            {/* Right actions */}
-            <div className="flex items-center gap-3">
-              {/* Market status */}
-              {marketStatus && (
-                <div
-                  className={cn(
-                    'hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium sm:flex',
-                    marketStatus.is_open
-                      ? 'border-success-500/30 bg-success-500/10 text-success-400'
-                      : 'border-slate-700 bg-primary-800/50 text-slate-300'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'h-2 w-2 rounded-full',
-                      marketStatus.is_open ? 'bg-success-500 animate-pulse' : 'bg-slate-400'
-                    )}
-                  />
-                  {marketStatus.message}
-                </div>
-              )}
-
-              {/* Notifications */}
-              <button
-                onClick={() => setNotificationsOpen(true)}
-                className="relative btn-ghost"
+            <div className="flex min-w-0 items-center justify-end gap-2">
+              <div
+                className={cn(
+                  'hidden h-9 items-center gap-2 rounded-full border px-3 text-xs font-bold sm:flex',
+                  marketStatus?.is_open
+                    ? 'border-emerald-300/25 bg-emerald-400/10 text-emerald-300'
+                    : 'border-white/10 bg-white/[0.04] text-slate-300'
+                )}
               >
-                <Bell className="h-5 w-5" />
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-danger-500" />
+                <span
+                  className={cn(
+                    'h-2 w-2 flex-none rounded-full',
+                    marketStatus?.is_open ? 'bg-emerald-300 shadow-[0_0_10px_rgba(78,222,163,0.8)]' : 'bg-slate-500'
+                  )}
+                />
+                <span className="max-w-[180px] truncate">{statusText}</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen(true)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-300/30 hover:text-emerald-300"
+                aria-label="Thông báo"
+              >
+                <Bell className="h-4 w-4" />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-300 ring-2 ring-[#101415]" />
               </button>
 
-              {/* Mobile search */}
               <button
+                type="button"
                 onClick={() => setSearchOpen(true)}
-                className="btn-ghost md:hidden"
+                className="btn-ghost p-2 md:hidden"
+                aria-label="Tìm kiếm"
               >
                 <Search className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="btn-ghost p-2 lg:hidden"
+                aria-label="Đóng menu"
+              >
+                <X className="h-5 w-5" />
               </button>
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="px-4 py-6 lg:px-6">
-          <div className="mx-auto flex max-w-[1600px] gap-6">
+        <main className="px-4 py-6 md:px-6 2xl:px-8">
+          <div className="mx-auto flex max-w-[1600px] items-start gap-6">
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 8 }}
@@ -235,16 +237,10 @@ export default function Layout() {
             >
               <Outlet />
             </motion.div>
-            
-            {/* Watchlist sidebar */}
-            <div className="hidden xl:block">
-              <WatchlistSidebar />
-            </div>
           </div>
         </main>
       </div>
 
-      {/* Modals */}
       <NotificationsPanel isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>

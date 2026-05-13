@@ -47,7 +47,7 @@ export const FILTER_GROUPS = [
           {
             id: 'market_cap',
             label: 'Vốn hóa thị trường',
-            unit: 'Tỷ VNĐ',
+            unit: 'Tỷ VND',
             description: 'Quy mô doanh nghiệp',
           },
         ],
@@ -218,7 +218,7 @@ export const FILTER_GROUPS = [
           },
           {
             id: 'garp_profit_growth',
-            label: 'Tăng trưởng lợi nhuận ổn',
+            label: 'Tăng trưởng lợi nhuận ổn định',
             unit: '%',
             description: 'Tăng trưởng duy trì theo quý',
             apiMinKey: 'min_profit_growth',
@@ -280,10 +280,8 @@ function flattenMetrics(tree, collector = []) {
       flattenMetrics(node.children, collector)
       return
     }
-
     collector.push(node)
   })
-
   return collector
 }
 

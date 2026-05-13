@@ -16,14 +16,16 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 
 function App() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-primary-600 border-r-transparent"></div>
-          <p className="mt-4 text-sm font-medium text-slate-600">Đang tải...</p>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-app-radial">
+          <div className="text-center">
+            <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-emerald-300 border-r-transparent" />
+            <p className="mt-4 text-sm font-medium text-slate-400">Đang tải...</p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

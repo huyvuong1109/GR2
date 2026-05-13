@@ -11,10 +11,11 @@ import time
 import requests
 from datetime import datetime
 from sqlalchemy import create_engine, text
+from backend.config import DATABASE_PATH
 
 # Database path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(SCRIPT_DIR, "Database", "master_db", "analytics(final).db")
+DB_PATH = str(DATABASE_PATH)
 
 # SSI API endpoint (public, không cần auth)
 SSI_API_URL = "https://iboard.ssi.com.vn/dchart/api/1.1/defaultAllStocks"
@@ -24,6 +25,29 @@ TCBS_API_URL = "https://apipubaws.tcbs.com.vn/stock-insight/v1/stock/second-tc-p
 
 # VCI API (backup 2)
 VCI_API_URL = "https://bgapidatafeed.vps.com.vn/getliststockdata"
+
+
+def normalize_price(value):
+    """Normalize provider prices to VND/share."""
+    if value is None or value == "":
+        return None
+
+    try:
+        if isinstance(value, str):
+            value = value.replace(",", "").strip()
+        price = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if price <= 0:
+        return None
+
+    # Vietnamese quote APIs commonly return either VND/share or thousand VND/share.
+    # A listed share price below 1,000 here is treated as thousand VND.
+    if price < 1000:
+        price *= 1000
+
+    return price
 
 
 def get_prices_from_ssi():
@@ -44,10 +68,10 @@ def get_prices_from_ssi():
                 for ticker, info in data.items():
                     if isinstance(info, dict):
                         # Lấy giá đóng cửa hoặc giá hiện tại
-                        price = info.get('lastPrice') or info.get('closePrice') or info.get('matchPrice')
+                        price = normalize_price(info.get('lastPrice') or info.get('closePrice') or info.get('matchPrice'))
                         if price:
                             # SSI giá đơn vị 1000đ
-                            prices[ticker.upper()] = float(price) * 1000
+                            prices[ticker.upper()] = price
             print(f"✅ SSI: Lấy được {len(prices)} mã")
             return prices
     except Exception as e:
@@ -73,9 +97,9 @@ def get_prices_from_tcbs(tickers: list):
             if response.status_code == 200:
                 data = response.json()
                 if data and isinstance(data, dict):
-                    price = data.get('price') or data.get('closePrice')
+                    price = normalize_price(data.get('price') or data.get('closePrice'))
                     if price:
-                        prices[ticker.upper()] = float(price) * 1000
+                        prices[ticker.upper()] = price
                         print(f"  ✓ {ticker}: {price:,.0f}")
             time.sleep(0.2)  # Rate limit
         except Exception as e:
@@ -106,9 +130,9 @@ def get_prices_from_vps(tickers: list):
             if isinstance(data, list):
                 for item in data:
                     ticker = item.get('sym', '').upper()
-                    price = item.get('lastPrice') or item.get('c') or item.get('closePrice')
+                    price = normalize_price(item.get('lastPrice') or item.get('c') or item.get('closePrice'))
                     if ticker and price:
-                        prices[ticker] = float(price) * 1000
+                        prices[ticker] = price
             
             print(f"✅ VPS: Lấy được {len(prices)} mã")
             return prices
@@ -129,9 +153,9 @@ def get_prices_from_cafef(ticker: str):
             data = response.json()
             if data.get('Data') and data['Data'].get('Data'):
                 item = data['Data']['Data'][0]
-                price = item.get('ClosePrice')
+                price = normalize_price(item.get('ClosePrice'))
                 if price:
-                    return float(price) * 1000
+                    return price
     except:
         pass
     return None
@@ -151,25 +175,34 @@ def update_database(prices: dict):
     updated = 0
     today = datetime.now().strftime("%Y-%m-%d")
     
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         # Lấy danh sách ticker trong DB
         result = conn.execute(text("SELECT ticker FROM companies")).fetchall()
-        db_tickers = [row[0].upper() for row in result]
+        db_tickers = [str(row[0]).strip().upper() for row in result if row[0]]
         
         print(f"\n📊 Đang cập nhật {len(db_tickers)} mã trong database...")
         
         for ticker in db_tickers:
             if ticker in prices:
-                price = prices[ticker]
+                price = normalize_price(prices[ticker])
+                if not price:
+                    continue
+
+                updated_at = datetime.now().isoformat(timespec="seconds")
                 try:
                     conn.execute(
                         text("""
                             UPDATE companies 
                             SET current_price = :price,
-                                market_cap = :price * shares_outstanding
+                                market_cap = CASE
+                                    WHEN shares_outstanding IS NOT NULL AND shares_outstanding > 0
+                                    THEN CAST(:price * shares_outstanding AS INTEGER)
+                                    ELSE market_cap
+                                END,
+                                price_updated_at = :updated_at
                             WHERE UPPER(ticker) = :ticker
                         """),
-                        {"price": price, "ticker": ticker}
+                        {"price": price, "ticker": ticker, "updated_at": updated_at}
                     )
                     conn.execute(
                         text(
@@ -185,7 +218,7 @@ def update_database(prices: dict):
                             "ticker": ticker,
                             "trade_date": today,
                             "price": price,
-                            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "updated_at": updated_at,
                         },
                     )
                     conn.execute(
@@ -208,8 +241,6 @@ def update_database(prices: dict):
                     print(f"  ✓ {ticker}: {price:,.0f}đ")
                 except Exception as e:
                     print(f"  ✗ {ticker}: {e}")
-        
-        conn.commit()
     
     return updated
 
@@ -305,7 +336,7 @@ def main():
     engine = create_engine(f"sqlite:///{DB_PATH}")
     with engine.connect() as conn:
         result = conn.execute(text("SELECT ticker FROM companies")).fetchall()
-        db_tickers = [row[0].upper() for row in result]
+        db_tickers = [str(row[0]).strip().upper() for row in result if row[0]]
     
     print(f"📋 Có {len(db_tickers)} mã trong database: {', '.join(db_tickers)}")
     print()
@@ -343,13 +374,6 @@ def main():
     # Cập nhật database
     print()
     updated = update_database(prices)
-    
-    # Cập nhật timestamp
-    engine = create_engine(f"sqlite:///{DB_PATH}")
-    with engine.connect() as conn:
-        now = datetime.now().isoformat()
-        conn.execute(text(f"UPDATE companies SET price_updated_at = '{now}'"))
-        conn.commit()
     
     print()
     print("=" * 60)

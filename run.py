@@ -24,7 +24,7 @@ def main():
     # Chạy uvicorn với module path
     subprocess.run([
         sys.executable, "-m", "uvicorn",
-        "backend.fastapi_auth.app.main:app",
+        "backend.main:app",
         "--reload",
         "--host", "0.0.0.0",
         "--port", "8000"

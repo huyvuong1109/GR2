@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Bell, Check, Trash2, ExternalLink } from 'lucide-react'
-import { notificationsApi } from '../services/api'
-import { cn } from '../utils/helpers'
+import { X, Bell, Check, Trash2, ExternalLink, Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { notificationsApi } from '../services/api'
+import { cn } from '../utils/helpers'
 
 export default function NotificationsPanel({ isOpen, onClose }) {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
-  const [filter, setFilter] = useState('all') // 'all' or 'unread'
+  const [filter, setFilter] = useState('all')
   const panelRef = useRef(null)
   const wsRef = useRef(null)
 
@@ -18,7 +18,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
     if (typeof data === 'string' && data) {
       try {
         data = JSON.parse(data)
-      } catch (error) {
+      } catch {
         data = notification.data
       }
     }
@@ -31,13 +31,11 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   }
 
   useEffect(() => {
-    if (isOpen) {
-      fetchNotifications()
-    }
+    if (isOpen) fetchNotifications()
   }, [isOpen, filter])
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
+    const token = window.sessionStorage.getItem('auth_token')
     if (!isOpen || !token) {
       if (wsRef.current) {
         wsRef.current.close()
@@ -46,7 +44,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
       return
     }
 
-    const baseUrl = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:8001' : window.location.origin)
+    const baseUrl = import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : window.location.origin)
     const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/ws/notifications?token=${encodeURIComponent(token)}`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
@@ -63,20 +61,18 @@ export default function NotificationsPanel({ isOpen, onClose }) {
           return
         }
         if (payload.type === 'read' && payload.id) {
-          setNotifications((prev) => prev.map((n) => n.id === payload.id ? { ...n, is_read: true } : n))
+          setNotifications((prev) => prev.map((item) => item.id === payload.id ? { ...item, is_read: true } : item))
           return
         }
         if (payload.type === 'delete' && payload.id) {
-          setNotifications((prev) => prev.filter((n) => n.id !== payload.id))
+          setNotifications((prev) => prev.filter((item) => item.id !== payload.id))
         }
       } catch (error) {
         console.error('Invalid WS payload', error)
       }
     }
 
-    ws.onerror = () => {
-      ws.close()
-    }
+    ws.onerror = () => ws.close()
 
     return () => {
       ws.close()
@@ -84,21 +80,13 @@ export default function NotificationsPanel({ isOpen, onClose }) {
     }
   }, [isOpen])
 
-  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (panelRef.current && !panelRef.current.contains(event.target)) {
-        onClose()
-      }
+      if (panelRef.current && !panelRef.current.contains(event.target)) onClose()
     }
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, onClose])
 
   const fetchNotifications = async () => {
@@ -118,11 +106,9 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   const handleMarkAsRead = async (id) => {
     try {
       await notificationsApi.markAsRead(id)
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-      )
+      setNotifications((prev) => prev.map((item) => item.id === id ? { ...item, is_read: true } : item))
       toast.success('Đã đánh dấu đã đọc')
-    } catch (error) {
+    } catch {
       toast.error('Có lỗi xảy ra')
     }
   }
@@ -130,199 +116,197 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   const handleDelete = async (id) => {
     try {
       await notificationsApi.delete(id)
-      setNotifications(prev => prev.filter(n => n.id !== id))
+      setNotifications((prev) => prev.filter((item) => item.id !== id))
       toast.success('Đã xóa thông báo')
-    } catch (error) {
+    } catch {
       toast.error('Có lỗi xảy ra')
     }
   }
 
-  const getNotificationIcon = (type) => {
-    const icons = {
-      success: '✅',
-      warning: '⚠️',
-      info: 'ℹ️',
-      danger: '❌',
-    }
-    return icons[type] || 'ℹ️'
-  }
-
-  const getNotificationColor = (type) => {
-    const colors = {
-      success: 'bg-success-50 border-success-200',
-      warning: 'bg-warning-50 border-warning-200',
-      info: 'bg-primary-50 border-primary-200',
-      danger: 'bg-danger-50 border-danger-200',
-    }
-    return colors[type] || colors.info
-  }
-
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const unreadCount = notifications.filter((item) => !item.is_read).length
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-primary-900/40 backdrop-blur-sm z-40"
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm"
             onClick={onClose}
           />
 
-          {/* Panel */}
-          <motion.div
+          <motion.aside
             ref={panelRef}
-            initial={{ opacity: 0, x: 300 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 300 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed top-0 right-0 h-full w-full sm:w-96 bg-white border-l border-slate-200 shadow-2xl z-50 flex flex-col"
+            initial={{ opacity: 0, x: 32, y: -6 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 32, y: -6 }}
+            transition={{ duration: 0.18 }}
+            className="fixed right-4 top-16 z-50 flex max-h-[calc(100vh-5rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#101415]/95 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-primary-700" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-300/25 bg-emerald-400/10">
+                  <Bell className="h-5 w-5 text-emerald-300" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Thông báo</h2>
-                  <p className="text-xs text-slate-600">
-                    {unreadCount} chưa đọc
-                  </p>
+                  <h2 className="text-base font-black text-slate-100">Thông báo</h2>
+                  <p className="text-xs text-slate-500">{unreadCount} chưa đọc</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-colors"
+                className="btn-ghost p-2"
+                aria-label="Đóng thông báo"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Filter tabs */}
-            <div className="flex gap-2 p-4 border-b border-slate-200">
-              <button
-                onClick={() => setFilter('all')}
-                className={cn(
-                  'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  filter === 'all'
-                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                )}
-              >
+            <div className="flex gap-2 border-b border-white/10 p-3">
+              <Tab active={filter === 'all'} onClick={() => setFilter('all')}>
                 Tất cả
-              </button>
-              <button
-                onClick={() => setFilter('unread')}
-                className={cn(
-                  'flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  filter === 'unread'
-                    ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                )}
-              >
+              </Tab>
+              <Tab active={filter === 'unread'} onClick={() => setFilter('unread')}>
                 Chưa đọc ({unreadCount})
-              </button>
+              </Tab>
             </div>
 
-            {/* Notifications list */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-[260px] flex-1 overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                <div className="flex h-64 items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-300 border-t-transparent" />
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                  <Bell className="w-12 h-12 mb-3 opacity-50" />
+                <div className="flex h-64 flex-col items-center justify-center px-6 text-center text-slate-500">
+                  <Bell className="mb-3 h-12 w-12 opacity-45" />
                   <p className="text-sm">Không có thông báo nào</p>
                 </div>
               ) : (
-                <div className="p-4 space-y-3">
+                <div className="space-y-3 p-3">
                   <AnimatePresence>
                     {notifications.map((notification) => (
-                      <motion.div
+                      <NotificationItem
                         key={notification.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -100 }}
-                        className={cn(
-                          'relative p-4 rounded-xl border',
-                          getNotificationColor(notification.type),
-                          !notification.is_read && 'ring-2 ring-primary-500/20 shadow-md shadow-primary-500/10'
-                        )}
-                      >
-                        {/* Unread indicator */}
-                        {!notification.is_read && (
-                          <div className="absolute top-2 right-2 w-2 h-2 bg-primary-600 rounded-full" />
-                        )}
-
-                        {/* Content */}
-                        <div className="flex gap-3">
-                          <div className="text-2xl flex-shrink-0">
-                            {getNotificationIcon(notification.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h3 className="font-semibold text-slate-900 text-sm">
-                                {notification.title}
-                              </h3>
-                            </div>
-                            <p className="text-xs text-slate-500 mb-2">
-                              {notification.message}
-                            </p>
-                            
-                            {/* Ticker link */}
-                            {notification.ticker && (
-                              <Link
-                                to={`/company/${notification.ticker}`}
-                                className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700"
-                                onClick={onClose}
-                              >
-                                <span className="font-mono font-semibold">
-                                  {notification.ticker}
-                                </span>
-                                <ExternalLink className="w-3 h-3" />
-                              </Link>
-                            )}
-                            
-                            {/* Timestamp */}
-                            <p className="text-xs text-slate-500 mt-2">
-                              {new Date(notification.created_at).toLocaleString('vi-VN')}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
-                          {!notification.is_read && (
-                            <button
-                              onClick={() => handleMarkAsRead(notification.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors"
-                            >
-                              <Check className="w-3 h-3" />
-                              Đánh dấu đã đọc
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(notification.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 transition-colors ml-auto"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            Xóa
-                          </button>
-                        </div>
-                      </motion.div>
+                        notification={notification}
+                        onClose={onClose}
+                        onMarkAsRead={handleMarkAsRead}
+                        onDelete={handleDelete}
+                      />
                     ))}
                   </AnimatePresence>
                 </div>
               )}
             </div>
-          </motion.div>
+          </motion.aside>
         </>
       )}
     </AnimatePresence>
   )
+}
+
+function Tab({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex-1 rounded-lg px-3 py-2 text-sm font-bold transition',
+        active
+          ? 'border border-emerald-300/25 bg-emerald-400/10 text-emerald-300'
+          : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function NotificationItem({ notification, onClose, onMarkAsRead, onDelete }) {
+  const Icon = getNotificationIcon(notification.type)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: 30 }}
+      className={cn(
+        'relative rounded-xl border p-4',
+        getNotificationColor(notification.type),
+        !notification.is_read && 'shadow-[0_0_0_1px_rgba(78,222,163,0.18)]'
+      )}
+    >
+      {!notification.is_read && (
+        <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(78,222,163,0.75)]" />
+      )}
+
+      <div className="flex gap-3">
+        <div className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white/[0.06]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="pr-4 text-sm font-black text-slate-100">{notification.title}</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{notification.message}</p>
+
+          {notification.ticker && (
+            <Link
+              to={`/company/${notification.ticker}`}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-mono font-black text-emerald-300 hover:text-emerald-200"
+              onClick={onClose}
+            >
+              {notification.ticker}
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          )}
+
+          <p className="mt-2 text-[11px] text-slate-600">
+            {new Date(notification.created_at).toLocaleString('vi-VN')}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3">
+        {!notification.is_read && (
+          <button
+            type="button"
+            onClick={() => onMarkAsRead(notification.id)}
+            className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] hover:text-emerald-300"
+          >
+            <Check className="h-3 w-3" />
+            Đã đọc
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onDelete(notification.id)}
+          className="ml-auto inline-flex items-center gap-1 rounded-lg border border-red-300/20 bg-red-400/10 px-3 py-1.5 text-xs font-bold text-red-200 transition hover:bg-red-400/15"
+        >
+          <Trash2 className="h-3 w-3" />
+          Xóa
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+function getNotificationIcon(type) {
+  const icons = {
+    success: CheckCircle,
+    warning: AlertTriangle,
+    info: Info,
+    danger: XCircle,
+  }
+  return icons[type] || Info
+}
+
+function getNotificationColor(type) {
+  const colors = {
+    success: 'border-emerald-300/20 bg-emerald-400/10 text-emerald-300',
+    warning: 'border-amber-300/20 bg-amber-400/10 text-amber-300',
+    info: 'border-sky-300/20 bg-sky-400/10 text-sky-300',
+    danger: 'border-red-300/20 bg-red-400/10 text-red-300',
+  }
+  return colors[type] || colors.info
 }

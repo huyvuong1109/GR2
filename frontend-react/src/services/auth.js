@@ -1,16 +1,36 @@
 import axios from 'axios'
 
 // Determine API base URL
-const AUTH_BASE = import.meta.env.VITE_AUTH_API_URL || 'http://localhost:8001'
+const AUTH_BASE = import.meta.env.VITE_AUTH_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 console.log('Auth API Base URL:', AUTH_BASE)
 
+const storage = window.sessionStorage
+const clearLegacyTokens = () => {
+  window.localStorage.removeItem('auth_token')
+  window.localStorage.removeItem('refresh_token')
+}
+
+clearLegacyTokens()
+
 export const tokenStore = {
-  getAccess: () => localStorage.getItem('auth_token'),
-  setAccess: (t) => { if (t) localStorage.setItem('auth_token', t); else localStorage.removeItem('auth_token') },
-  getRefresh: () => localStorage.getItem('refresh_token'),
-  setRefresh: (t) => { if (t) localStorage.setItem('refresh_token', t); else localStorage.removeItem('refresh_token') },
-  clear: () => { localStorage.removeItem('auth_token'); localStorage.removeItem('refresh_token') }
+  getAccess: () => storage.getItem('auth_token'),
+  setAccess: (t) => {
+    clearLegacyTokens()
+    if (t) storage.setItem('auth_token', t)
+    else storage.removeItem('auth_token')
+  },
+  getRefresh: () => storage.getItem('refresh_token'),
+  setRefresh: (t) => {
+    clearLegacyTokens()
+    if (t) storage.setItem('refresh_token', t)
+    else storage.removeItem('refresh_token')
+  },
+  clear: () => {
+    storage.removeItem('auth_token')
+    storage.removeItem('refresh_token')
+    clearLegacyTokens()
+  }
 }
 
 const client = axios.create({ 
@@ -44,7 +64,7 @@ export async function register(payload) {
       throw new Error(error.response.data.detail)
     }
     if (!error.response && error.message === 'Network Error') {
-      throw new Error(`Khong the ket noi toi server (${AUTH_BASE}). Hay chay backend tren port 8001`)
+      throw new Error(`Khong the ket noi toi server (${AUTH_BASE}). Hay chay backend tren port 8000`)
     }
     if (!error.response) {
       throw new Error(`Loi ket noi: ${error.message}. Kiem tra xem backend co chay khong?`)

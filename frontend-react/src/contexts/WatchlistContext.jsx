@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { watchlistApi } from '../services/api'
 import { AuthContext } from './AuthContext'
+import toast from 'react-hot-toast'
 
 export const WatchlistContext = createContext(null)
 
@@ -21,6 +22,7 @@ export function WatchlistProvider({ children }) {
       setItems(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Failed to load watchlist', error)
+      toast.error('Không thể tải danh mục quan tâm')
       setItems([])
     } finally {
       setLoading(false)
@@ -35,21 +37,37 @@ export function WatchlistProvider({ children }) {
     const normalized = String(ticker || '').toUpperCase().trim()
     if (!normalized || !user) return false
 
-    await watchlistApi.add(normalized)
-    setItems((prev) => {
-      if (prev.some((x) => x.ticker === normalized)) return prev
-      return [{ ticker: normalized, added_at: new Date().toISOString() }, ...prev]
-    })
-    return true
+    try {
+      const result = await watchlistApi.add(normalized)
+      setItems((prev) => {
+        if (prev.some((x) => x.ticker === normalized)) return prev
+        return [{ ticker: normalized, added_at: new Date().toISOString() }, ...prev]
+      })
+      if (!result?.already_exists) {
+        toast.success(`Đã thêm ${normalized} vào danh mục quan tâm`)
+      }
+      return true
+    } catch (error) {
+      console.error('Failed to add watchlist ticker', error)
+      toast.error(`Không thể thêm ${normalized}`)
+      throw error
+    }
   }, [user])
 
   const removeTicker = useCallback(async (ticker) => {
     const normalized = String(ticker || '').toUpperCase().trim()
     if (!normalized || !user) return false
 
-    await watchlistApi.remove(normalized)
-    setItems((prev) => prev.filter((x) => x.ticker !== normalized))
-    return true
+    try {
+      await watchlistApi.remove(normalized)
+      setItems((prev) => prev.filter((x) => x.ticker !== normalized))
+      toast.success(`Đã xoá ${normalized} khỏi danh mục quan tâm`)
+      return true
+    } catch (error) {
+      console.error('Failed to remove watchlist ticker', error)
+      toast.error(`Không thể xoá ${normalized}`)
+      throw error
+    }
   }, [user])
 
   const toggleTicker = useCallback(async (ticker) => {

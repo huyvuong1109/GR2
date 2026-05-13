@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bảng điều khiển - Value Invest</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-dim": "#101415",
+                        "surface-container-lowest": "#0b0f10",
+                        "surface-container-highest": "#323537",
+                        "primary": "#bec6e0",
+                        "on-background": "#e0e3e5",
+                        "outline": "#909097",
+                        "inverse-surface": "#e0e3e5",
+                        "primary-container": "#0f172a",
+                        "on-secondary": "#003824",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-secondary-fixed": "#002113",
+                        "on-secondary-container": "#00311f",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "secondary-fixed-dim": "#4edea3",
+                        "on-error-container": "#ffdad6",
+                        "inverse-primary": "#565e74",
+                        "on-surface": "#e0e3e5",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed": "#001a42",
+                        "surface-container-low": "#191c1e",
+                        "outline-variant": "#45464d",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#2d3133",
+                        "on-primary": "#283044",
+                        "error": "#ffb4ab",
+                        "primary-fixed": "#dae2fd",
+                        "tertiary": "#adc6ff",
+                        "surface-tint": "#bec6e0",
+                        "secondary": "#4edea3",
+                        "tertiary-container": "#00163a",
+                        "surface-container-high": "#272a2c",
+                        "on-primary-container": "#798098",
+                        "on-tertiary-container": "#357df1",
+                        "on-secondary-fixed-variant": "#005236",
+                        "background": "#101415",
+                        "surface-container": "#1d2022",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-bright": "#363a3b",
+                        "on-tertiary": "#002e6a",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-surface-variant": "#c6c6cd",
+                        "surface-variant": "#323537",
+                        "secondary-fixed": "#6ffbbe",
+                        "secondary-container": "#00a572",
+                        "surface": "#101415"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.25rem",
+                        lg: "0.5rem",
+                        xl: "0.75rem",
+                        full: "9999px"
+                    },
+                    spacing: {
+                        gutter: "24px",
+                        unit: "8px",
+                        "margin-mobile": "20px",
+                        "container-max": "1440px",
+                        "margin-desktop": "64px"
+                    },
+                    fontFamily: {
+                        "label-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "data-point-lg": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "display-lg": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    fontSize: {
+                        "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+                        "data-point-lg": ["28px", { lineHeight: "34px", letterSpacing: "0.02em", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.01em", fontWeight: "600" }]
+                    }
+                }
+            }
+        };
+    </script>
+<style>
+        .glass-card {
+            background: rgba(39, 42, 44, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        .bg-gradient-radial {
+            background-image: radial-gradient(circle at top left, rgba(190, 198, 224, 0.15) 0%, rgba(16, 20, 21, 1) 60%);
+        }
+        body {
+            background-color: #101415;
+            color: #e0e3e5;
+        }
+    </style>
+</head>
+<body class="bg-gradient-radial min-h-screen text-on-surface font-body-md overflow-x-hidden">
+<!-- SideNavBar (Predicted Component) -->
+<nav class="h-screen w-64 fixed left-0 top-0 bg-surface-dim/80 backdrop-blur-xl border-r border-outline-variant/10 shadow-2xl shadow-surface-container-lowest/50 flex flex-col py-8 px-4 z-50 hidden md:flex">
+<div class="mb-10 px-4">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">WealthArch</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1 uppercase tracking-wider">Cấp độ tổ chức</p>
+</div>
+<div class="flex-1 space-y-2">
+<!-- Active Tab: Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/10 text-secondary border-r-2 border-secondary font-semibold font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span>Bảng điều khiển</span>
+</a>
+<!-- Inactive Tabs -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 hover:backdrop-blur-md transition-all duration-300 active:scale-95 transform font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">filter_alt</span>
+<span>Bộ lọc cổ phiếu</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 hover:backdrop-blur-md transition-all duration-300 active:scale-95 transform font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">compare_arrows</span>
+<span>So sánh</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 hover:backdrop-blur-md transition-all duration-300 active:scale-95 transform font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span>Báo cáo</span>
+</a>
+</div>
+<div class="mt-auto space-y-4">
+<div class="space-y-2 border-t border-outline-variant/10 pt-4">
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 hover:backdrop-blur-md transition-all duration-300 active:scale-95 transform font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Cài đặt</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant hover:text-on-surface transition-colors hover:bg-surface-variant/50 hover:backdrop-blur-md transition-all duration-300 active:scale-95 transform font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">help</span>
+<span>Hỗ trợ</span>
+</a>
+</div>
+<button class="w-full py-3 px-4 rounded-lg bg-primary-container text-primary font-label-sm text-label-sm uppercase tracking-wider hover:bg-surface-variant/50 transition-colors border border-primary/20 hover:border-primary/50 shadow-sm">
+                Nâng cấp lên Pro
+            </button>
+<div class="flex items-center gap-3 px-4 py-2 mt-4">
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/20">
+<img alt="Investor Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a financial investor, clean background, sharp focus, high-end corporate style, well-lit, confident expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn8j7EF2cfwK9K6aHYkECdNafCoB62SEEBj-iR9HVsz6iRaiuNlGNBEM7wk_Rt6dVS5fFHS9YW2Ztf0fnZUrvAIuk-ktvOgxATZqwoiZPaN2Up45-hUjkOl1pgnAW5aVVccH8MkPe1Gji-XCXCEfBqrMCHlz5yJwmrxcHiAFngb4RNsljGjtI871k_BQ1tHlmrtASXzTf-OdEBTEG0Z2UBZn97SPr2mqQGgFVa2AcPRpzbZn1pWhIIONQ6cjvDOrnAFNw30uxkIQpZ"/>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface">Nhà đầu tư</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-70">Gói Cao cấp</span>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="md:ml-64 pt-20 p-margin-mobile md:p-margin-desktop max-w-container-max mx-auto min-h-screen flex flex-col gap-gutter">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-4">
+<div>
+<h2 class="font-display-lg text-display-lg text-on-surface mb-2">Chào buổi sáng, Nhà đầu tư</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">Tổng quan thị trường chứng khoán Việt Nam. Dữ liệu được tổng hợp từ năm 2022 đến hiện tại, tập trung vào chiến lược đầu tư giá trị và phân tích sức khỏe tài chính.</p>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-high/50 backdrop-blur-md px-4 py-2 rounded-full border border-outline-variant/20 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.8)] animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface">Thị trường đang mở cửa</span>
+<span class="text-on-surface-variant mx-1">•</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Cập nhật: Vừa xong</span>
+</div>
+</header>
+<!-- KPI Cards Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Card 1: P/E VN-Index -->
+<div class="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl">query_stats</span>
+</div>
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">P/E VN-Index Hiện Tại</h3>
+<div class="flex items-baseline gap-3 mb-4">
+<span class="font-data-point-lg text-data-point-lg text-primary">14.2x</span>
+<span class="font-label-sm text-label-sm text-secondary flex items-center bg-secondary/10 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px] mr-1">arrow_downward</span> -5.4% so với TB (2022)
+                    </span>
+</div>
+<div class="mt-auto">
+<div class="w-full bg-surface-container-highest rounded-full h-1.5 mb-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 65%"></div>
+</div>
+<div class="flex justify-between font-label-sm text-[10px] text-on-surface-variant">
+<span>Min (2022): 9.8x</span>
+<span>Trung bình: 15.0x</span>
+</div>
+</div>
+</div>
+<!-- Card 2: Market Cap -->
+<div class="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl">account_balance</span>
+</div>
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Tổng Vốn Hóa Thị Trường</h3>
+<div class="flex items-baseline gap-3 mb-4">
+<span class="font-data-point-lg text-data-point-lg text-on-surface">5.2 Triệu Tỷ</span>
+<span class="font-label-sm text-label-sm text-secondary flex items-center bg-secondary/10 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px] mr-1">arrow_upward</span> +12% YTD
+                    </span>
+</div>
+<div class="mt-auto text-on-surface-variant font-label-sm text-label-sm">
+                    Tập trung chủ yếu vào nhóm ngành Ngân hàng và Bất động sản.
+                </div>
+</div>
+<!-- Card 3: Quality Stocks -->
+<div class="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-6xl">diamond</span>
+</div>
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Cổ Phiếu Chất Lượng (F-Score 8-9)</h3>
+<div class="flex items-baseline gap-3 mb-4">
+<span class="font-data-point-lg text-data-point-lg text-secondary">42</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">/ 400+ niêm yết</span>
+</div>
+<div class="mt-auto flex gap-2">
+<span class="px-2 py-1 bg-surface-container-highest rounded text-[11px] font-label-sm text-on-surface">Giá trị: 15 mã</span>
+<span class="px-2 py-1 bg-surface-container-highest rounded text-[11px] font-label-sm text-on-surface">Tăng trưởng: 27 mã</span>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout for Charts and Lists -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mt-4">
+<!-- Main Chart Area (Spans 2 columns) -->
+<div class="glass-card rounded-xl p-6 lg:col-span-2 flex flex-col min-h-[400px]">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Xu hướng VN-Index (2022 - Hiện tại)</h3>
+<div class="flex gap-2">
+<button class="px-3 py-1 rounded bg-surface-container-highest text-on-surface font-label-sm text-label-sm hover:bg-surface-bright transition-colors">1M</button>
+<button class="px-3 py-1 rounded bg-surface-container-highest text-on-surface font-label-sm text-label-sm hover:bg-surface-bright transition-colors">6M</button>
+<button class="px-3 py-1 rounded bg-primary/20 border border-primary/30 text-primary font-label-sm text-label-sm">Tất cả</button>
+</div>
+</div>
+<!-- Chart Visualization Canvas -->
+<div class="flex-1 relative w-full h-full border-b border-l border-outline-variant/30 pl-2 pb-2">
+<!-- Y Axis Labels -->
+<div class="absolute left-[-40px] top-0 bottom-0 flex flex-col justify-between text-[10px] text-on-surface-variant py-2">
+<span>1500</span>
+<span>1250</span>
+<span>1000</span>
+<span>800</span>
+</div>
+<!-- X Axis Labels -->
+<div class="absolute left-0 right-0 bottom-[-24px] flex justify-between text-[10px] text-on-surface-variant px-4">
+<span>Q1 2022</span>
+<span>Q3 2022</span>
+<span>Q1 2023</span>
+<span>Q3 2023</span>
+<span>Q1 2024</span>
+<span>Hiện tại</span>
+</div>
+<!-- Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pl-2 pt-2">
+<div class="w-full border-t border-outline-variant/10"></div>
+<div class="w-full border-t border-outline-variant/10"></div>
+<div class="w-full border-t border-outline-variant/10"></div>
+<div class="w-full border-t border-outline-variant/10"></div>
+</div>
+<!-- Simulated Area Chart -->
+<div class="absolute inset-0 pt-2 pl-2 overflow-hidden flex items-end">
+<div class="w-full h-full relative" style="background: linear-gradient(to bottom, rgba(190, 198, 224, 0.2) 0%, rgba(16, 20, 21, 0) 100%); clip-path: polygon(0 10%, 15% 30%, 30% 60%, 45% 40%, 60% 30%, 75% 20%, 90% 15%, 100% 25%, 100% 100%, 0 100%);">
+<!-- Line stroke -->
+<svg class="absolute inset-0 h-full w-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<path d="M0,10 L15,30 L30,60 L45,40 L60,30 L75,20 L90,15 L100,25" fill="none" stroke="#bec6e0" stroke-width="0.5" vector-effect="non-scaling-stroke"></path>
+</svg>
+</div>
+</div>
+<!-- Current Point Indicator -->
+<div class="absolute right-0 top-[25%] w-3 h-3 bg-primary rounded-full border-2 border-surface-dim shadow-[0_0_10px_rgba(190,198,224,0.8)] -translate-y-1/2 translate-x-1/2"></div>
+</div>
+</div>
+<!-- Side Column for Lists & Warnings -->
+<div class="flex flex-col gap-gutter lg:col-span-1">
+<!-- Top Health Score Stocks -->
+<div class="glass-card rounded-xl p-6 flex flex-col">
+<h3 class="font-headline-md text-body-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[20px]">workspace_premium</span>
+                        Top Cổ phiếu Sức khỏe Tài chính
+                    </h3>
+<div class="space-y-3">
+<!-- List Item 1 -->
+<div class="flex justify-between items-center p-3 rounded-lg hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-outline-variant/10 cursor-pointer">
+<div>
+<div class="font-label-sm text-body-md font-bold text-on-surface">FPT</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant">Công nghệ thông tin</div>
+</div>
+<div class="text-right">
+<div class="font-label-sm text-secondary bg-secondary/10 px-2 py-0.5 rounded text-[12px]">F-Score: 9</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant mt-1">PE: 22.4</div>
+</div>
+</div>
+<!-- List Item 2 -->
+<div class="flex justify-between items-center p-3 rounded-lg hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-outline-variant/10 cursor-pointer">
+<div>
+<div class="font-label-sm text-body-md font-bold text-on-surface">VCB</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant">Ngân hàng</div>
+</div>
+<div class="text-right">
+<div class="font-label-sm text-secondary bg-secondary/10 px-2 py-0.5 rounded text-[12px]">F-Score: 8</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant mt-1">PE: 15.2</div>
+</div>
+</div>
+<!-- List Item 3 -->
+<div class="flex justify-between items-center p-3 rounded-lg hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-outline-variant/10 cursor-pointer">
+<div>
+<div class="font-label-sm text-body-md font-bold text-on-surface">REE</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant">Tiện ích</div>
+</div>
+<div class="text-right">
+<div class="font-label-sm text-secondary bg-secondary/10 px-2 py-0.5 rounded text-[12px]">F-Score: 8</div>
+<div class="font-label-sm text-[11px] text-on-surface-variant mt-1">PE: 11.5</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Risk Warnings Section -->
+<div class="glass-card rounded-xl p-6 flex flex-col border-l-4 border-l-error">
+<h3 class="font-headline-md text-body-lg font-semibold text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-[20px]">warning</span>
+                        Cảnh báo rủi ro hệ thống
+                    </h3>
+<div class="space-y-4">
+<div class="bg-error-container/20 border border-error-container/30 rounded p-3">
+<div class="flex items-center gap-2 mb-1">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm text-error">Nghiêm trọng: Lỗ liên tiếp</span>
+</div>
+<p class="font-body-md text-[13px] text-on-surface-variant">24 doanh nghiệp ghi nhận Net Profit &lt; 0 trong ≥ 2 kỳ liên tiếp.</p>
+</div>
+<div class="bg-error-container/20 border border-error-container/30 rounded p-3">
+<div class="flex items-center gap-2 mb-1">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm text-error">Nghiêm trọng: CFO âm</span>
+</div>
+<p class="font-body-md text-[13px] text-on-surface-variant">15 doanh nghiệp có Operating Cash Flow &lt; 0 liên tục, cảnh báo thanh khoản.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

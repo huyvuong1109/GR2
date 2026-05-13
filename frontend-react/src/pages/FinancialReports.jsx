@@ -5,14 +5,13 @@ import {
   ChevronDown,
   ChevronRight,
   Database,
+  DollarSign,
   FileText,
   Search,
   TrendingUp,
   Wallet,
-  DollarSign,
   X,
 } from 'lucide-react'
-import { Badge, Card, CardContent, Input } from '../components/ui'
 import { formatCurrency } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
@@ -30,27 +29,9 @@ const META_KEYS = new Set([
 ])
 
 const REPORT_TYPES = [
-  {
-    id: 'balance_sheet',
-    key: 'balance_sheets',
-    name: 'Can doi ke toan',
-    icon: Wallet,
-    gradient: 'from-blue-500 to-indigo-500',
-  },
-  {
-    id: 'income_statement',
-    key: 'income_statements',
-    name: 'Ket qua kinh doanh',
-    icon: TrendingUp,
-    gradient: 'from-indigo-500 to-purple-500',
-  },
-  {
-    id: 'cash_flow',
-    key: 'cash_flows',
-    name: 'Luu chuyen tien te',
-    icon: DollarSign,
-    gradient: 'from-blue-500 to-purple-600',
-  },
+  { id: 'balance_sheet', key: 'balance_sheets', name: 'Cân đối kế toán', icon: Wallet },
+  { id: 'income_statement', key: 'income_statements', name: 'Kết quả kinh doanh', icon: TrendingUp },
+  { id: 'cash_flow', key: 'cash_flows', name: 'Lưu chuyển tiền tệ', icon: DollarSign },
 ]
 
 const toArray = (value) => {
@@ -61,23 +42,6 @@ const toArray = (value) => {
 
 const periodYear = (record) => record?.period_year ?? record?.fiscal_year ?? null
 const periodQuarter = (record) => record?.period_quarter ?? record?.quarter ?? null
-
-const periodKey = (record) => `${periodYear(record) ?? 'na'}-${periodQuarter(record) ?? 0}`
-
-const formatPeriodLabel = (record) => {
-  const year = periodYear(record)
-  const quarter = periodQuarter(record)
-
-  if (quarter !== null && quarter !== undefined && `${quarter}` !== '' && Number(quarter) > 0) {
-    return `Q${quarter}/${year ?? '-'}`
-  }
-
-  if (year !== null && year !== undefined && `${year}` !== '') {
-    return `${year}`
-  }
-
-  return record?.period_label || 'Ky khong xac dinh'
-}
 
 const collectFields = (record) =>
   Object.keys(record || {})
@@ -90,9 +54,7 @@ const collectFieldCountFromReports = (reportSet) => {
   ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
     toArray(reportSet?.[key]).forEach((record) => {
       Object.keys(record || {}).forEach((field) => {
-        if (!META_KEYS.has(field)) {
-          fields.add(field)
-        }
+        if (!META_KEYS.has(field)) fields.add(field)
       })
     })
   })
@@ -113,7 +75,7 @@ const humanizeFieldName = (field) =>
     .replace(/\b\w/g, (char) => char.toUpperCase())
 
 const formatValue = (value) => {
-  if (value === null || value === undefined || value === '') return '-'
+  if (value === null || value === undefined || value === '') return '0'
 
   if (typeof value === 'number' && Number.isFinite(value)) {
     return formatCurrency(value, false)
@@ -133,9 +95,7 @@ const getYearsList = (reports) => {
   ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
     toArray(reports?.[key]).forEach((record) => {
       const year = Number(periodYear(record) || 0)
-      if (year > 0) {
-        yearSet.add(year)
-      }
+      if (year > 0) yearSet.add(year)
     })
   })
 
@@ -156,7 +116,7 @@ const getQuarterOptionsByYear = (reports, selectedYear) => {
       const keyValue = `${year}-${quarter}`
 
       if (!quarterMap.has(keyValue)) {
-        const label = quarter > 0 ? `Q${quarter}` : 'Ca nam'
+        const label = quarter > 0 ? `Q${quarter}` : 'Cả năm'
         quarterMap.set(keyValue, {
           key: keyValue,
           year,
@@ -173,9 +133,7 @@ const getQuarterOptionsByYear = (reports, selectedYear) => {
 
 const getRecordByPeriod = (reports, reportTypeKey, periodSelection) => {
   const reportList = toArray(reports?.[reportTypeKey])
-  if (!periodSelection) {
-    return reportList[0] || null
-  }
+  if (!periodSelection) return reportList[0] || null
   return (
     reportList.find(
       (record) =>
@@ -185,13 +143,9 @@ const getRecordByPeriod = (reports, reportTypeKey, periodSelection) => {
   )
 }
 
-const DynamicRecordTable = ({ record, metricQuery }) => {
+function DynamicRecordTable({ record, metricQuery }) {
   if (!record) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white/55 p-8 text-center text-slate-600">
-        Khong tim thay du lieu cho ky nay.
-      </div>
-    )
+    return <div className="alert-info text-center text-sm">Không tìm thấy dữ liệu cho kỳ này.</div>
   }
 
   const fields = collectFields(record)
@@ -199,40 +153,32 @@ const DynamicRecordTable = ({ record, metricQuery }) => {
   const visibleFields =
     keyword === ''
       ? fields
-      : fields.filter((field) => {
-          const byName = normalizeText(field)
-          const byLabel = normalizeText(humanizeFieldName(field))
-          return byName.includes(keyword) || byLabel.includes(keyword)
-        })
+      : fields.filter((field) => normalizeText(field).includes(keyword) || normalizeText(humanizeFieldName(field)).includes(keyword))
 
   if (!visibleFields.length) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white/55 p-8 text-center text-slate-600">
-        Khong co cot phu hop voi tu khoa tim kiem.
-      </div>
-    )
+    return <div className="alert-info text-center text-sm">Không có chỉ tiêu phù hợp với từ khóa tìm kiếm.</div>
   }
 
   return (
-    <div className="max-h-[60vh] overflow-auto rounded-xl border border-blue-500/25 bg-white/55">
+    <div className="max-h-[60vh] overflow-auto rounded-xl border border-white/10 bg-white/[0.035]">
       <table className="w-full min-w-[680px] text-sm">
         <thead className="sticky top-0 z-20">
-          <tr className="border-b border-slate-200 bg-slate-100">
-            <th className="w-[45%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-900">Chi tieu</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-900">Gia tri</th>
+          <tr className="border-b border-white/10 bg-[#191c1e]">
+            <th className="w-[45%] px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-400">Chỉ tiêu</th>
+            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-400">Giá trị</th>
           </tr>
         </thead>
         <tbody>
           {visibleFields.map((field, index) => (
             <tr
               key={field}
-              className={cn('border-t border-white/5 transition-colors hover:bg-blue-500/[0.05]', index % 2 === 0 ? 'bg-slate-50/50' : 'bg-white')}
+              className={cn('border-t border-white/[0.06] transition-colors hover:bg-white/[0.06]', index % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent')}
             >
               <td className="px-4 py-3 align-top">
-                <p className="font-semibold text-slate-900">{humanizeFieldName(field)}</p>
-                <p className="text-xs text-primary-700/55">{field}</p>
+                <p className="font-bold text-slate-100">{humanizeFieldName(field)}</p>
+                <p className="text-xs text-slate-500">{field}</p>
               </td>
-              <td className="px-4 py-3 text-right font-mono text-slate-900">{formatValue(record[field])}</td>
+              <td className="px-4 py-3 text-right font-mono text-slate-100">{formatValue(record[field])}</td>
             </tr>
           ))}
         </tbody>
@@ -241,7 +187,7 @@ const DynamicRecordTable = ({ record, metricQuery }) => {
   )
 }
 
-const ReportModal = ({
+function ReportModal({
   isOpen,
   onClose,
   company,
@@ -250,7 +196,7 @@ const ReportModal = ({
   selectedPeriod,
   periodOptions,
   onSelectPeriod,
-}) => {
+}) {
   const [activeTab, setActiveTab] = useState('balance_sheet')
   const [metricQuery, setMetricQuery] = useState('')
 
@@ -266,7 +212,6 @@ const ReportModal = ({
   const activeReportType = REPORT_TYPES.find((type) => type.id === activeTab)
   const activeRecord = getRecordByPeriod(reports, activeReportType?.key, selectedPeriod)
   const activeFieldCount = activeRecord ? collectFields(activeRecord).length : 0
-
   const selectedPeriodLabel =
     selectedPeriod && Number(selectedPeriod.quarter || 0) > 0
       ? `Q${selectedPeriod.quarter}/${selectedPeriod.year}`
@@ -278,41 +223,29 @@ const ReportModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.18 }}
           onClick={(event) => event.stopPropagation()}
-          className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-blue-500/30 bg-white"
+          className="glass-card relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden"
         >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-30"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-            }}
-          />
-
-          <div className="relative border-b border-slate-200 px-6 py-5">
+          <div className="border-b border-white/10 px-6 py-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">{company.ticker}</h3>
-                <p className="mt-1 text-sm text-slate-600">{company.name}</p>
+                <h3 className="text-xl font-black text-slate-100">{company.ticker}</h3>
+                <p className="mt-1 text-sm text-slate-400">{company.name}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className="border-blue-500/30 bg-slate-50 text-slate-700">
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-slate-300">
                   <Calendar className="mr-1.5 h-3.5 w-3.5" />
                   {selectedPeriodLabel}
-                </Badge>
-                <button
-                  onClick={onClose}
-                  className="rounded-lg border border-slate-200 p-2 text-slate-700 transition-colors hover:bg-blue-500/15"
-                >
+                </span>
+                <button type="button" onClick={onClose} className="btn-ghost p-2" aria-label="Đóng báo cáo">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -322,16 +255,16 @@ const ReportModal = ({
               {REPORT_TYPES.map((type) => {
                 const Icon = type.icon
                 const isActive = activeTab === type.id
-
                 return (
                   <button
                     key={type.id}
+                    type="button"
                     onClick={() => setActiveTab(type.id)}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all',
+                      'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-bold transition-all',
                       isActive
-                        ? 'border-primary-900 bg-primary-900 text-accent-400 shadow-sm'
-                        : 'border-primary-900 bg-primary-900 text-white hover:bg-primary-800'
+                        ? 'border-emerald-300/30 bg-emerald-400/12 text-emerald-300'
+                        : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-emerald-300/25 hover:text-emerald-300'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -341,7 +274,7 @@ const ReportModal = ({
               })}
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200 pt-3">
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
               {(periodOptions || []).map((periodOption) => {
                 const isActivePeriod =
                   Number(selectedPeriod?.year || 0) === Number(periodOption.year || 0) &&
@@ -353,10 +286,10 @@ const ReportModal = ({
                     type="button"
                     onClick={() => onSelectPeriod(periodOption)}
                     className={cn(
-                      'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all',
+                      'rounded-lg border px-3 py-1.5 text-xs font-bold transition-all',
                       isActivePeriod
-                        ? 'border-primary-900 bg-primary-900 text-accent-400'
-                        : 'border-primary-900 bg-primary-900 text-white hover:bg-primary-800'
+                        ? 'border-emerald-300/30 bg-emerald-400/12 text-emerald-300'
+                        : 'border-white/10 bg-white/[0.04] text-slate-400 hover:text-slate-200'
                     )}
                   >
                     {periodOption.label}
@@ -366,27 +299,27 @@ const ReportModal = ({
             </div>
           </div>
 
-          <div className="relative flex flex-wrap items-center gap-2 border-b border-slate-200 px-6 py-3">
-
+          <div className="flex flex-wrap items-center gap-3 border-b border-white/10 px-6 py-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{activeFieldCount} chỉ tiêu</p>
             <div className="ml-auto w-full max-w-sm">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
                   value={metricQuery}
                   onChange={(event) => setMetricQuery(event.target.value)}
-                  placeholder="Tim nhanh chi tieu..."
-                  className="border-blue-500/25 bg-slate-50 pl-9 text-slate-900 placeholder:text-slate-700/40"
+                  placeholder="Tìm nhanh chỉ tiêu..."
+                  className="input-primary h-10 pl-9 text-sm"
                 />
               </div>
             </div>
           </div>
 
-          <div className="relative overflow-y-auto p-6">
+          <div className="overflow-y-auto p-6">
             <DynamicRecordTable record={activeRecord} metricQuery={metricQuery} />
           </div>
 
-          <div className="relative border-t border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-700/60">
-            Bao cao hien thi toan bo cot cua ky duoc chon theo quy trinh: ma cong ty -&gt; nam -&gt; quy.
+          <div className="border-t border-white/10 bg-white/[0.025] px-6 py-4 text-xs text-slate-500">
+            Báo cáo hiển thị theo quy trình: mã công ty - năm báo cáo - kỳ báo cáo - toàn bộ chỉ tiêu.
           </div>
         </motion.div>
       </motion.div>
@@ -454,9 +387,7 @@ export default function FinancialReports() {
     setExpandedCompany(ticker)
 
     const targetCompany = companies.find((item) => item.ticker === ticker)
-    if (targetCompany?.reports) {
-      return
-    }
+    if (targetCompany?.reports) return
 
     const reports = await fetchReports(ticker)
     setCompanies((prev) => prev.map((company) => (company.ticker === ticker ? { ...company, reports } : company)))
@@ -478,10 +409,6 @@ export default function FinancialReports() {
     setModalOpen(true)
   }
 
-  const handleSelectPeriodInModal = (period) => {
-    setSelectedPeriod(period)
-  }
-
   const filteredCompanies = useMemo(
     () =>
       companies.filter(
@@ -494,46 +421,36 @@ export default function FinancialReports() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 bg-white p-6">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-35"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.08) 1px, transparent 1px)',
-            backgroundSize: '30px 30px',
-          }}
-        />
-        <div className="pointer-events-none absolute -left-16 top-0 h-44 w-44 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 bottom-0 h-52 w-52 rounded-full bg-purple-500/20 blur-3xl" />
-
-        <h1 className="relative flex items-center gap-3 text-3xl font-bold text-slate-900">
-          <FileText className="h-8 w-8 text-primary-700" />
-          Bao cao tai chinh
-        </h1>
-          <p className="relative mt-2 text-slate-600">
-            Luong moi: Bam ma cong ty -&gt; chon nam bao cao -&gt; chon quy bao cao -&gt; xem full cot du lieu.
-          </p>
-      </div>
-
-      <Card className="border-slate-200 bg-slate-50">
-        <CardContent className="p-4">
+      <section className="panel">
+        <div className="panel-header">
+          <div className="flex items-start gap-3">
+            <FileText className="mt-1 h-7 w-7 text-emerald-300" />
+            <div>
+              <h1 className="text-3xl font-black tracking-tight text-slate-100">Báo cáo tài chính</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                Chọn mã công ty, năm và kỳ báo cáo để xem toàn bộ chỉ tiêu tài chính theo dữ liệu hiện có.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="panel-body">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-700/55" />
-            <Input
-              placeholder="Tim ma co phieu hoac ten cong ty..."
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+            <input
+              placeholder="Tìm mã cổ phiếu hoặc tên công ty..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="border-slate-200 bg-white/55 pl-10 text-slate-900 placeholder:text-slate-700/40"
+              className="input-primary h-12 pl-11 text-sm font-semibold"
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <div className="space-y-3">
         {loading && (
-          <Card className="border-slate-200 bg-slate-50">
-            <CardContent className="p-8 text-center text-slate-600">Dang tai danh sach cong ty...</CardContent>
-          </Card>
+          <div className="panel">
+            <div className="panel-body text-center text-sm text-slate-400">Đang tải danh sách công ty...</div>
+          </div>
         )}
 
         {!loading &&
@@ -545,33 +462,30 @@ export default function FinancialReports() {
             const highlightedYear = selectedYearByTicker[company.ticker] || null
 
             return (
-              <Card
-                key={company.ticker}
-                className="overflow-hidden border-slate-200 bg-white"
-              >
+              <div key={company.ticker} className="panel">
                 <button
+                  type="button"
                   onClick={() => handleCompanyClick(company.ticker)}
-                  className="w-full px-4 py-4 transition-colors hover:bg-slate-50"
+                  className="w-full px-5 py-4 transition-colors hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-4 text-left">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 font-bold text-white shadow-lg shadow-primary-500/20">
+                    <div className="flex min-w-0 items-center gap-4 text-left">
+                      <div className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 font-black text-emerald-300">
                         {company.ticker?.slice(0, 2)}
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900">{company.ticker}</h3>
-                        <p className="text-sm text-slate-600">{company.name}</p>
+                      <div className="min-w-0">
+                        <h3 className="font-mono text-lg font-black text-slate-100">{company.ticker}</h3>
+                        <p className="truncate text-sm text-slate-400">{company.name}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      
-                      
-                      {isExpanded ? (
-                        <ChevronDown className="h-5 w-5 text-slate-600" />
-                      ) : (
-                        <ChevronRight className="h-5 w-5 text-slate-600" />
+                    <div className="flex items-center gap-3">
+                      {fieldCount > 0 && (
+                        <span className="hidden rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-slate-400 sm:inline-flex">
+                          {fieldCount} chỉ tiêu
+                        </span>
                       )}
+                      {isExpanded ? <ChevronDown className="h-5 w-5 text-slate-500" /> : <ChevronRight className="h-5 w-5 text-slate-500" />}
                     </div>
                   </div>
                 </button>
@@ -582,12 +496,12 @@ export default function FinancialReports() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-slate-200"
+                      className="overflow-hidden border-t border-white/10"
                     >
-                      <div className="space-y-3 bg-slate-50 p-5">
-                        <p className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                          <Calendar className="h-4 w-4 text-primary-700" />
-                          Chon nam bao cao
+                      <div className="space-y-3 bg-white/[0.025] p-5">
+                        <p className="flex items-center gap-2 text-sm font-bold text-slate-200">
+                          <Calendar className="h-4 w-4 text-emerald-300" />
+                          Chọn năm báo cáo
                         </p>
 
                         {years.length > 0 ? (
@@ -595,36 +509,37 @@ export default function FinancialReports() {
                             {years.map((year) => (
                               <button
                                 key={`${company.ticker}-${year}`}
+                                type="button"
                                 onClick={() => handleOpenYear(company, year)}
                                 className={cn(
-                                  'rounded-lg border px-3 py-2 text-sm font-medium transition-all',
+                                  'rounded-lg border px-3 py-2 text-sm font-bold transition-all',
                                   highlightedYear === year
-                                    ? 'border-primary-500 bg-primary-50 text-slate-900'
-                                    : 'border-blue-500/25 bg-white/60 text-slate-700/80 hover:bg-slate-50'
+                                    ? 'border-emerald-300/30 bg-emerald-400/12 text-emerald-300'
+                                    : 'border-white/10 bg-white/[0.04] text-slate-400 hover:border-emerald-300/25 hover:text-slate-200'
                                 )}
                               >
-                                Nam {year}
+                                Năm {year}
                               </button>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-slate-700/55">Chua co du lieu nam cho cong ty nay.</p>
+                          <p className="text-sm text-slate-500">Chưa có dữ liệu năm cho công ty này.</p>
                         )}
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </Card>
+              </div>
             )
           })}
 
         {!loading && filteredCompanies.length === 0 && (
-          <Card className="border-slate-200 bg-slate-50">
-            <CardContent className="p-12 text-center">
-              <Database className="mx-auto mb-4 h-14 w-14 text-primary-700/40" />
-              <p className="text-slate-600">Khong tim thay cong ty phu hop.</p>
-            </CardContent>
-          </Card>
+          <div className="panel">
+            <div className="panel-body text-center">
+              <Database className="mx-auto mb-4 h-14 w-14 text-slate-600" />
+              <p className="text-sm text-slate-400">Không tìm thấy công ty phù hợp.</p>
+            </div>
+          </div>
         )}
       </div>
 
@@ -636,7 +551,7 @@ export default function FinancialReports() {
         selectedYear={selectedYear}
         selectedPeriod={selectedPeriod}
         periodOptions={getQuarterOptionsByYear(selectedCompany?.reports, selectedYear)}
-        onSelectPeriod={handleSelectPeriodInModal}
+        onSelectPeriod={setSelectedPeriod}
       />
     </div>
   )

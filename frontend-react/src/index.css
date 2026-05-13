@@ -1,354 +1,460 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:wght@400;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+  --bg: #101415;
+  --surface-lowest: #0b0f10;
+  --surface-low: #191c1e;
+  --surface: #1d2022;
+  --surface-high: #272a2c;
+  --surface-highest: #323537;
+  --text: #e0e3e5;
+  --muted: #c6c6cd;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(190, 198, 224, 0.24);
+  --primary: #bec6e0;
+  --secondary: #4edea3;
+  --secondary-deep: #00a572;
+  --tertiary: #adc6ff;
+  --danger: #ffb4ab;
+  --warning: #fbbf24;
+}
+
 @layer base {
   * {
-    @apply border-slate-200;
+    box-sizing: border-box;
+    border-color: var(--line);
   }
-  
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    margin: 0;
+    background:
+      radial-gradient(circle at 22% 0%, rgba(190, 198, 224, 0.1), transparent 34rem),
+      radial-gradient(circle at 82% 18%, rgba(78, 222, 163, 0.06), transparent 28rem),
+      linear-gradient(135deg, #101415 0%, #0b0f10 100%);
+    color: var(--text);
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
   }
-  
-  /* Custom scrollbar - Modern style */
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--text);
+    font-family: Manrope, Inter, system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  ::selection {
+    background: rgba(78, 222, 163, 0.24);
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
-  
+
   ::-webkit-scrollbar-track {
-    @apply bg-slate-100;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded-lg hover:bg-slate-400;
+    background: #0b0f10;
   }
 
-  /* Headings */
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-serif text-slate-900;
+  ::-webkit-scrollbar-thumb {
+    background: #45464d;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #60626a;
   }
 }
 
 @layer components {
-  /* Card styles - Modern & Clean */
+  .glass-card,
   .card {
-    @apply bg-white border border-slate-200 rounded-2xl shadow-sm;
+    background: rgba(29, 32, 34, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
   }
-  
+
   .card-hover {
-    @apply card transition-all duration-200 hover:shadow-md hover:border-primary-200;
-  }
-  
-  /* Button styles - Modern */
-  .btn-primary {
-    @apply px-5 py-2.5 bg-gradient-primary text-white font-medium rounded-xl
-           hover:shadow-lg hover:shadow-primary-500/30 active:scale-[0.98]
-           transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
-  }
-  
-  .btn-secondary {
-    @apply px-5 py-2.5 bg-white text-slate-700 font-medium rounded-xl border border-slate-300
-           hover:bg-slate-50 hover:border-slate-400 hover:shadow-sm
-           transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2;
-  }
-  
-  .btn-success {
-    @apply px-5 py-2.5 bg-gradient-success text-white font-medium rounded-xl
-           hover:shadow-lg hover:shadow-success-500/30 active:scale-[0.98]
-           transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-success-500 focus:ring-offset-2;
-  }
-  
-  .btn-ghost {
-    @apply px-4 py-2 text-slate-300 font-medium rounded-xl
-           hover:bg-primary-800 hover:text-white
-           transition-all duration-200;
-  }
-  
-  /* Input styles */
-  .input-primary {
-    @apply w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl
-           text-slate-900 placeholder-slate-400
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
-           transition-all duration-200;
-  }
-  
-  .input-primary:disabled {
-    @apply bg-slate-50 text-slate-500 cursor-not-allowed;
-  }
-  
-  /* Badge styles - Modern */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold;
-  }
-  
-  .badge-success {
-    @apply badge bg-success-100 text-success-700 border border-success-200;
-  }
-  
-  .badge-danger {
-    @apply badge bg-danger-100 text-danger-700 border border-danger-200;
-  }
-  
-  .badge-warning {
-    @apply badge bg-warning-100 text-warning-700 border border-warning-200;
-  }
-  
-  .badge-info {
-    @apply badge bg-primary-100 text-primary-700 border border-primary-200;
+    transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
   }
 
-  .badge-neutral {
-    @apply badge bg-slate-100 text-slate-700 border border-slate-200;
-  }
-  
-  /* Table styles - Modern financial data */
-  .table-financial {
-    @apply w-full text-left border-collapse;
-  }
-  
-  .table-financial thead {
-    @apply bg-gradient-to-r from-slate-50 to-slate-100 border-b-2 border-slate-200;
-  }
-  
-  .table-financial th {
-    @apply px-4 py-3.5 text-xs font-bold text-slate-700 uppercase tracking-wider;
-  }
-  
-  .table-financial tbody tr {
-    @apply border-b border-slate-100 hover:bg-primary-50/50 transition-colors;
-  }
-  
-  .table-financial tbody tr:last-child {
-    @apply border-b-0;
-  }
-  
-  .table-financial td {
-    @apply px-4 py-3.5 text-sm text-slate-700;
+  .card-hover:hover {
+    background: rgba(39, 42, 44, 0.8);
+    border-color: rgba(78, 222, 163, 0.28);
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45), 0 0 24px rgba(78, 222, 163, 0.08);
   }
 
-  /* Striped table variant */
-  .table-financial.table-striped tbody tr:nth-child(even) {
-    @apply bg-slate-50/50;
-  }
-
-  /* Compact table variant */
-  .table-financial.table-compact th,
-  .table-financial.table-compact td {
-    @apply px-3 py-2.5 text-xs;
-  }
-  
-  /* Number formatting - Financial emphasis */
-  .number-positive {
-    @apply text-success-600 font-semibold;
-  }
-  
-  .number-negative {
-    @apply text-danger-600 font-semibold;
-  }
-
-  .number-neutral {
-    @apply text-slate-700 font-mono;
-  }
-
-  .number-large {
-    @apply text-lg font-mono font-semibold;
-  }
-  
-  /* Navigation */
-  .nav-link {
-    @apply flex items-center gap-2.5 px-4 py-2.5 text-slate-300 rounded-xl
-           hover:bg-primary-800 hover:text-white
-           transition-all duration-200 font-medium;
-  }
-  
-  .nav-link.active {
-    @apply bg-primary-800 text-accent-400 shadow-md shadow-primary-900/30;
-  }
-  
-  /* Stat card - Dashboard metrics */
-  .stat-card {
-    @apply card p-6;
-  }
-
-  .stat-card-value {
-    @apply text-3xl font-bold text-slate-900 font-mono;
-  }
-
-  .stat-card-label {
-    @apply text-sm text-slate-600 uppercase tracking-wide font-medium;
-  }
-
-  .stat-card-change {
-    @apply text-sm font-semibold;
-  }
-  
-  /* Section header */
-  .section-header {
-    @apply mb-4 pb-3 border-b-2 border-slate-200;
-  }
-
-  .section-title {
-    @apply text-xl font-serif font-bold text-slate-900;
-  }
-
-  .section-subtitle {
-    @apply text-sm text-slate-600 mt-1;
-  }
-  
-  /* Alert/Notice boxes - Modern */
-  .alert {
-    @apply p-4 rounded-xl border;
-  }
-
-  .alert-info {
-    @apply alert bg-primary-50 border-primary-200 text-primary-800;
-  }
-
-  .alert-success {
-    @apply alert bg-success-50 border-success-200 text-success-800;
-  }
-
-  .alert-warning {
-    @apply alert bg-warning-50 border-warning-200 text-warning-800;
-  }
-
-  .alert-danger {
-    @apply alert bg-danger-50 border-danger-200 text-danger-800;
-  }
-
-  /* Divider */
-  .divider {
-    @apply border-t border-slate-200 my-6;
-  }
-
-  .divider-thick {
-    @apply border-t-2 border-slate-300 my-8;
-  }
-
-  /* Loading skeleton */
-  .skeleton {
-    @apply bg-slate-200 animate-pulse rounded;
-  }
-
-  /* Tooltip */
-  .tooltip {
-    @apply absolute z-50 px-3 py-2 text-xs bg-slate-900 text-white rounded-lg shadow-xl
-           whitespace-nowrap;
-  }
-
-  /* Sidebar - Modern */
-  .sidebar {
-    @apply bg-primary-900 border-r border-primary-800 shadow-sm;
-  }
-
-  .sidebar-header {
-    @apply p-4 border-b border-primary-800 bg-primary-900;
-  }
-
-  /* Header - Modern */
-  .header {
-    @apply bg-primary-900/95 backdrop-blur-xl border-b border-primary-800 shadow-sm;
-  }
-
-  /* Panel - Modern card variant */
   .panel {
-    @apply bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden;
+    overflow: hidden;
+    background: rgba(29, 32, 34, 0.74);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    box-shadow: 0 22px 64px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
   }
 
   .panel-header {
-    @apply px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(90deg, rgba(50, 53, 55, 0.7), rgba(29, 32, 34, 0.25));
   }
 
   .panel-body {
-    @apply p-6;
+    padding: 1.5rem;
   }
 
   .panel-footer {
-    @apply px-6 py-4 bg-slate-50 border-t border-slate-200;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(11, 15, 16, 0.35);
   }
 
-  /* Metric highlight - For important financial metrics */
-  .metric-highlight {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-accent-50 to-primary-50
-           border border-accent-200 rounded-lg text-accent-700 font-semibold shadow-sm;
+  .section-title {
+    font-family: Manrope, Inter, system-ui, sans-serif;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 700;
+    color: var(--text);
   }
 
-  /* Data grid - For comparison tables */
-  .data-grid {
-    @apply grid gap-4;
+  .section-subtitle {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: rgba(198, 198, 205, 0.78);
   }
 
-  .data-cell {
-    @apply p-4 bg-white border border-slate-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all;
+  .btn-primary {
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, var(--secondary-deep), var(--secondary));
+    color: #00311f;
+    font-weight: 800;
+    box-shadow: 0 0 22px rgba(78, 222, 163, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
   }
 
-  .data-cell-label {
-    @apply text-xs text-slate-600 uppercase tracking-wide mb-1 font-medium;
+  .btn-primary:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 30px rgba(78, 222, 163, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 
-  .data-cell-value {
-    @apply text-lg font-semibold text-slate-900 font-mono;
+  .btn-secondary,
+  .btn-outline {
+    border-radius: 0.5rem;
+    border: 1px solid rgba(190, 198, 224, 0.22);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    font-weight: 700;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .btn-secondary:hover,
+  .btn-outline:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(78, 222, 163, 0.36);
+    color: var(--secondary);
+  }
+
+  .btn-success {
+    border-radius: 0.5rem;
+    background: linear-gradient(135deg, #166534, #4edea3);
+    color: #002113;
+    font-weight: 800;
+  }
+
+  .btn-ghost {
+    border-radius: 0.5rem;
+    color: rgba(224, 227, 229, 0.76);
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--secondary);
+  }
+
+  .input-primary {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(11, 15, 16, 0.58);
+    color: var(--text);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  }
+
+  .input-primary::placeholder {
+    color: rgba(198, 198, 205, 0.48);
+  }
+
+  .input-primary:focus {
+    outline: none;
+    border-color: rgba(78, 222, 163, 0.72);
+    box-shadow: 0 0 0 3px rgba(78, 222, 163, 0.14);
+    background: rgba(11, 15, 16, 0.78);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .badge-success {
+    background: rgba(78, 222, 163, 0.12);
+    border-color: rgba(78, 222, 163, 0.28);
+    color: var(--secondary);
+  }
+
+  .badge-danger {
+    background: rgba(147, 0, 10, 0.25);
+    border-color: rgba(255, 180, 171, 0.25);
+    color: var(--danger);
+  }
+
+  .badge-warning {
+    background: rgba(251, 191, 36, 0.12);
+    border-color: rgba(251, 191, 36, 0.25);
+    color: var(--warning);
+  }
+
+  .badge-info,
+  .badge-neutral {
+    background: rgba(190, 198, 224, 0.1);
+    border-color: rgba(190, 198, 224, 0.22);
+    color: var(--primary);
+  }
+
+  .sidebar {
+    background: rgba(11, 15, 16, 0.78);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 12px 0 48px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(24px);
+  }
+
+  .sidebar-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .header {
+    background: rgba(16, 20, 21, 0.72);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: rgba(224, 227, 229, 0.72);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 700;
+    transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+  }
+
+  .nav-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+  }
+
+  .nav-link.active {
+    background: rgba(78, 222, 163, 0.12);
+    color: var(--secondary);
+    border: 1px solid rgba(78, 222, 163, 0.36);
+  }
+
+  .table-financial {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+  }
+
+  .table-financial th {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(198, 198, 205, 0.8);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .table-financial td {
+    padding: 0.875rem 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    color: rgba(224, 227, 229, 0.9);
+  }
+
+  .table-financial tbody tr:hover {
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .number-positive {
+    color: var(--secondary);
+    font-weight: 800;
+  }
+
+  .number-negative {
+    color: var(--danger);
+    font-weight: 800;
+  }
+
+  .number-neutral {
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .alert-info,
+  .alert-success,
+  .alert-warning,
+  .alert-danger {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .alert-info {
+    color: var(--primary);
+  }
+
+  .alert-success {
+    color: var(--secondary);
+    border-color: rgba(78, 222, 163, 0.25);
+    background: rgba(78, 222, 163, 0.08);
+  }
+
+  .alert-warning {
+    color: var(--warning);
+    border-color: rgba(251, 191, 36, 0.25);
+    background: rgba(251, 191, 36, 0.08);
+  }
+
+  .alert-danger {
+    color: var(--danger);
+    border-color: rgba(255, 180, 171, 0.25);
+    background: rgba(147, 0, 10, 0.18);
+  }
+
+  .app-compact .panel-header {
+    padding: 1rem 1.2rem;
+  }
+
+  .app-compact .panel-body {
+    padding: 1.2rem;
+  }
+
+  .app-compact .section-title {
+    font-size: 1.08rem;
+    line-height: 1.5rem;
+  }
+
+  .app-compact .section-subtitle {
+    font-size: 0.78rem;
+  }
+
+  .app-compact .table-financial th {
+    padding: 0.6rem 0.65rem;
+    font-size: 0.68rem;
+  }
+
+  .app-compact .table-financial td {
+    padding: 0.68rem 0.65rem;
+    font-size: 0.86rem;
+  }
+
+  .app-compact .nav-link {
+    padding: 0.68rem 0.82rem;
+    border-radius: 0.65rem;
+    font-size: 0.8rem;
+    line-height: 1.15rem;
   }
 }
 
 @layer utilities {
-  /* Text utilities */
   .text-financial {
-    @apply font-mono tabular-nums;
+    font-family: "JetBrains Mono", monospace;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Responsive text sizes for financial data */
-  .text-metric {
-    @apply text-2xl md:text-3xl lg:text-4xl font-bold font-mono;
+  .text-muted {
+    color: rgba(198, 198, 205, 0.76);
   }
 
-  /* Background patterns for sections */
-  .bg-pattern-dots {
-    background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
-    background-size: 20px 20px;
+  .bg-app-radial {
+    background:
+      radial-gradient(circle at 20% 0%, rgba(190, 198, 224, 0.11), transparent 32rem),
+      radial-gradient(circle at 82% 22%, rgba(78, 222, 163, 0.07), transparent 28rem),
+      linear-gradient(135deg, #101415 0%, #0b0f10 100%);
   }
 
-  .bg-pattern-grid {
-    background-image: 
-      linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-      linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
-    background-size: 20px 20px;
+  .app-compact .text-5xl {
+    font-size: 2.4rem;
+    line-height: 1.08;
   }
 
-  /* Gradient text */
-  .text-gradient-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent;
+  .app-compact .text-4xl {
+    font-size: 2rem;
+    line-height: 1.12;
   }
 
-  .text-gradient-success {
-    @apply bg-gradient-to-r from-success-600 to-success-500 bg-clip-text text-transparent;
+  .app-compact .text-3xl {
+    font-size: 1.55rem;
+    line-height: 1.22;
   }
 
-  /* Print styles */
+  .app-compact .text-2xl {
+    font-size: 1.28rem;
+    line-height: 1.35;
+  }
+
+  .app-compact .text-xl {
+    font-size: 1.05rem;
+    line-height: 1.45;
+  }
+
+  .app-compact .text-lg {
+    font-size: 0.96rem;
+    line-height: 1.55;
+  }
+
+  @media (min-width: 1024px) {
+    .app-compact main > div {
+      zoom: 0.8;
+    }
+  }
+
   @media print {
     .no-print {
       display: none !important;
     }
 
     body {
-      @apply bg-white;
+      background: white;
+      color: black;
     }
-
-    .card, .panel {
-      @apply shadow-none border-slate-300;
-    }
-  }
-
-  /* Focus visible for accessibility */
-  .focus-visible-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
   }
 }

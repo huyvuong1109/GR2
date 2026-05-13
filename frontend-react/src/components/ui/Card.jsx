@@ -30,7 +30,7 @@ export function CardHeader({ children, className, ...props }) {
 
 export function CardTitle({ children, className, ...props }) {
   return (
-    <h3 className={cn('text-lg font-serif font-bold text-navy-900', className)} {...props}>
+    <h3 className={cn('text-lg font-bold text-slate-100', className)} {...props}>
       {children}
     </h3>
   )
@@ -38,7 +38,7 @@ export function CardTitle({ children, className, ...props }) {
 
 export function CardDescription({ children, className, ...props }) {
   return (
-    <p className={cn('text-sm text-paper-600 mt-1', className)} {...props}>
+    <p className={cn('text-sm text-slate-400 mt-1', className)} {...props}>
       {children}
     </p>
   )
@@ -54,7 +54,7 @@ export function CardContent({ children, className, ...props }) {
 
 export function CardFooter({ children, className, ...props }) {
   return (
-    <div className={cn('mt-4 pt-4 border-t border-paper-300', className)} {...props}>
+    <div className={cn('mt-4 pt-4 border-t border-white/10', className)} {...props}>
       {children}
     </div>
   )

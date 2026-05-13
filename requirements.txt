@@ -30,3 +30,4 @@ surya-ocr
 numpy
 pillow
 requests
+vnstock

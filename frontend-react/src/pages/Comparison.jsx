@@ -6,9 +6,6 @@ import {
   Plus,
   X,
   TrendingUp,
-  TrendingDown,
-  Minus,
-  ArrowRight,
   Download,
   BarChart3,
   Activity,
@@ -17,8 +14,8 @@ import {
   CheckCircle,
   AlertCircle,
 } from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge } from '../components/ui'
-import { formatCompact, formatCurrency, formatPercent, formatRatio } from '../utils/formatters'
+import { Button, Input, Badge } from '../components/ui'
+import { formatCompact } from '../utils/formatters'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 import {
@@ -37,86 +34,64 @@ import {
   Legend,
 } from 'recharts'
 
-// Colors for each company in comparison
-const COLORS = ['#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444']
+const COLORS = ['#4edea3', '#adc6ff', '#fbbf24', '#c084fc', '#ffb4ab']
 
-// Metric configurations
 const METRIC_CONFIGS = {
-  pe_ratio: { name: 'P/E', unit: 'x', inverse: true, description: 'Gia tren loi nhuan' },
-  pb_ratio: { name: 'P/B', unit: 'x', inverse: true, description: 'Gia tren gia tri so sach' },
-  roe: { name: 'ROE', unit: '%', inverse: false, description: 'Ty suat sinh loi tren von chu' },
-  roa: { name: 'ROA', unit: '%', inverse: false, description: 'Ty suat sinh loi tren tong tai san' },
-  debt_to_equity: { name: 'D/E', unit: 'x', inverse: true, description: 'No tren von chu so huu' },
-  current_ratio: { name: 'Thanh toan hien hanh', unit: 'x', inverse: false, description: 'Kha nang thanh toan ngan han' },
-  gross_margin: { name: 'Bien LN gop', unit: '%', inverse: false, description: 'Bien loi nhuan gop' },
-  net_margin: { name: 'Bien LN rong', unit: '%', inverse: false, description: 'Bien loi nhuan rong' },
-  revenue_growth: { name: 'TT Doanh thu', unit: '%', inverse: false, description: 'Tang truong doanh thu theo nam' },
-  profit_growth: { name: 'TT Loi nhuan', unit: '%', inverse: false, description: 'Tang truong loi nhuan theo nam' },
+  pe_ratio: { name: 'P/E', unit: 'x', inverse: true, description: 'Giá trên lợi nhuận' },
+  pb_ratio: { name: 'P/B', unit: 'x', inverse: true, description: 'Giá trên giá trị sổ sách' },
+  roe: { name: 'ROE', unit: '%', inverse: false, description: 'Tỷ suất sinh lời trên vốn chủ' },
+  roa: { name: 'ROA', unit: '%', inverse: false, description: 'Tỷ suất sinh lời trên tổng tài sản' },
+  debt_to_equity: { name: 'D/E', unit: 'x', inverse: true, description: 'Nợ trên vốn chủ sở hữu' },
+  current_ratio: { name: 'Thanh toán hiện hành', unit: 'x', inverse: false, description: 'Khả năng thanh toán ngắn hạn' },
+  gross_margin: { name: 'Biên LN gộp', unit: '%', inverse: false, description: 'Biên lợi nhuận gộp' },
+  net_margin: { name: 'Biên LN ròng', unit: '%', inverse: false, description: 'Biên lợi nhuận ròng' },
+  revenue_growth: { name: 'TT Doanh thu', unit: '%', inverse: false, description: 'Tăng trưởng doanh thu theo năm' },
+  profit_growth: { name: 'TT Lợi nhuận', unit: '%', inverse: false, description: 'Tăng trưởng lợi nhuận theo năm' },
 }
 
-// Radar chart data transformer
 const transformForRadar = (companies) => {
   const metrics = ['roe', 'roa', 'gross_margin', 'net_margin', 'current_ratio']
-  
-  return metrics.map(metric => {
+  return metrics.map((metric) => {
     const config = METRIC_CONFIGS[metric]
     const dataPoint = { metric: config.name }
-    
-    companies.forEach(company => {
-      // Normalize to 0-100 scale for radar chart
-      let value = company.ratios?.[metric] || 0
-      // Cap values for better visualization
-      value = Math.min(Math.max(value, 0), 50)
-      dataPoint[company.ticker] = value
+    companies.forEach((company) => {
+      const value = company.ratios?.[metric] || 0
+      dataPoint[company.ticker] = Math.min(Math.max(value, 0), 50)
     })
-    
     return dataPoint
   })
 }
 
-// Get winner for a metric
 const getWinner = (companies, metric, inverse = false) => {
-  const validCompanies = companies.filter(c => c.ratios?.[metric] != null)
+  const validCompanies = companies.filter((company) => company.ratios?.[metric] != null)
   if (validCompanies.length === 0) return null
-  
-  if (inverse) {
-    return validCompanies.reduce((a, b) => 
-      (a.ratios[metric] < b.ratios[metric]) ? a : b
-    )
-  } else {
-    return validCompanies.reduce((a, b) => 
-      (a.ratios[metric] > b.ratios[metric]) ? a : b
-    )
-  }
+  return validCompanies.reduce((a, b) => (
+    inverse
+      ? (a.ratios[metric] < b.ratios[metric] ? a : b)
+      : (a.ratios[metric] > b.ratios[metric] ? a : b)
+  ))
 }
 
-// Metric comparison row
-const MetricRow = ({ metric, companies }) => {
+function MetricRow({ metric, companies }) {
   const config = METRIC_CONFIGS[metric]
   const winner = getWinner(companies, metric, config.inverse)
-  
+
   return (
-    <tr className="border-b border-slate-100 hover:bg-white">
-      <td className="p-3">
-        <div>
-          <span className="text-slate-900 font-medium">{config.name}</span>
-          <p className="text-xs text-slate-500">{config.description}</p>
-        </div>
+    <tr>
+      <td>
+        <span className="font-bold text-slate-100">{config.name}</span>
+        <p className="text-xs text-slate-500">{config.description}</p>
       </td>
-      {companies.map((company, idx) => {
+      {companies.map((company) => {
         const value = company.ratios?.[metric]
         const isWinner = winner?.ticker === company.ticker
-        
         return (
-          <td key={company.ticker} className="p-3 text-center">
-            <div className={cn(
-              'font-mono text-lg',
-              isWinner ? 'text-success-600 font-bold' : 'text-slate-900'
-            )}>
+          <td key={company.ticker} className="text-center">
+            <div className={cn('font-mono text-lg', isWinner ? 'font-black text-emerald-300' : 'text-slate-200')}>
               {value != null ? (
                 <>
-                  {value.toFixed(1)}{config.unit}
-                  {isWinner && <CheckCircle className="w-4 h-4 inline ml-1" />}
+                  {Number(value).toFixed(1)}{config.unit}
+                  {isWinner && <CheckCircle className="ml-1 inline h-4 w-4" />}
                 </>
               ) : (
                 <span className="text-slate-500">-</span>
@@ -138,43 +113,33 @@ export default function Comparison() {
   const [searchResults, setSearchResults] = useState([])
   const [showSearch, setShowSearch] = useState(false)
 
-  // Get tickers from URL
   const tickers = searchParams.get('tickers')?.split(',').filter(Boolean) || []
 
-  // Fetch comparison data
   useEffect(() => {
-    if (tickers.length >= 2) {
-      fetchComparison(tickers)
-    }
+    if (tickers.length >= 2) fetchComparison(tickers)
   }, [searchParams])
 
   const fetchComparison = async (tickerList) => {
     setLoading(true)
     setError(null)
-    
     try {
       const response = await api.post('/compare', { tickers: tickerList })
-      // Note: api interceptor returns response.data directly, so response IS the data
       setCompanies(response.companies || [])
     } catch (err) {
       console.error('Error fetching comparison:', err)
       setError('Không thể tải dữ liệu so sánh')
-      
-      // Fallback: fetch individual companies
       try {
-        const results = await Promise.all(
-          tickerList.map(ticker => api.get(`/analysis/${ticker}/health-score`))
-        )
-        setCompanies(results.map(r => ({
+        const results = await Promise.all(tickerList.map((ticker) => api.get(`/analysis/${ticker}/health-score`)))
+        setCompanies(results.map((r) => ({
           ticker: r.ticker,
           name: r.company_name,
           industry: r.industry,
           f_score: r.f_score?.total_score,
           ratios: r.key_ratios,
           price: r.price_info?.current_price,
-          market_cap: r.price_info?.market_cap
+          market_cap: r.price_info?.market_cap,
         })))
-      } catch (e) {
+      } catch {
         setCompanies([])
       }
     } finally {
@@ -182,511 +147,369 @@ export default function Comparison() {
     }
   }
 
-  // Search companies
   const handleSearch = async (query) => {
     setSearchQuery(query)
     if (query.length < 1) {
       setSearchResults([])
       return
     }
-    
+
     try {
       const response = await api.get(`/companies/search?q=${query}`)
-      // Note: api interceptor returns response.data directly
       setSearchResults(response.results || [])
-    } catch (err) {
+    } catch {
       setSearchResults([])
     }
   }
 
-  // Add company to comparison
   const addCompany = (ticker) => {
-    if (tickers.length >= 5) return
-    if (tickers.includes(ticker)) return
-    
-    const newTickers = [...tickers, ticker]
-    setSearchParams({ tickers: newTickers.join(',') })
+    if (tickers.length >= 5 || tickers.includes(ticker)) return
+    setSearchParams({ tickers: [...tickers, ticker].join(',') })
     setShowSearch(false)
     setSearchQuery('')
     setSearchResults([])
   }
 
-  // Remove company from comparison
   const removeCompany = (ticker) => {
-    const newTickers = tickers.filter(t => t !== ticker)
-    if (newTickers.length >= 2) {
-      setSearchParams({ tickers: newTickers.join(',') })
-    } else {
-      setSearchParams({})
-    }
+    const newTickers = tickers.filter((item) => item !== ticker)
+    setSearchParams(newTickers.length >= 2 ? { tickers: newTickers.join(',') } : {})
   }
 
-  // Export comparison
   const handleExport = () => {
     if (companies.length === 0) return
-    
-    const headers = ['Chỉ số', ...companies.map(c => c.ticker)]
-    const metrics = Object.keys(METRIC_CONFIGS)
-    const rows = metrics.map(metric => {
+    const headers = ['Chỉ số', ...companies.map((company) => company.ticker)]
+    const rows = Object.keys(METRIC_CONFIGS).map((metric) => {
       const config = METRIC_CONFIGS[metric]
-      return [config.name, ...companies.map(c => c.ratios?.[metric] || '')]
+      return [config.name, ...companies.map((company) => company.ratios?.[metric] || '')]
     })
-    
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = `so_sanh_${tickers.join('_')}.csv`
     link.click()
+    URL.revokeObjectURL(url)
   }
 
-  // Radar chart data
   const radarData = transformForRadar(companies)
-
-  // Bar chart data for comparison
   const barChartData = [
-    { name: 'ROE', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.roe || 0])) },
-    { name: 'ROA', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.roa || 0])) },
-    { name: 'Biên LN gộp', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.gross_margin || 0])) },
-    { name: 'Biên LN ròng', ...Object.fromEntries(companies.map(c => [c.ticker, c.ratios?.net_margin || 0])) },
+    { name: 'ROE', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.roe || 0])) },
+    { name: 'ROA', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.roa || 0])) },
+    { name: 'Biên LN gộp', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.gross_margin || 0])) },
+    { name: 'Biên LN ròng', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.net_margin || 0])) },
   ]
 
   if (tickers.length < 2) {
     return (
-      <div className="max-w-3xl mx-auto">
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-8 text-center">
-            <Scale className="w-16 h-16 mx-auto mb-4 text-primary-700 opacity-50" />
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">So sánh cổ phiếu</h2>
-            <p className="text-slate-600 mb-6">
-              Chọn 2-5 mã cổ phiếu để so sánh các chỉ số tài chính
-            </p>
-            
-            <div className="relative max-w-md mx-auto">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" />
-              <Input
-                placeholder="Tìm kiếm mã cổ phiếu..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 bg-slate-50 border-slate-300 text-lg"
-              />
-              
-              {searchResults.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-white border border-slate-300 rounded-lg shadow-xl z-10 max-h-60 overflow-y-auto">
-                  {searchResults.map(stock => (
-                    <button
-                      key={stock.ticker}
-                      onClick={() => addCompany(stock.ticker)}
-                      className="w-full p-3 text-left hover:bg-slate-50 flex justify-between items-center"
-                    >
-                      <div>
-                        <span className="font-bold text-primary-700">{stock.ticker}</span>
-                        <span className="text-slate-600 ml-2 text-sm">{stock.name}</span>
-                      </div>
-                      <Plus className="w-4 h-4 text-slate-600" />
-                    </button>
-                  ))}
-                </div>
-              )}
+      <div className="mx-auto max-w-3xl">
+        <div className="glass-card p-8 text-center">
+          <Scale className="mx-auto mb-5 h-16 w-16 text-emerald-300/70" />
+          <h1 className="text-3xl font-black text-slate-100">So sánh cổ phiếu</h1>
+          <p className="mx-auto mt-3 max-w-xl text-slate-400">Chọn 2-5 mã cổ phiếu để so sánh các chỉ số tài chính quan trọng.</p>
+
+          <div className="relative mx-auto mt-8 max-w-md">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+            <Input
+              placeholder="Tìm kiếm mã cổ phiếu..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="py-3 pl-12 text-lg"
+            />
+
+            <SearchResults results={searchResults} onAdd={addCompany} tickers={tickers} />
+          </div>
+
+          {tickers.length === 1 && (
+            <div className="mt-6">
+              <Badge variant="info">{tickers[0]} đã chọn - thêm ít nhất 1 mã nữa</Badge>
             </div>
-            
-            {tickers.length === 1 && (
-              <div className="mt-6">
-                <Badge className="bg-primary-50 text-primary-700">
-                  {tickers[0]} đã chọn - Thêm ít nhất 1 mã nữa
-                </Badge>
-              </div>
-            )}
-            
-            <div className="mt-8 text-sm text-slate-500">
-              <p>Gợi ý so sánh:</p>
-              <div className="flex flex-wrap gap-2 justify-center mt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSearchParams({ tickers: 'VNM,MSN,VCB' })}
-                >
-                  VNM vs MSN vs VCB
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSearchParams({ tickers: 'VIC,VHM' })}
-                >
-                  VIC vs VHM
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSearchParams({ tickers: 'HPG,HSG' })}
-                >
-                  HPG vs HSG
-                </Button>
-              </div>
+          )}
+
+          <div className="mt-8">
+            <p className="text-sm text-slate-500">Gợi ý so sánh</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'VNM,MSN,VCB' })}>VNM vs MSN vs VCB</button>
+              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'VIC,VHM' })}>VIC vs VHM</button>
+              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'HPG,HSG' })}>HPG vs HSG</button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-            <Scale className="w-8 h-8 text-primary-700" />
+          <h1 className="flex items-center gap-3 text-4xl font-black tracking-tight text-slate-100 md:text-5xl">
+            <Scale className="h-9 w-9 text-emerald-300" />
             So sánh cổ phiếu
           </h1>
-          <p className="text-slate-600 mt-1">
-            Đang so sánh {companies.length} công ty
-          </p>
+          <p className="mt-3 text-lg text-slate-400">Đang so sánh {companies.length} công ty.</p>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-3">
           {tickers.length < 5 && (
             <div className="relative">
-              <Button
-                variant="outline"
-                onClick={() => setShowSearch(!showSearch)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
+              <button type="button" onClick={() => setShowSearch(!showSearch)} className="btn-outline flex items-center gap-2 px-4 py-2.5">
+                <Plus className="h-4 w-4" />
                 Thêm mã
-              </Button>
-              
+              </button>
+
               {showSearch && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-300 rounded-lg shadow-xl z-10 p-3">
+                <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-white/10 bg-[#191c1e] p-3 shadow-2xl">
                   <Input
                     placeholder="Tìm mã cổ phiếu..."
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="bg-slate-50 border-slate-300"
                     autoFocus
                   />
-                  {searchResults.length > 0 && (
-                    <div className="mt-2 max-h-48 overflow-y-auto">
-                      {searchResults.filter(s => !tickers.includes(s.ticker)).map(stock => (
-                        <button
-                          key={stock.ticker}
-                          onClick={() => addCompany(stock.ticker)}
-                          className="w-full p-2 text-left hover:bg-slate-50 rounded flex justify-between items-center"
-                        >
-                          <span className="font-bold text-primary-700">{stock.ticker}</span>
-                          <Plus className="w-4 h-4 text-slate-600" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <SearchResults results={searchResults} onAdd={addCompany} tickers={tickers} compact />
                 </div>
               )}
             </div>
           )}
-          
-          <Button onClick={handleExport} variant="outline" disabled={companies.length === 0}>
-            <Download className="w-4 h-4 mr-2" />
+
+          <button type="button" onClick={handleExport} disabled={companies.length === 0} className="btn-outline flex items-center gap-2 px-4 py-2.5 disabled:opacity-50">
+            <Download className="h-4 w-4" />
             Xuất CSV
-          </Button>
+          </button>
         </div>
-      </div>
+      </section>
 
-      {/* Loading State */}
       {loading && (
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-12 text-center">
-            <div className="w-16 h-16 border-4 border-primary-300 border-t-primary-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-600">Đang tải dữ liệu so sánh...</p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-12 text-center">
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-emerald-300/20 border-t-emerald-300" />
+          <p className="text-slate-400">Đang tải dữ liệu so sánh...</p>
+        </div>
       )}
 
-      {/* Error State */}
       {error && !loading && (
-        <Card className="bg-danger-50 border-danger-200">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-danger-600" />
-              <div>
-                <p className="text-danger-600 font-medium">{error}</p>
-                <p className="text-sm text-slate-600 mt-1">
-                  Vui lòng thử lại hoặc chọn mã khác
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="alert-danger flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-6 w-6" />
+          <div>
+            <p className="font-bold">{error}</p>
+            <p className="mt-1 text-sm text-red-100/75">Vui lòng thử lại hoặc chọn mã khác.</p>
+          </div>
+        </div>
       )}
 
-      {/* No Data State */}
       {!loading && companies.length === 0 && tickers.length >= 2 && (
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-12 text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-warning-600 opacity-50" />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Không có dữ liệu</h3>
-            <p className="text-slate-600">
-              Không tìm thấy dữ liệu cho các mã: {tickers.join(', ')}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-12 text-center">
+          <AlertCircle className="mx-auto mb-4 h-16 w-16 text-amber-300/70" />
+          <h3 className="text-xl font-black text-slate-100">Không có dữ liệu</h3>
+          <p className="mt-2 text-slate-400">Không tìm thấy dữ liệu cho các mã: {tickers.join(', ')}</p>
+        </div>
       )}
 
-      {/* Main Content - Only show when we have data */}
       {!loading && companies.length > 0 && (
         <>
-      {/* Company Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {companies.map((company, idx) => (
-          <motion.div
-            key={company.ticker}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-          >
-            <Card className="bg-white border-slate-200 relative group">
-              <button
-                onClick={() => removeCompany(company.ticker)}
-                className="absolute top-2 right-2 p-1 rounded-full bg-red-500/20 text-danger-600 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: COLORS[idx] }}
-                  />
-                  <Link to={`/company/${company.ticker}`}>
-                    <span className="text-xl font-bold text-slate-900 hover:text-primary-700">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {companies.map((company, idx) => (
+              <motion.div key={company.ticker} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.06 }}>
+                <div className="glass-card relative p-5">
+                  <button
+                    type="button"
+                    onClick={() => removeCompany(company.ticker)}
+                    className="btn-ghost absolute right-3 top-3 p-1.5 text-red-300 opacity-70 hover:opacity-100"
+                    aria-label={`Xóa ${company.ticker}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+
+                  <div className="mb-4 flex items-center gap-3">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
+                    <Link to={`/company/${company.ticker}`} className="text-2xl font-black text-slate-100 hover:text-emerald-300">
                       {company.ticker}
-                    </span>
-                  </Link>
-                </div>
-                
-                <p className="text-sm text-slate-600 mb-2 line-clamp-1">{company.name}</p>
-                <Badge variant="outline" className="text-xs mb-3">
-                  {company.industry || 'Khong co'}
-                </Badge>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Giá</span>
-                    <span className="text-slate-900 font-mono">
-                      {company.price ? `${company.price.toLocaleString()}đ` : '-'}
-                    </span>
+                    </Link>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Vốn hóa</span>
-                    <span className="text-slate-900 font-mono">
-                      {company.market_cap ? formatCompact(company.market_cap) : '-'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">F-Score</span>
-                    <span className={cn(
-                      'font-bold',
-                      company.f_score >= 7 ? 'text-success-600' :
-                      company.f_score >= 5 ? 'text-warning-600' : 'text-danger-600'
-                    )}>
-                      {company.f_score || '-'}/9
-                    </span>
+
+                  <p className="mb-3 line-clamp-1 text-sm text-slate-400">{company.name}</p>
+                  <Badge variant="outline">{company.industry || 'Không có ngành'}</Badge>
+
+                  <div className="mt-5 space-y-3 text-sm">
+                    <DataLine label="Giá" value={company.price ? `${company.price.toLocaleString('vi-VN')}₫` : '-'} />
+                    <DataLine label="Vốn hóa" value={company.market_cap ? formatCompact(company.market_cap) : '-'} />
+                    <DataLine
+                      label="F-Score"
+                      value={`${company.f_score || '-'}/9`}
+                      valueClass={company.f_score >= 7 ? 'text-emerald-300' : company.f_score >= 5 ? 'text-amber-300' : 'text-red-300'}
+                    />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+              </motion.div>
+            ))}
+          </section>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Radar Chart */}
-        <Card className="bg-white border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-slate-900 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary-700" />
-              Biểu đồ Radar
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="hsl(var(--chart-grid))" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: 'hsl(var(--chart-axis))', fontSize: 12 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fill: 'hsl(var(--chart-axis))' }} />
-                {companies.map((company, idx) => (
-                  <Radar
-                    key={company.ticker}
-                    name={company.ticker}
-                    dataKey={company.ticker}
-                    stroke={COLORS[idx]}
-                    fill={COLORS[idx]}
-                    fillOpacity={0.2}
-                  />
-                ))}
-                <Legend />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--chart-tooltip-bg))',
-                    border: '1px solid hsl(var(--chart-tooltip-border))',
-                    borderRadius: '8px',
-                  }}
-                />
-              </RadarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Bar Chart */}
-        <Card className="bg-white border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-primary-700" />
-              So sánh sinh lợi
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" />
-                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--chart-axis))' }} />
-                <YAxis tick={{ fill: 'hsl(var(--chart-axis))' }} unit="%" />
-                {companies.map((company, idx) => (
-                  <Bar
-                    key={company.ticker}
-                    dataKey={company.ticker}
-                    fill={COLORS[idx]}
-                    radius={[4, 4, 0, 0]}
-                  />
-                ))}
-                <Legend />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--chart-tooltip-bg))',
-                    border: '1px solid hsl(var(--chart-tooltip-border))',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(value) => `${value.toFixed(1)}%`}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Comparison Table */}
-      <Card className="bg-white border-slate-200">
-        <CardHeader>
-          <CardTitle className="text-slate-900">So sánh chi tiết</CardTitle>
-          <p className="text-sm text-slate-600">
-            <CheckCircle className="w-4 h-4 inline mr-1 text-success-600" />
-            = Tốt nhất trong nhóm
-          </p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="p-3 text-left text-slate-600 font-medium">Chỉ số</th>
+          <section className="grid gap-6 lg:grid-cols-2">
+            <ChartPanel title="Biểu đồ Radar" icon={<Activity className="h-5 w-5 text-emerald-300" />}>
+              <ResponsiveContainer width="100%" height={350}>
+                <RadarChart data={radarData}>
+                  <PolarGrid stroke="rgba(255,255,255,0.12)" />
+                  <PolarAngleAxis dataKey="metric" tick={{ fill: '#c6c6cd', fontSize: 12 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fill: '#909097' }} />
                   {companies.map((company, idx) => (
-                    <th key={company.ticker} className="p-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: COLORS[idx] }}
-                        />
-                        <span className="text-slate-900 font-bold">{company.ticker}</span>
-                      </div>
-                    </th>
+                    <Radar key={company.ticker} name={company.ticker} dataKey={company.ticker} stroke={COLORS[idx]} fill={COLORS[idx]} fillOpacity={0.18} />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* Market Ratios */}
-                <tr className="bg-white">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
-                    CHI SO THI TRUONG
-                  </td>
-                </tr>
-                <MetricRow metric="pe_ratio" companies={companies} />
-                <MetricRow metric="pb_ratio" companies={companies} />
-                
-                {/* Profitability */}
-                <tr className="bg-white">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
-                    SINH LỢI
-                  </td>
-                </tr>
-                <MetricRow metric="roe" companies={companies} />
-                <MetricRow metric="roa" companies={companies} />
-                <MetricRow metric="gross_margin" companies={companies} />
-                <MetricRow metric="net_margin" companies={companies} />
-                
-                {/* Financial Health */}
-                <tr className="bg-white">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
-                    SỨC KHỎE TÀI CHÍNH
-                  </td>
-                </tr>
-                <MetricRow metric="debt_to_equity" companies={companies} />
-                <MetricRow metric="current_ratio" companies={companies} />
-                
-                {/* Growth */}
-                <tr className="bg-white">
-                  <td colSpan={companies.length + 1} className="p-2 text-xs text-primary-700 font-medium">
-                    TĂNG TRƯỞNG
-                  </td>
-                </tr>
-                <MetricRow metric="revenue_growth" companies={companies} />
-                <MetricRow metric="profit_growth" companies={companies} />
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  <Legend />
+                  <Tooltip contentStyle={tooltipStyle} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </ChartPanel>
 
-      {/* Summary */}
-      <Card className="bg-gradient-to-r from-primary-500/10 to-blue-500/10 border-primary-200">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">📊 Tóm tắt so sánh</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Best ROE */}
-            {getWinner(companies, 'roe') && (
-              <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-success-50 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-success-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">ROE cao nhất</p>
-                  <p className="font-bold text-slate-900">
-                    {getWinner(companies, 'roe').ticker} ({getWinner(companies, 'roe').ratios?.roe?.toFixed(1)}%)
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {/* Best D/E */}
-            {getWinner(companies, 'debt_to_equity', true) && (
-              <div className="flex items-center gap-3 p-3 bg-white rounded-lg">
-                <div className="w-10 h-10 rounded-full bg-warning-50 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-warning-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">D/E thấp nhất</p>
-                  <p className="font-bold text-slate-900">
-                    {getWinner(companies, 'debt_to_equity', true).ticker} ({getWinner(companies, 'debt_to_equity', true).ratios?.debt_to_equity?.toFixed(2)}x)
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            <ChartPanel title="So sánh sinh lời" icon={<BarChart3 className="h-5 w-5 text-emerald-300" />}>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={barChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis dataKey="name" tick={{ fill: '#c6c6cd' }} />
+                  <YAxis tick={{ fill: '#c6c6cd' }} unit="%" />
+                  {companies.map((company, idx) => (
+                    <Bar key={company.ticker} dataKey={company.ticker} fill={COLORS[idx]} radius={[4, 4, 0, 0]} />
+                  ))}
+                  <Legend />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(1)}%`} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartPanel>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2 className="section-title">So sánh chi tiết</h2>
+              <p className="section-subtitle"><CheckCircle className="mr-1 inline h-4 w-4 text-emerald-300" /> = Tốt nhất trong nhóm</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table-financial min-w-[720px]">
+                <thead>
+                  <tr>
+                    <th>Chỉ số</th>
+                    {companies.map((company, idx) => (
+                      <th key={company.ticker} className="text-center">
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
+                          {company.ticker}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <GroupRow label="Chỉ số thị trường" colSpan={companies.length + 1} />
+                  <MetricRow metric="pe_ratio" companies={companies} />
+                  <MetricRow metric="pb_ratio" companies={companies} />
+                  <GroupRow label="Sinh lời" colSpan={companies.length + 1} />
+                  <MetricRow metric="roe" companies={companies} />
+                  <MetricRow metric="roa" companies={companies} />
+                  <MetricRow metric="gross_margin" companies={companies} />
+                  <MetricRow metric="net_margin" companies={companies} />
+                  <GroupRow label="Sức khỏe tài chính" colSpan={companies.length + 1} />
+                  <MetricRow metric="debt_to_equity" companies={companies} />
+                  <MetricRow metric="current_ratio" companies={companies} />
+                  <GroupRow label="Tăng trưởng" colSpan={companies.length + 1} />
+                  <MetricRow metric="revenue_growth" companies={companies} />
+                  <MetricRow metric="profit_growth" companies={companies} />
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="glass-card p-6">
+            <h3 className="mb-5 text-lg font-black text-slate-100">Tóm tắt so sánh</h3>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {getWinner(companies, 'roe') && (
+                <SummaryItem
+                  icon={<TrendingUp className="h-5 w-5 text-emerald-300" />}
+                  label="ROE cao nhất"
+                  value={`${getWinner(companies, 'roe').ticker} (${getWinner(companies, 'roe').ratios?.roe?.toFixed(1)}%)`}
+                />
+              )}
+              {getWinner(companies, 'debt_to_equity', true) && (
+                <SummaryItem
+                  icon={<Building2 className="h-5 w-5 text-amber-300" />}
+                  label="D/E thấp nhất"
+                  value={`${getWinner(companies, 'debt_to_equity', true).ticker} (${getWinner(companies, 'debt_to_equity', true).ratios?.debt_to_equity?.toFixed(2)}x)`}
+                />
+              )}
+            </div>
+          </section>
         </>
       )}
+    </div>
+  )
+}
+
+const tooltipStyle = {
+  backgroundColor: 'rgba(25, 28, 30, 0.94)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: '12px',
+  color: '#e0e3e5',
+  boxShadow: '0 18px 50px rgba(0,0,0,0.45)',
+}
+
+function SearchResults({ results, onAdd, tickers, compact = false }) {
+  if (!results.length) return null
+  return (
+    <div className={cn('absolute top-full z-10 mt-2 w-full overflow-hidden rounded-xl border border-white/10 bg-[#191c1e] shadow-2xl', compact && 'relative top-auto mt-2')}>
+      <div className="max-h-60 overflow-y-auto py-2">
+        {results.filter((stock) => !tickers.includes(stock.ticker)).map((stock) => (
+          <button
+            key={stock.ticker}
+            type="button"
+            onClick={() => onAdd(stock.ticker)}
+            className="flex w-full items-center justify-between px-3 py-2.5 text-left transition hover:bg-white/[0.06]"
+          >
+            <span>
+              <span className="font-black text-emerald-300">{stock.ticker}</span>
+              <span className="ml-2 text-sm text-slate-400">{stock.name}</span>
+            </span>
+            <Plus className="h-4 w-4 text-slate-500" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DataLine({ label, value, valueClass = 'text-slate-100' }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className={cn('font-mono font-bold', valueClass)}>{value}</span>
+    </div>
+  )
+}
+
+function ChartPanel({ title, icon, children }) {
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <h2 className="section-title flex items-center gap-2">{icon}{title}</h2>
+      </div>
+      <div className="panel-body">{children}</div>
+    </div>
+  )
+}
+
+function GroupRow({ label, colSpan }) {
+  return (
+    <tr className="bg-white/[0.035]">
+      <td colSpan={colSpan} className="text-xs font-black uppercase tracking-widest text-emerald-300">
+        {label}
+      </td>
+    </tr>
+  )
+}
+
+function SummaryItem({ icon, label, value }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.05]">{icon}</div>
+      <div>
+        <p className="text-sm text-slate-500">{label}</p>
+        <p className="font-black text-slate-100">{value}</p>
+      </div>
     </div>
   )
 }

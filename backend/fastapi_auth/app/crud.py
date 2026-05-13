@@ -30,6 +30,12 @@ def add_watchlist(db: Session, user_id: int, ticker: str):
     db.add(item); db.commit(); db.refresh(item)
     return item
 
+def is_in_watchlist(db: Session, user_id: int, ticker: str):
+    return db.query(models.Watchlist).filter(
+        models.Watchlist.user_id==user_id,
+        models.Watchlist.ticker==ticker
+    ).first() is not None
+
 def remove_watchlist(db: Session, user_id: int, ticker: str):
     existing = db.query(models.Watchlist).filter(models.Watchlist.user_id==user_id, models.Watchlist.ticker==ticker).first()
     if not existing: return False

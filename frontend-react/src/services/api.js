@@ -1,8 +1,10 @@
 import axios from 'axios'
 
-// Use direct backend URL during development if proxy doesn't work
-const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api'
-const USER_API_BASE_URL = import.meta.env.VITE_AUTH_API_URL || (import.meta.env.DEV ? 'http://localhost:8001' : '')
+// Use one backend origin for both financial data and authenticated user APIs.
+const API_ORIGIN = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '')
+const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
+const USER_API_BASE_URL = (import.meta.env.VITE_AUTH_API_URL || API_ORIGIN || '').replace(/\/$/, '')
+const getAuthToken = () => window.sessionStorage.getItem('auth_token')
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -24,7 +26,7 @@ const userApi = axios.create({
 api.interceptors.request.use(
   (config) => {
     // Add auth token if available
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -35,7 +37,7 @@ api.interceptors.request.use(
 
 userApi.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

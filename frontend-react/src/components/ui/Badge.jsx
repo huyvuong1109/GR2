@@ -7,8 +7,9 @@ export function Badge({ children, variant = 'default', size = 'md', className, .
     danger: 'badge-danger',
     warning: 'badge-warning',
     info: 'badge-info',
-    primary: 'bg-navy-100 text-navy-800 border-navy-300',
-    secondary: 'bg-paper-200 text-paper-700 border-paper-300',
+    primary: 'bg-emerald-400/10 text-emerald-300 border-emerald-300/25',
+    secondary: 'bg-slate-400/10 text-slate-300 border-white/10',
+    outline: 'bg-transparent text-slate-300 border-white/10',
   }
 
   const sizes = {
