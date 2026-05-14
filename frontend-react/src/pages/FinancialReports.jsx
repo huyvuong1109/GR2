@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar,
@@ -34,6 +35,103 @@ const REPORT_TYPES = [
   { id: 'cash_flow', key: 'cash_flows', name: 'Lưu chuyển tiền tệ', icon: DollarSign },
 ]
 
+const FIELD_LABELS = {
+  total_assets: 'Tổng tài sản',
+  current_assets: 'Tài sản ngắn hạn',
+  non_current_assets: 'Tài sản dài hạn',
+  cash: 'Tiền và tương đương tiền',
+  short_term_investments: 'Đầu tư tài chính ngắn hạn',
+  accounts_receivable: 'Các khoản phải thu',
+  inventories: 'Hàng tồn kho',
+  total_liabilities: 'Tổng nợ phải trả',
+  current_liabilities: 'Nợ ngắn hạn',
+  non_current_liabilities: 'Nợ dài hạn',
+  long_term_liabilities: 'Nợ dài hạn',
+  short_term_debt: 'Vay ngắn hạn',
+  long_term_debt: 'Vay dài hạn',
+  total_equity: 'Vốn chủ sở hữu',
+  shareholders_equity: 'Vốn chủ sở hữu',
+  charter_capital: 'Vốn điều lệ',
+  retained_earnings: 'Lợi nhuận sau thuế chưa phân phối',
+  revenue: 'Doanh thu',
+  net_revenue: 'Doanh thu thuần',
+  cost_of_revenue: 'Giá vốn hàng bán',
+  cost_of_goods_sold: 'Giá vốn hàng bán',
+  gross_profit: 'Lợi nhuận gộp',
+  selling_expenses: 'Chi phí bán hàng',
+  admin_expenses: 'Chi phí quản lý doanh nghiệp',
+  operating_income: 'Lợi nhuận từ hoạt động kinh doanh',
+  financial_income: 'Doanh thu tài chính',
+  financial_expenses: 'Chi phí tài chính',
+  profit_before_tax: 'Lợi nhuận trước thuế',
+  income_tax: 'Chi phí thuế thu nhập doanh nghiệp',
+  net_income: 'Lợi nhuận sau thuế',
+  profit: 'Lợi nhuận sau thuế',
+  net_profit_to_shareholders: 'Lợi nhuận sau thuế của cổ đông công ty mẹ',
+  operating_cash_flow: 'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+  investing_cash_flow: 'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+  financing_cash_flow: 'Lưu chuyển tiền thuần từ hoạt động tài chính',
+  capex: 'Chi mua sắm tài sản cố định',
+  dividends_paid: 'Cổ tức đã trả',
+  ending_cash: 'Tiền và tương đương tiền cuối kỳ',
+  net_change_in_cash: 'Lưu chuyển tiền thuần trong kỳ',
+}
+
+const TOKEN_LABELS = {
+  tong: 'tổng',
+  tai: 'tài',
+  san: 'sản',
+  ngan: 'ngắn',
+  dai: 'dài',
+  han: 'hạn',
+  tien: 'tiền',
+  va: 'và',
+  tuong: 'tương',
+  duong: 'đương',
+  dau: 'đầu',
+  tu: 'tư',
+  chinh: 'chính',
+  phai: 'phải',
+  thu: 'thu',
+  khach: 'khách',
+  hang: 'hàng',
+  hang_ton_kho: 'hàng tồn kho',
+  no: 'nợ',
+  tra: 'trả',
+  von: 'vốn',
+  chu: 'chủ',
+  so: 'sở',
+  huu: 'hữu',
+  loi: 'lợi',
+  nhuan: 'nhuận',
+  sau: 'sau',
+  thue: 'thuế',
+  chua: 'chưa',
+  phan: 'phân',
+  phoi: 'phối',
+  doanh: 'doanh',
+  gia: 'giá',
+  ban: 'bán',
+  chi: 'chi',
+  phi: 'phí',
+  quan: 'quản',
+  ly: 'lý',
+  hoat: 'hoạt',
+  dong: 'động',
+  kinh: 'kinh',
+  co: 'cổ',
+  tuc: 'tức',
+  da: 'đã',
+  cuoi: 'cuối',
+  ky: 'kỳ',
+  lctt: 'LCTT',
+  hdkd: 'HĐKD',
+  hddt: 'HĐĐT',
+  hdtc: 'HĐTC',
+  tndn: 'TNDN',
+  nhnn: 'NHNN',
+}
+
 const toArray = (value) => {
   if (Array.isArray(value)) return value
   if (Array.isArray(value?.data)) return value.data
@@ -48,31 +146,21 @@ const collectFields = (record) =>
     .filter((key) => !META_KEYS.has(key))
     .sort((a, b) => a.localeCompare(b))
 
-const collectFieldCountFromReports = (reportSet) => {
-  const fields = new Set()
-
-  ;['balance_sheets', 'income_statements', 'cash_flows'].forEach((key) => {
-    toArray(reportSet?.[key]).forEach((record) => {
-      Object.keys(record || {}).forEach((field) => {
-        if (!META_KEYS.has(field)) fields.add(field)
-      })
-    })
-  })
-
-  return fields.size
-}
-
 const normalizeText = (value) =>
   String(value || '')
     .toLowerCase()
     .trim()
 
 const humanizeFieldName = (field) =>
+  FIELD_LABELS[field] ||
   String(field)
-    .replace(/_/g, ' ')
+    .split('_')
+    .filter(Boolean)
+    .map((token) => TOKEN_LABELS[token] || token)
+    .join(' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/^\p{Ll}/u, (char) => char.toUpperCase())
 
 const formatValue = (value) => {
   if (value === null || value === undefined || value === '') return '0'
@@ -156,16 +244,16 @@ function DynamicRecordTable({ record, metricQuery }) {
       : fields.filter((field) => normalizeText(field).includes(keyword) || normalizeText(humanizeFieldName(field)).includes(keyword))
 
   if (!visibleFields.length) {
-    return <div className="alert-info text-center text-sm">Không có chỉ tiêu phù hợp với từ khóa tìm kiếm.</div>
+    return <div className="alert-info text-center text-sm">Không có khoản mục phù hợp với từ khóa tìm kiếm.</div>
   }
 
   return (
-    <div className="max-h-[60vh] overflow-auto rounded-xl border border-white/10 bg-white/[0.035]">
-      <table className="w-full min-w-[680px] text-sm">
+    <div className="max-h-[58vh] overflow-auto rounded-lg border border-white/10 bg-white/[0.035]">
+      <table className="w-full min-w-[720px] text-[13px]">
         <thead className="sticky top-0 z-20">
           <tr className="border-b border-white/10 bg-[#191c1e]">
-            <th className="w-[45%] px-4 py-3 text-left text-xs font-black uppercase tracking-widest text-slate-400">Chỉ tiêu</th>
-            <th className="px-4 py-3 text-right text-xs font-black uppercase tracking-widest text-slate-400">Giá trị</th>
+            <th className="w-[48%] px-4 py-2.5 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Khoản mục</th>
+            <th className="px-4 py-2.5 text-right text-[11px] font-black uppercase tracking-widest text-slate-400">Giá trị</th>
           </tr>
         </thead>
         <tbody>
@@ -174,11 +262,10 @@ function DynamicRecordTable({ record, metricQuery }) {
               key={field}
               className={cn('border-t border-white/[0.06] transition-colors hover:bg-white/[0.06]', index % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent')}
             >
-              <td className="px-4 py-3 align-top">
+              <td className="px-4 py-2.5 align-top">
                 <p className="font-bold text-slate-100">{humanizeFieldName(field)}</p>
-                <p className="text-xs text-slate-500">{field}</p>
               </td>
-              <td className="px-4 py-3 text-right font-mono text-slate-100">{formatValue(record[field])}</td>
+              <td className="px-4 py-2.5 text-right font-mono text-slate-100">{formatValue(record[field])}</td>
             </tr>
           ))}
         </tbody>
@@ -211,19 +298,18 @@ function ReportModal({
 
   const activeReportType = REPORT_TYPES.find((type) => type.id === activeTab)
   const activeRecord = getRecordByPeriod(reports, activeReportType?.key, selectedPeriod)
-  const activeFieldCount = activeRecord ? collectFields(activeRecord).length : 0
   const selectedPeriodLabel =
     selectedPeriod && Number(selectedPeriod.quarter || 0) > 0
       ? `Q${selectedPeriod.quarter}/${selectedPeriod.year}`
       : `${selectedPeriod?.year || selectedYear || '-'}`
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -232,16 +318,16 @@ function ReportModal({
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ duration: 0.18 }}
           onClick={(event) => event.stopPropagation()}
-          className="glass-card relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden"
+          className="glass-card relative flex max-h-[88dvh] w-full max-w-[min(94vw,1180px)] flex-col overflow-hidden"
         >
-          <div className="border-b border-white/10 px-6 py-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="border-b border-white/10 px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-xl font-black text-slate-100">{company.ticker}</h3>
-                <p className="mt-1 text-sm text-slate-400">{company.name}</p>
+                <h3 className="text-lg font-black text-slate-100">{company.ticker}</h3>
+                <p className="mt-0.5 text-xs text-slate-400">{company.name}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-bold text-slate-300">
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-xs font-bold text-slate-300">
                   <Calendar className="mr-1.5 h-3.5 w-3.5" />
                   {selectedPeriodLabel}
                 </span>
@@ -251,7 +337,7 @@ function ReportModal({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {REPORT_TYPES.map((type) => {
                 const Icon = type.icon
                 const isActive = activeTab === type.id
@@ -261,13 +347,13 @@ function ReportModal({
                     type="button"
                     onClick={() => setActiveTab(type.id)}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-bold transition-all',
+                      'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all',
                       isActive
                         ? 'border-emerald-300/30 bg-emerald-400/12 text-emerald-300'
                         : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-emerald-300/25 hover:text-emerald-300'
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3.5 w-3.5" />
                     {type.name}
                   </button>
                 )
@@ -286,7 +372,7 @@ function ReportModal({
                     type="button"
                     onClick={() => onSelectPeriod(periodOption)}
                     className={cn(
-                      'rounded-lg border px-3 py-1.5 text-xs font-bold transition-all',
+                      'rounded-md border px-2.5 py-1 text-xs font-bold transition-all',
                       isActivePeriod
                         ? 'border-emerald-300/30 bg-emerald-400/12 text-emerald-300'
                         : 'border-white/10 bg-white/[0.04] text-slate-400 hover:text-slate-200'
@@ -299,31 +385,31 @@ function ReportModal({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-b border-white/10 px-6 py-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{activeFieldCount} chỉ tiêu</p>
-            <div className="ml-auto w-full max-w-sm">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b border-white/10 px-5 py-2.5">
+            <div className="w-full max-w-sm">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
                   value={metricQuery}
                   onChange={(event) => setMetricQuery(event.target.value)}
-                  placeholder="Tìm nhanh chỉ tiêu..."
-                  className="input-primary h-10 pl-9 text-sm"
+                  placeholder="Tìm nhanh khoản mục..."
+                  className="input-primary h-9 pl-9 text-xs"
                 />
               </div>
             </div>
           </div>
 
-          <div className="overflow-y-auto p-6">
+          <div className="overflow-y-auto p-4">
             <DynamicRecordTable record={activeRecord} metricQuery={metricQuery} />
           </div>
 
-          <div className="border-t border-white/10 bg-white/[0.025] px-6 py-4 text-xs text-slate-500">
-            Báo cáo hiển thị theo quy trình: mã công ty - năm báo cáo - kỳ báo cáo - toàn bộ chỉ tiêu.
+          <div className="border-t border-white/10 bg-white/[0.025] px-5 py-3 text-[11px] text-slate-500">
+            Báo cáo hiển thị theo mã công ty, năm báo cáo và kỳ báo cáo đã chọn.
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 
@@ -421,15 +507,22 @@ export default function FinancialReports() {
 
   return (
     <div className="space-y-6">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-5xl">
+          <h1 className="text-3xl font-black leading-tight text-slate-100 md:text-4xl">Báo cáo tài chính</h1>
+          <p className="mt-3 max-w-4xl text-base leading-7 text-slate-400">
+            Tra cứu báo cáo theo mã công ty, năm và kỳ để xem nhanh các khoản mục tài chính quan trọng.
+          </p>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-header">
           <div className="flex items-start gap-3">
-            <FileText className="mt-1 h-7 w-7 text-emerald-300" />
+            <FileText className="mt-0.5 h-5 w-5 text-emerald-300" />
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-100">Báo cáo tài chính</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-                Chọn mã công ty, năm và kỳ báo cáo để xem toàn bộ chỉ tiêu tài chính theo dữ liệu hiện có.
-              </p>
+              <h2 className="section-title">Chọn doanh nghiệp</h2>
+              <p className="section-subtitle">Tìm mã cổ phiếu hoặc tên công ty để mở báo cáo hiện có.</p>
             </div>
           </div>
         </div>
@@ -458,7 +551,6 @@ export default function FinancialReports() {
             const isExpanded = expandedCompany === company.ticker
             const reports = company.reports || {}
             const years = getYearsList(reports)
-            const fieldCount = collectFieldCountFromReports(reports)
             const highlightedYear = selectedYearByTicker[company.ticker] || null
 
             return (
@@ -480,11 +572,6 @@ export default function FinancialReports() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {fieldCount > 0 && (
-                        <span className="hidden rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-bold text-slate-400 sm:inline-flex">
-                          {fieldCount} chỉ tiêu
-                        </span>
-                      )}
                       {isExpanded ? <ChevronDown className="h-5 w-5 text-slate-500" /> : <ChevronRight className="h-5 w-5 text-slate-500" />}
                     </div>
                   </div>

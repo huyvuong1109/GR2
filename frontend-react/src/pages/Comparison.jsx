@@ -5,14 +5,13 @@ import {
   Scale,
   Plus,
   X,
-  TrendingUp,
   Download,
   BarChart3,
   Activity,
-  Building2,
   Search,
   CheckCircle,
   AlertCircle,
+  Info,
 } from 'lucide-react'
 import { Button, Input, Badge } from '../components/ui'
 import { formatCompact } from '../utils/formatters'
@@ -37,53 +36,215 @@ import {
 const COLORS = ['#4edea3', '#adc6ff', '#fbbf24', '#c084fc', '#ffb4ab']
 
 const METRIC_CONFIGS = {
-  pe_ratio: { name: 'P/E', unit: 'x', inverse: true, description: 'Giá trên lợi nhuận' },
-  pb_ratio: { name: 'P/B', unit: 'x', inverse: true, description: 'Giá trên giá trị sổ sách' },
-  roe: { name: 'ROE', unit: '%', inverse: false, description: 'Tỷ suất sinh lời trên vốn chủ' },
-  roa: { name: 'ROA', unit: '%', inverse: false, description: 'Tỷ suất sinh lời trên tổng tài sản' },
-  debt_to_equity: { name: 'D/E', unit: 'x', inverse: true, description: 'Nợ trên vốn chủ sở hữu' },
-  current_ratio: { name: 'Thanh toán hiện hành', unit: 'x', inverse: false, description: 'Khả năng thanh toán ngắn hạn' },
-  gross_margin: { name: 'Biên LN gộp', unit: '%', inverse: false, description: 'Biên lợi nhuận gộp' },
-  net_margin: { name: 'Biên LN ròng', unit: '%', inverse: false, description: 'Biên lợi nhuận ròng' },
-  revenue_growth: { name: 'TT Doanh thu', unit: '%', inverse: false, description: 'Tăng trưởng doanh thu theo năm' },
-  profit_growth: { name: 'TT Lợi nhuận', unit: '%', inverse: false, description: 'Tăng trưởng lợi nhuận theo năm' },
+  pe_ratio: {
+    name: 'P/E',
+    unit: 'x',
+    lowerIsBetter: true,
+    description: 'Giá trên lợi nhuận',
+    meaning: 'Nhà đầu tư đang trả bao nhiêu đồng cho 1 đồng lợi nhuận.',
+    isValid: (value) => Number(value) > 0,
+  },
+  pb_ratio: {
+    name: 'P/B',
+    unit: 'x',
+    lowerIsBetter: true,
+    description: 'Giá trên giá trị sổ sách',
+    meaning: 'Giá thị trường đang cao/thấp bao nhiêu so với giá trị sổ sách.',
+    isValid: (value) => Number(value) > 0,
+  },
+  roe: {
+    name: 'ROE',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Tỷ suất sinh lời trên vốn chủ',
+    meaning: 'Doanh nghiệp tạo ra bao nhiêu lợi nhuận trên vốn chủ sở hữu.',
+  },
+  roa: {
+    name: 'ROA',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Tỷ suất sinh lời trên tổng tài sản',
+    meaning: 'Doanh nghiệp dùng tổng tài sản hiệu quả đến mức nào để tạo lợi nhuận.',
+  },
+  debt_to_equity: {
+    name: 'D/E',
+    unit: 'x',
+    lowerIsBetter: true,
+    description: 'Nợ trên vốn chủ sở hữu',
+    meaning: 'Doanh nghiệp dùng bao nhiêu nợ so với vốn chủ.',
+  },
+  current_ratio: {
+    name: 'Thanh toán hiện hành',
+    unit: 'x',
+    lowerIsBetter: false,
+    description: 'Khả năng thanh toán ngắn hạn',
+    meaning: 'Tài sản ngắn hạn có đủ phủ nợ ngắn hạn hay không.',
+  },
+  gross_margin: {
+    name: 'Biên LN gộp',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Biên lợi nhuận gộp',
+    meaning: 'Sau giá vốn, doanh nghiệp giữ lại bao nhiêu lợi nhuận trên doanh thu.',
+  },
+  net_margin: {
+    name: 'Biên LN ròng',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Biên lợi nhuận ròng',
+    meaning: 'Sau toàn bộ chi phí, doanh nghiệp giữ lại bao nhiêu lợi nhuận ròng.',
+  },
+  revenue_growth: {
+    name: 'TT Doanh thu',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Tăng trưởng doanh thu theo năm',
+    meaning: 'Quy mô bán hàng của doanh nghiệp đang tăng hay giảm.',
+  },
+  profit_growth: {
+    name: 'TT Lợi nhuận',
+    unit: '%',
+    lowerIsBetter: false,
+    description: 'Tăng trưởng lợi nhuận theo năm',
+    meaning: 'Lợi nhuận thuộc về cổ đông đang tăng hay giảm.',
+  },
+}
+
+const CATEGORY_CONFIGS = [
+  { key: 'valuation', label: 'Định giá', metrics: ['pe_ratio', 'pb_ratio'], weight: 0.25 },
+  { key: 'profitability', label: 'Sinh lời', metrics: ['roe', 'roa', 'gross_margin', 'net_margin'], weight: 0.3 },
+  { key: 'health', label: 'Sức khỏe tài chính', metrics: ['debt_to_equity', 'current_ratio'], weight: 0.25 },
+  { key: 'growth', label: 'Tăng trưởng', metrics: ['revenue_growth', 'profit_growth'], weight: 0.2 },
+]
+
+const RADAR_METRICS = [
+  { key: 'roe', label: 'ROE score' },
+  { key: 'roa', label: 'ROA score' },
+  { key: 'gross_margin', label: 'Biên LN gộp score' },
+  { key: 'net_margin', label: 'Biên LN ròng score' },
+  { key: 'current_ratio', label: 'Thanh toán score' },
+  { key: 'debt_to_equity', label: 'Đòn bẩy score' },
+]
+
+const normalizedIndustry = (company) => String(company.industry || '').trim().toLowerCase()
+const hasMultipleIndustries = (companies) => new Set(companies.map(normalizedIndustry).filter(Boolean)).size > 1
+const clampScore = (value) => Math.max(0, Math.min(100, Math.round(value)))
+
+const metricValue = (company, metric) => {
+  if (metric === 'f_score') return company.f_score
+  return company.ratios?.[metric]
+}
+
+const validMetricEntries = (companies, metric) => {
+  const config = METRIC_CONFIGS[metric]
+  return companies
+    .map((company) => ({ company, value: Number(metricValue(company, metric)) }))
+    .filter(({ value }) => Number.isFinite(value) && (config?.isValid ? config.isValid(value) : true))
+}
+
+const metricScores = (companies, metric) => {
+  const config = METRIC_CONFIGS[metric]
+  const entries = validMetricEntries(companies, metric)
+  const scores = Object.fromEntries(companies.map((company) => [company.ticker, null]))
+
+  if (!entries.length) return scores
+  if (metric === 'f_score') {
+    entries.forEach(({ company, value }) => {
+      scores[company.ticker] = clampScore((value / 9) * 100)
+    })
+    return scores
+  }
+
+  const values = entries.map((entry) => entry.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+
+  entries.forEach(({ company, value }) => {
+    if (max === min) {
+      scores[company.ticker] = 70
+      return
+    }
+    const ratio = config?.lowerIsBetter ? (max - value) / (max - min) : (value - min) / (max - min)
+    scores[company.ticker] = clampScore(ratio * 100)
+  })
+
+  return scores
+}
+
+const averageScores = (values) => {
+  const valid = values.filter((value) => Number.isFinite(value))
+  if (!valid.length) return null
+  return Math.round(valid.reduce((sum, value) => sum + value, 0) / valid.length)
+}
+
+const buildComparisonScores = (companies) => {
+  const scoreMaps = Object.fromEntries(Object.keys(METRIC_CONFIGS).map((metric) => [metric, metricScores(companies, metric)]))
+  const fScoreMap = metricScores(companies, 'f_score')
+
+  return companies.map((company) => {
+    const categories = Object.fromEntries(
+      CATEGORY_CONFIGS.map((category) => {
+        const baseScores = category.metrics.map((metric) => scoreMaps[metric]?.[company.ticker])
+        const values = category.key === 'health' ? [...baseScores, fScoreMap[company.ticker]] : baseScores
+        return [category.key, averageScores(values)]
+      })
+    )
+
+    const totalWeight = CATEGORY_CONFIGS.reduce((sum, category) => (
+      Number.isFinite(categories[category.key]) ? sum + category.weight : sum
+    ), 0)
+    const total = totalWeight
+      ? Math.round(CATEGORY_CONFIGS.reduce((sum, category) => (
+          Number.isFinite(categories[category.key]) ? sum + categories[category.key] * category.weight : sum
+        ), 0) / totalWeight)
+      : null
+
+    return { company, categories, total }
+  }).sort((a, b) => (b.total ?? -1) - (a.total ?? -1))
 }
 
 const transformForRadar = (companies) => {
-  const metrics = ['roe', 'roa', 'gross_margin', 'net_margin', 'current_ratio']
-  return metrics.map((metric) => {
-    const config = METRIC_CONFIGS[metric]
-    const dataPoint = { metric: config.name }
+  return RADAR_METRICS.map((metric) => {
+    const scores = metricScores(companies, metric.key)
+    const dataPoint = { metric: metric.label }
     companies.forEach((company) => {
-      const value = company.ratios?.[metric] || 0
-      dataPoint[company.ticker] = Math.min(Math.max(value, 0), 50)
+      dataPoint[company.ticker] = scores[company.ticker] ?? 0
     })
     return dataPoint
   })
 }
 
-const getWinner = (companies, metric, inverse = false) => {
-  const validCompanies = companies.filter((company) => company.ratios?.[metric] != null)
-  if (validCompanies.length === 0) return null
-  return validCompanies.reduce((a, b) => (
-    inverse
-      ? (a.ratios[metric] < b.ratios[metric] ? a : b)
-      : (a.ratios[metric] > b.ratios[metric] ? a : b)
-  ))
+const getComparableWinner = (companies, metric) => {
+  const config = METRIC_CONFIGS[metric]
+  const entries = validMetricEntries(companies, metric)
+  if (!entries.length) return null
+  return entries.reduce((best, current) => (
+    config?.lowerIsBetter
+      ? (current.value < best.value ? current : best)
+      : (current.value > best.value ? current : best)
+  )).company
 }
 
 function MetricRow({ metric, companies }) {
   const config = METRIC_CONFIGS[metric]
-  const winner = getWinner(companies, metric, config.inverse)
+  const winner = getComparableWinner(companies, metric)
 
   return (
     <tr>
       <td>
-        <span className="font-bold text-slate-100">{config.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-100">{config.name}</span>
+          <span className="group relative inline-flex">
+            <Info className="h-3.5 w-3.5 cursor-help text-slate-500 transition group-hover:text-emerald-300" />
+            <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-white/10 bg-[#191c1e] p-3 text-xs leading-5 text-slate-300 shadow-2xl group-hover:block">
+              {config.meaning}
+            </span>
+          </span>
+        </div>
         <p className="text-xs text-slate-500">{config.description}</p>
       </td>
       {companies.map((company) => {
-        const value = company.ratios?.[metric]
+        const value = metricValue(company, metric)
         const isWinner = winner?.ticker === company.ticker
         return (
           <td key={company.ticker} className="text-center">
@@ -193,19 +354,26 @@ export default function Comparison() {
   }
 
   const radarData = transformForRadar(companies)
-  const barChartData = [
-    { name: 'ROE', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.roe || 0])) },
-    { name: 'ROA', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.roa || 0])) },
-    { name: 'Biên LN gộp', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.gross_margin || 0])) },
-    { name: 'Biên LN ròng', ...Object.fromEntries(companies.map((company) => [company.ticker, company.ratios?.net_margin || 0])) },
-  ]
+  const comparisonScores = buildComparisonScores(companies)
+  const multipleIndustries = hasMultipleIndustries(companies)
+  const barChartData = CATEGORY_CONFIGS.map((category) => ({
+    name: category.label,
+    ...Object.fromEntries(
+      comparisonScores.map((item) => [item.company.ticker, item.categories[category.key] ?? 0])
+    ),
+  }))
 
   if (tickers.length < 2) {
     return (
-      <div className="mx-auto max-w-3xl">
-        <div className="glass-card p-8 text-center">
+      <div className="space-y-6">
+        <PageIntro
+          title="So sánh cổ phiếu"
+          description="Đặt 2-5 mã cạnh nhau để nhìn nhanh định giá, sức khỏe tài chính, khả năng sinh lời và tăng trưởng."
+        />
+
+        <div className="glass-card mx-auto max-w-3xl p-8 text-center">
           <Scale className="mx-auto mb-5 h-16 w-16 text-emerald-300/70" />
-          <h1 className="text-3xl font-black text-slate-100">So sánh cổ phiếu</h1>
+          <h2 className="text-2xl font-black text-slate-100">Chọn mã để bắt đầu</h2>
           <p className="mx-auto mt-3 max-w-xl text-slate-400">Chọn 2-5 mã cổ phiếu để so sánh các chỉ số tài chính quan trọng.</p>
 
           <div className="relative mx-auto mt-8 max-w-md">
@@ -242,13 +410,10 @@ export default function Comparison() {
   return (
     <div className="space-y-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="flex items-center gap-3 text-4xl font-black tracking-tight text-slate-100 md:text-5xl">
-            <Scale className="h-9 w-9 text-emerald-300" />
-            So sánh cổ phiếu
-          </h1>
-          <p className="mt-3 text-lg text-slate-400">Đang so sánh {companies.length} công ty.</p>
-        </div>
+        <PageIntro
+          title="So sánh cổ phiếu"
+          description={`Đang so sánh ${companies.length} công ty theo định giá, sinh lời, tăng trưởng và sức khỏe tài chính.`}
+        />
 
         <div className="flex flex-wrap items-center gap-3">
           {tickers.length < 5 && (
@@ -306,6 +471,8 @@ export default function Comparison() {
 
       {!loading && companies.length > 0 && (
         <>
+          {multipleIndustries && <IndustryWarning />}
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {companies.map((company, idx) => (
               <motion.div key={company.ticker} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.06 }}>
@@ -343,33 +510,35 @@ export default function Comparison() {
             ))}
           </section>
 
+          <ComparisonConclusion scores={comparisonScores} />
+
           <section className="grid gap-6 lg:grid-cols-2">
-            <ChartPanel title="Biểu đồ Radar" icon={<Activity className="h-5 w-5 text-emerald-300" />}>
+            <ChartPanel title="Radar điểm chuẩn hóa" icon={<Activity className="h-5 w-5 text-emerald-300" />}>
               <ResponsiveContainer width="100%" height={350}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="rgba(255,255,255,0.12)" />
                   <PolarAngleAxis dataKey="metric" tick={{ fill: '#c6c6cd', fontSize: 12 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 50]} tick={{ fill: '#909097' }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#909097' }} />
                   {companies.map((company, idx) => (
                     <Radar key={company.ticker} name={company.ticker} dataKey={company.ticker} stroke={COLORS[idx]} fill={COLORS[idx]} fillOpacity={0.18} />
                   ))}
                   <Legend />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)}/100`} />
                 </RadarChart>
               </ResponsiveContainer>
             </ChartPanel>
 
-            <ChartPanel title="So sánh sinh lời" icon={<BarChart3 className="h-5 w-5 text-emerald-300" />}>
+            <ChartPanel title="Điểm theo nhóm tiêu chí" icon={<BarChart3 className="h-5 w-5 text-emerald-300" />}>
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={barChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
                   <XAxis dataKey="name" tick={{ fill: '#c6c6cd' }} />
-                  <YAxis tick={{ fill: '#c6c6cd' }} unit="%" />
+                  <YAxis tick={{ fill: '#c6c6cd' }} domain={[0, 100]} />
                   {companies.map((company, idx) => (
                     <Bar key={company.ticker} dataKey={company.ticker} fill={COLORS[idx]} radius={[4, 4, 0, 0]} />
                   ))}
                   <Legend />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(1)}%`} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)}/100`} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartPanel>
@@ -378,13 +547,15 @@ export default function Comparison() {
           <section className="panel">
             <div className="panel-header">
               <h2 className="section-title">So sánh chi tiết</h2>
-              <p className="section-subtitle"><CheckCircle className="mr-1 inline h-4 w-4 text-emerald-300" /> = Tốt nhất trong nhóm</p>
+              <p className="section-subtitle">
+                <CheckCircle className="mr-1 inline h-4 w-4 text-emerald-300" /> = tốt hơn trong nhóm theo đúng chiều tốt/xấu của chỉ số. Hover biểu tượng thông tin để xem ý nghĩa chỉ số.
+              </p>
             </div>
             <div className="overflow-x-auto">
-              <table className="table-financial min-w-[720px]">
+              <table className="table-financial min-w-[760px]">
                 <thead>
                   <tr>
-                    <th>Chỉ số</th>
+                    <th className="w-[220px]">Chỉ số</th>
                     {companies.map((company, idx) => (
                       <th key={company.ticker} className="text-center">
                         <span className="inline-flex items-center justify-center gap-2">
@@ -414,26 +585,6 @@ export default function Comparison() {
               </table>
             </div>
           </section>
-
-          <section className="glass-card p-6">
-            <h3 className="mb-5 text-lg font-black text-slate-100">Tóm tắt so sánh</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {getWinner(companies, 'roe') && (
-                <SummaryItem
-                  icon={<TrendingUp className="h-5 w-5 text-emerald-300" />}
-                  label="ROE cao nhất"
-                  value={`${getWinner(companies, 'roe').ticker} (${getWinner(companies, 'roe').ratios?.roe?.toFixed(1)}%)`}
-                />
-              )}
-              {getWinner(companies, 'debt_to_equity', true) && (
-                <SummaryItem
-                  icon={<Building2 className="h-5 w-5 text-amber-300" />}
-                  label="D/E thấp nhất"
-                  value={`${getWinner(companies, 'debt_to_equity', true).ticker} (${getWinner(companies, 'debt_to_equity', true).ratios?.debt_to_equity?.toFixed(2)}x)`}
-                />
-              )}
-            </div>
-          </section>
         </>
       )}
     </div>
@@ -446,6 +597,100 @@ const tooltipStyle = {
   borderRadius: '12px',
   color: '#e0e3e5',
   boxShadow: '0 18px 50px rgba(0,0,0,0.45)',
+}
+
+function PageIntro({ title, description }) {
+  return (
+    <div className="max-w-5xl">
+      <h1 className="text-3xl font-black leading-tight text-slate-100 md:text-4xl">{title}</h1>
+      <p className="mt-3 max-w-4xl text-base leading-7 text-slate-400">{description}</p>
+    </div>
+  )
+}
+
+function IndustryWarning() {
+  return (
+    <div className="alert-warning flex items-start gap-3 text-sm leading-6">
+      <AlertCircle className="mt-0.5 h-5 w-5 flex-none" />
+      <p>
+        Các mã đang thuộc nhiều ngành khác nhau. Một số chỉ số như biên lợi nhuận, D/E, thanh toán hiện hành có thể không so sánh trực tiếp. Nên ưu tiên so với trung bình ngành.
+      </p>
+    </div>
+  )
+}
+
+function ComparisonConclusion({ scores }) {
+  const leader = scores.find((item) => Number.isFinite(item.total))
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <h2 className="section-title">Kết luận so sánh</h2>
+        <p className="section-subtitle">
+          Mỗi tiêu chí được chuẩn hóa về thang 0-100 trong riêng nhóm mã đang chọn.
+        </p>
+      </div>
+
+      <div className="panel-body space-y-4">
+        {leader && (
+          <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-4">
+            <p className="text-sm font-bold text-emerald-300">Mã nổi bật nhất trong nhóm hiện tại</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">
+              {leader.company.ticker} đang có điểm so sánh tổng hợp cao nhất với {leader.total}/100. Điểm này phản ánh tương quan định giá, sinh lời, sức khỏe tài chính và tăng trưởng so với các mã còn lại trong nhóm.
+            </p>
+          </div>
+        )}
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          {scores.map((item, index) => (
+            <div key={item.company.ticker} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-lg font-black text-slate-100">
+                    {index + 1}. {item.company.ticker}
+                  </p>
+                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">{item.company.name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-2xl font-black text-emerald-300">{item.total ?? '-'}</p>
+                  <p className="text-xs font-bold text-slate-500">/100</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 text-xs">
+                {CATEGORY_CONFIGS.map((category) => (
+                  <ScoreLine
+                    key={`${item.company.ticker}-${category.key}`}
+                    label={category.label}
+                    score={item.categories[category.key]}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-slate-500">
+          Điểm này chỉ dùng để so sánh tương đối trong nhóm mã đang chọn, không phải khuyến nghị mua bán.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function ScoreLine({ label, score }) {
+  const width = Number.isFinite(score) ? score : 0
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <span className="text-slate-400">{label}</span>
+        <span className="font-mono font-bold text-slate-200">{score ?? '-'}/100</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-full rounded-full bg-emerald-300" style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  )
 }
 
 function SearchResults({ results, onAdd, tickers, compact = false }) {

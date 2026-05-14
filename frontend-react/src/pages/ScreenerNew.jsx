@@ -6,7 +6,6 @@ import {
   Filter,
   RotateCcw,
   X,
-  Star,
   Eye,
   AlertTriangle,
   Scale,
@@ -14,7 +13,7 @@ import {
   SlidersHorizontal,
   ArrowUpRight,
 } from 'lucide-react'
-import { Button, Badge, SkeletonTable } from '../components/ui'
+import { Button, Badge, Select, SkeletonTable } from '../components/ui'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 import DynamicScreenerPanel from '../components/screener/DynamicScreenerPanel'
@@ -227,17 +226,12 @@ export default function Screener() {
 
             <div>
               <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">Ngành</label>
-              <select
+              <Select
                 value={filters.ticker_group}
                 onChange={(e) => handleFilterChange('ticker_group', e.target.value)}
-                className="input-primary py-3 pl-3 pr-8"
-              >
-                {groupOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#191c1e] text-slate-100">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={groupOptions}
+                placeholder="Tất cả ngành"
+              />
             </div>
 
             <button type="button" onClick={applyFilters} className="btn-primary flex items-center justify-center gap-2 px-5 py-3">
@@ -304,10 +298,25 @@ export default function Screener() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="table-financial min-w-[1120px]">
+              <table className="table-financial min-w-[1320px] table-fixed">
+                <colgroup>
+                  <col className="w-[3%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[3%]" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th className="w-10">
+                    <th>
                       <input
                         type="checkbox"
                         onChange={(e) => setSelectedStocks(e.target.checked ? filteredStocks.slice(0, 5).map((s) => s.ticker) : [])}
@@ -316,9 +325,9 @@ export default function Screener() {
                       />
                     </th>
                     <SortHead label="Mã CK" sortKey="ticker" sortConfig={sortConfig} onSort={handleSort} />
-                    <th className="text-center"><Star className="mx-auto h-4 w-4" /></th>
-                    <th>Ngành</th>
-                    <SortHead label="Giá" sortKey="price" align="right" sortConfig={sortConfig} onSort={handleSort} />
+                    <th className="px-2 text-center text-[11px] leading-4">Thêm vào watchlist</th>
+                    <th className="px-2 text-center">Ngành</th>
+                    <SortHead label="Giá" sortKey="price" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="Vốn hóa" sortKey="market_cap" align="right" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="P/E" sortKey="pe_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="P/B" sortKey="pb_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
@@ -353,9 +362,13 @@ export default function Screener() {
                         </Link>
                         <p className="max-w-[220px] truncate text-xs text-slate-500">{stock.name}</p>
                       </td>
-                      <td className="text-center"><StarButton ticker={stock.ticker} /></td>
-                      <td><Badge variant="outline">{stock.industry || 'N/A'}</Badge></td>
-                      <td className="text-right font-mono text-slate-100">{stock.price ? `${stock.price.toLocaleString('vi-VN')}₫` : '-'}</td>
+                      <td className="px-2 text-center"><StarButton ticker={stock.ticker} /></td>
+                      <td className="px-2 text-center">
+                        <Badge variant="outline" className="max-w-full truncate text-center">
+                          {stock.industry || 'N/A'}
+                        </Badge>
+                      </td>
+                      <td className="text-center font-mono text-slate-100">{stock.price ? `${stock.price.toLocaleString('vi-VN')}₫` : '-'}</td>
                       <td className="text-right font-mono text-slate-100">{stock.market_cap ? `${(stock.market_cap / 1e9).toFixed(0)}B` : '-'}</td>
                       <td className="text-center"><RatioValue value={stock.pe_ratio} type="pe" /></td>
                       <td className="text-center"><RatioValue value={stock.pb_ratio} type="pb" /></td>

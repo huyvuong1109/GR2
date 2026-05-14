@@ -21,7 +21,7 @@ const navigation = [
   { name: 'Bảng điều khiển', href: '/', icon: LayoutDashboard },
   { name: 'Bộ lọc cổ phiếu', href: '/screener', icon: Search },
   { name: 'So sánh', href: '/compare', icon: Scale },
-  { name: 'Báo cáo', href: '/reports', icon: FileText },
+  { name: 'Báo cáo tài chính', href: '/reports', icon: FileText },
 ]
 
 const pageTitles = {
@@ -94,24 +94,24 @@ export default function Layout() {
 
       <aside
         className={cn(
-          'group fixed left-0 top-0 z-50 h-full w-72 sidebar transition-all duration-300 lg:w-24 lg:translate-x-0 lg:hover:w-64',
+          'group fixed left-0 top-0 z-50 h-full w-64 sidebar transition-all duration-300 lg:w-20 lg:translate-x-0 lg:hover:w-56',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-full flex-col px-4 py-5">
-          <div className="sidebar-header pb-5">
-            <NavLink to="/" className="flex min-h-14 items-center gap-3 overflow-hidden rounded-xl">
-              <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-emerald-300/25 bg-emerald-400/10 text-emerald-300 shadow-lg shadow-emerald-900/20">
-                <TrendingUp className="h-6 w-6" />
+        <div className="flex h-full flex-col px-3 py-4">
+          <div className="sidebar-header pb-4">
+            <NavLink to="/" className="mx-auto flex min-h-12 w-12 items-center justify-center gap-0 overflow-hidden rounded-xl transition-all lg:group-hover:mx-0 lg:group-hover:w-full lg:group-hover:justify-start lg:group-hover:gap-2.5">
+              <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl border border-emerald-300/25 bg-emerald-400/10 text-emerald-300 shadow-lg shadow-emerald-900/20">
+                <TrendingUp className="h-5 w-5" />
               </div>
               <div className="min-w-0 transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
-                <h1 className="truncate text-base font-black tracking-tight text-slate-100">WealthArch</h1>
+                <h1 className="truncate text-sm font-black tracking-tight text-slate-100">WealthArch</h1>
                 <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-500">Phân tích tài chính</p>
               </div>
             </NavLink>
           </div>
 
-          <nav className="mt-5 flex-1 space-y-2">
+          <nav className="mt-4 flex-1 space-y-1.5">
             {navigation.map((item) => (
               <NavLink
                 key={item.name}
@@ -119,9 +119,9 @@ export default function Layout() {
                 end={item.href === '/'}
                 onClick={() => setSidebarOpen(false)}
                 title={item.name}
-                className={({ isActive }) => cn('nav-link min-h-11 overflow-hidden lg:justify-center lg:group-hover:justify-start', isActive && 'active')}
+                className={({ isActive }) => cn('nav-link mx-auto min-h-10 w-12 justify-center gap-0 overflow-hidden px-0 lg:group-hover:mx-0 lg:group-hover:w-full lg:group-hover:justify-start lg:group-hover:gap-2.5 lg:group-hover:px-3', isActive && 'active')}
               >
-                <item.icon className="h-5 w-5 flex-none" />
+                <item.icon className="h-[18px] w-[18px] flex-none" />
                 <span className="truncate whitespace-nowrap transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
                   {item.name}
                 </span>
@@ -133,9 +133,9 @@ export default function Layout() {
             <NavLink
               to="/settings"
               title="Cài đặt tài khoản"
-              className="flex items-center gap-3 overflow-hidden rounded-xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
+              className="mx-auto flex w-12 items-center justify-center gap-0 overflow-hidden rounded-xl px-0 py-2.5 text-left transition hover:bg-white/[0.06] lg:group-hover:mx-0 lg:group-hover:w-full lg:group-hover:justify-start lg:group-hover:gap-2.5 lg:group-hover:px-3"
             >
-              <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-400/10 text-sm font-black text-emerald-300">
+              <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-400/10 text-xs font-black text-emerald-300">
                 {displayInitial}
               </div>
               <div className="min-w-0 transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
@@ -147,7 +147,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="lg:pl-24">
+      <div className="lg:pl-20">
         <header className="header sticky top-0 z-30">
           <div className="grid h-14 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-4 px-4 md:px-6">
             <div className="flex min-w-0 items-center gap-3">

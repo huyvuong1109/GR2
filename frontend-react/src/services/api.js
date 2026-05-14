@@ -170,7 +170,16 @@ export const notificationsApi = {
 export const watchlistApi = {
   getAll: () => userApi.get('/api/watchlist'),
   add: (ticker) => userApi.post('/api/watchlist/add', { ticker }),
-  remove: (ticker) => userApi.delete('/api/watchlist/remove', { data: { ticker } }),
+  remove: async (ticker) => {
+    try {
+      return await userApi.post('/api/watchlist/remove', { ticker })
+    } catch (error) {
+      if (error.response?.status === 404 || error.response?.status === 405) {
+        return userApi.delete('/api/watchlist/remove', { data: { ticker } })
+      }
+      throw error
+    }
+  },
 }
 
 export const userApiService = {

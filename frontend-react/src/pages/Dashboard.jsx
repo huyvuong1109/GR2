@@ -4,11 +4,9 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowUpRight,
-  BarChart3,
   LineChart,
   ShieldCheck,
-  TrendingDown,
-  TrendingUp,
+  Star,
 } from 'lucide-react'
 import { AuthContext } from '../contexts/AuthContext'
 import { WatchlistContext } from '../contexts/WatchlistContext'
@@ -41,7 +39,7 @@ const OPPORTUNITY_TABS = [
 ]
 
 const HEALTH_FILTERS = {
-  sort_by: 'roe',
+  sort_by: 'health_score',
   sort_order: 'desc',
   limit: 80,
 }
@@ -70,6 +68,30 @@ const getResults = (response) => {
   if (Array.isArray(response)) return response
   if (Array.isArray(response?.results)) return response.results
   return []
+}
+
+const formatIndexValue = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number <= 0) return 'Đang cập nhật'
+  return number.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+}
+
+const formatPercentChange = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return 'Chưa có dữ liệu'
+  return `${number >= 0 ? '+' : ''}${number.toFixed(2)}% hôm nay`
+}
+
+const marketAssessment = (overview) => {
+  const changePercent = Number(overview?.vn_index_change_percent ?? overview?.vnIndexChangePercent)
+  const change = Number(overview?.vn_index_change ?? overview?.vnIndexChange)
+
+  if (!Number.isFinite(changePercent)) return 'Chưa có đủ dữ liệu VN-Index để đánh giá trạng thái thị trường.'
+  if (changePercent >= 1) return 'Thị trường đang đi lên rõ rệt, lực tăng trong phiên khá tích cực.'
+  if (changePercent >= 0.25) return 'Thị trường đang tăng nhẹ và có dấu hiệu hồi phục.'
+  if (changePercent > -0.25) return 'Thị trường đang đi ngang, trạng thái cân bằng và chưa có xu hướng rõ.'
+  if (changePercent > -1) return 'Thị trường đang giảm nhẹ, áp lực bán xuất hiện nhưng chưa quá mạnh.'
+  return `Thị trường đang giảm mạnh${Number.isFinite(change) ? `, VN-Index mất ${Math.abs(change).toFixed(2)} điểm` : ''}.`
 }
 
 function clamp(value, min, max) {
@@ -115,6 +137,10 @@ function opportunityScore(company) {
 }
 
 function healthScore(company) {
+  if (company.health_score !== null && company.health_score !== undefined) {
+    const score = Number(company.health_score)
+    return Number.isFinite(score) ? Number(score.toFixed(1)) : 0
+  }
   return Math.round(clamp(scoreHealth(company) + Math.min(Number(company.gross_margin || 0) * 0.25, 12) + Math.min(Number(company.profit_growth || 0) * 0.2, 18), 0, 100))
 }
 
@@ -154,11 +180,13 @@ export default function Dashboard() {
   const [healthyCompanies, setHealthyCompanies] = useState([])
   const [opportunities, setOpportunities] = useState([])
   const [riskAlerts, setRiskAlerts] = useState([])
+  const [watchlistCompanies, setWatchlistCompanies] = useState([])
   const [showAllRisks, setShowAllRisks] = useState(false)
   const [loadingMarket, setLoadingMarket] = useState(false)
   const [loadingHealthy, setLoadingHealthy] = useState(false)
   const [loadingOpportunities, setLoadingOpportunities] = useState(false)
   const [loadingRisks, setLoadingRisks] = useState(false)
+  const [loadingWatchlist, setLoadingWatchlist] = useState(false)
 
   const activeConfig = useMemo(
     () => OPPORTUNITY_TABS.find((tab) => tab.id === activeTab) || OPPORTUNITY_TABS[0],
@@ -169,6 +197,11 @@ export default function Dashboard() {
     () => watchlistItems.map((item) => item.ticker).filter(Boolean).slice(0, 12),
     [watchlistItems]
   )
+
+  const vnIndexValue = marketOverview?.vn_index ?? marketOverview?.vnIndex
+  const vnIndexChangePercent = marketOverview?.vn_index_change_percent ?? marketOverview?.vnIndexChangePercent
+  const marketStatusText = marketOverview?.market_status_message ?? marketOverview?.status_message ?? 'Đang cập nhật'
+  const marketUpdatedAt = marketOverview?.last_update_time || marketOverview?.last_update || '--'
 
   useEffect(() => {
     let cancelled = false
@@ -227,6 +260,35 @@ export default function Dashboard() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadWatchlistCompanies = async () => {
+      if (!watchlistTickers.length) {
+        setWatchlistCompanies([])
+        return
+      }
+
+      setLoadingWatchlist(true)
+      try {
+        const companies = await companiesApi.getBatch(watchlistTickers)
+        if (!cancelled) setWatchlistCompanies(Array.isArray(companies) ? companies : [])
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load watchlist companies', error)
+          setWatchlistCompanies([])
+        }
+      } finally {
+        if (!cancelled) setLoadingWatchlist(false)
+      }
+    }
+
+    loadWatchlistCompanies()
+    return () => {
+      cancelled = true
+    }
+  }, [watchlistTickers])
 
   useEffect(() => {
     let cancelled = false
@@ -312,8 +374,8 @@ export default function Dashboard() {
     <div className="space-y-8">
       <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-5xl">
-          <h1 className="text-4xl font-black leading-tight text-slate-100 md:text-5xl">Bảng điều khiển tài chính</h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-400">
+          <h1 className="text-3xl font-black leading-tight text-slate-100 md:text-4xl">Bảng điều khiển tài chính</h1>
+          <p className="mt-3 max-w-4xl text-base leading-7 text-slate-400">
             Chào {userName}. Dashboard ưu tiên trạng thái thị trường, cơ hội đáng nghiên cứu và các rủi ro tài chính cần chú ý.
           </p>
         </div>
@@ -322,35 +384,27 @@ export default function Dashboard() {
         </p>
       </motion.section>
 
-      <section className="grid gap-6 md:grid-cols-3">
-        <MarketCard
-          label="VN-Index"
-          value="0"
-          suffix="điểm"
-          change="Chưa có nguồn chỉ số"
-          icon={<TrendingDown className="h-12 w-12 text-slate-600/40" />}
-        />
-        <MarketCard
-          label="Vốn hóa thị trường"
-          value={formatCompactNumber(marketOverview?.totalMarketCap ?? marketOverview?.total_market_cap)}
-          change={`${marketOverview?.totalCompanies ?? marketOverview?.total_companies ?? 0} doanh nghiệp trong DB`}
-          icon={<BarChart3 className="h-12 w-12 text-slate-600/40" />}
-        />
-        <MarketCard
-          label="Thanh khoản ước tính"
-          value={formatCompactNumber(marketOverview?.tradingVolume ?? marketOverview?.trading_volume)}
-          change="Cập nhật cùng dữ liệu giá"
-          icon={<TrendingUp className="h-12 w-12 text-slate-600/40" />}
-        />
-      </section>
+      <MarketOverviewCard
+        loading={loadingMarket}
+        vnIndex={formatIndexValue(vnIndexValue)}
+        change={formatPercentChange(vnIndexChangePercent)}
+        status={marketStatusText}
+        updatedAt={marketUpdatedAt}
+        assessment={marketAssessment(marketOverview)}
+      />
 
       <div className="grid gap-6 xl:grid-cols-12">
-        <section className="xl:col-span-8">
+        <section className="space-y-6 xl:col-span-8">
           <OpportunitySection
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             opportunities={opportunities}
             loading={loadingOpportunities}
+          />
+          <WatchlistSection
+            items={watchlistCompanies}
+            rawItems={watchlistItems}
+            loading={loadingWatchlist}
           />
         </section>
 
@@ -365,23 +419,117 @@ export default function Dashboard() {
           />
         </aside>
       </div>
+
     </div>
   )
 }
 
-function MarketCard({ label, value, suffix, change, icon }) {
+function MarketOverviewCard({ loading, vnIndex, change, status, updatedAt, assessment }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card relative overflow-hidden p-6">
-      <div className="absolute right-5 top-5">{icon}</div>
-      <p className="text-xs font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <div className="mt-4 flex items-end gap-2">
-        <p className="text-4xl font-black text-slate-100">{value || '0'}</p>
-        {suffix && <span className="pb-1 text-sm font-bold text-slate-400">{suffix}</span>}
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card overflow-hidden p-6 md:p-7"
+    >
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest text-emerald-300">Tổng quan thị trường</p>
+          <h2 className="mt-2 text-xl font-black text-slate-100 md:text-2xl">Góc nhìn cơ bản dựa trên dữ liệu thị trường</h2>
+        </div>
+        <div className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-slate-400">
+          {loading ? 'Đang cập nhật...' : `Cập nhật: ${updatedAt}`}
+        </div>
       </div>
-      <div className="mt-6 inline-flex rounded-md bg-emerald-400/10 px-3 py-1.5 text-sm font-black text-emerald-300">
-        {change}
+
+      <div className="mt-7 grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">VN-Index</p>
+          <p className="mt-2 text-3xl font-black text-slate-100">{vnIndex}</p>
+          <p className={cn('mt-1 text-sm font-bold', String(change).startsWith('-') ? 'text-red-300' : 'text-emerald-300')}>{change}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Trạng thái thị trường</p>
+          <p className="mt-2 text-lg font-black text-slate-100">{status}</p>
+          <p className="mt-2 text-sm text-slate-500">Theo giờ giao dịch Việt Nam</p>
+        </div>
       </div>
-    </motion.div>
+
+      <div className="mt-6 rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-4">
+        <p className="text-sm font-black text-emerald-300">Đánh giá nhanh</p>
+        <p className="mt-2 max-w-5xl text-sm leading-7 text-slate-200">{assessment}</p>
+      </div>
+    </motion.section>
+  )
+}
+
+function WatchlistSection({ items, rawItems, loading }) {
+  const fallbackItems = useMemo(
+    () =>
+      rawItems
+        .map((item) => ({ ticker: item.ticker, name: item.ticker }))
+        .filter((item) => item.ticker && !items.some((company) => company.ticker === item.ticker)),
+    [items, rawItems]
+  )
+  const visibleItems = [...items, ...fallbackItems].slice(0, 12)
+
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Star className="mt-0.5 h-5 w-5 text-emerald-300" />
+            <div>
+              <h2 className="section-title">Watchlist của bạn</h2>
+              <p className="section-subtitle">Theo dõi nhanh các mã đã lưu trong danh mục quan tâm.</p>
+            </div>
+          </div>
+          <Link to="/settings" className="btn-outline inline-flex items-center gap-2 px-3 py-2 text-sm">
+            Quản lý
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+
+      <div className="panel-body">
+        {loading && <div className="alert-info text-sm">Đang tải watchlist...</div>}
+        {!loading && visibleItems.length === 0 && (
+          <div className="alert-info text-sm">Chưa có mã nào trong watchlist. Bấm biểu tượng sao ở bảng lọc hoặc trang chi tiết để thêm mã.</div>
+        )}
+        {!loading && visibleItems.length > 0 && (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {visibleItems.map((company) => (
+              <Link
+                key={company.ticker}
+                to={`/company/${company.ticker}`}
+                className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-emerald-300/25 hover:bg-white/[0.06]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-mono text-lg font-black text-emerald-300">{company.ticker}</p>
+                    <p className="mt-1 truncate text-sm text-slate-400">{company.name || company.ticker}</p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 flex-none text-slate-500" />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="font-bold uppercase tracking-widest text-slate-500">Giá</p>
+                    <p className="mt-1 font-mono font-black text-slate-100">
+                      {company.current_price || company.price ? Number(company.current_price || company.price).toLocaleString('vi-VN') : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold uppercase tracking-widest text-slate-500">Vốn hóa</p>
+                    <p className="mt-1 font-mono font-black text-slate-100">
+                      {company.market_cap ? formatCompactNumber(company.market_cap) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -474,14 +622,14 @@ function HealthySection({ companies, loading }) {
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 text-emerald-300" />
           <div>
-            <h2 className="section-title">Top doanh nghiệp khỏe nhất</h2>
-            <p className="section-subtitle">Công ty nào tốt? Không đồng nghĩa là đang rẻ.</p>
+            <h2 className="section-title">Top doanh nghiệp đáng chú ý</h2>
+            <p className="section-subtitle">Điểm = F-Score 40% + định giá 20% + tăng trưởng 20% + rủi ro 20%.</p>
           </div>
         </div>
       </div>
       <div className="panel-body">
         {loading && <div className="alert-info text-sm">Đang xếp hạng doanh nghiệp...</div>}
-        {!loading && companies.length === 0 && <div className="alert-info text-sm">0 doanh nghiệp đủ tiêu chí sức khỏe.</div>}
+        {!loading && companies.length === 0 && <div className="alert-info text-sm">0 doanh nghiệp đủ dữ liệu để xếp hạng đáng chú ý.</div>}
         {!loading && companies.length > 0 && (
           <div className="space-y-3">
             {companies.slice(0, 5).map((company, index) => (

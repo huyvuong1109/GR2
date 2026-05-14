@@ -28,6 +28,7 @@ from backend.fastapi_auth.app.routes.watchlist_router import router as watchlist
 from backend.fastapi_auth.app.routes.notifications_router import router as notifications_router
 from backend.fastapi_auth.app.routes.value_router import router as value_router
 from backend.fastapi_auth.app.routes.saved_filter_router import router as saved_filter_router
+from backend.fastapi_auth.app.routes.market_router import _fetch_index, _market_session
 from backend.fastapi_auth.app.ws import manager as notification_manager
 from backend.fastapi_auth.app.ws import serialize_notification
 
@@ -563,91 +564,35 @@ async def get_industries():
 
 @app.get("/api/market/overview")
 async def get_market_overview():
-    """Lấy tổng quan thị trường"""
-    companies_df = db.get_all_companies()
-    
-    # Tính tổng vốn hóa
-    total_market_cap = companies_df['market_cap'].sum()
-    
-    # Số lượng công ty
-    total_companies = len(companies_df)
-    
-    # Vốn hóa trung bình
-    avg_market_cap = companies_df['market_cap'].mean()
-    
-    # Giả định khối lượng giao dịch = 1% vốn hóa
-    trading_volume = total_market_cap * 0.01 if not pd.isna(total_market_cap) else 0
-    
+    """Lay tong quan thi truong tu du lieu chi so thuc."""
+    session = _market_session()
+    vnindex = _fetch_index("VNINDEX")
+
     return {
-        "totalMarketCap": int(total_market_cap) if not pd.isna(total_market_cap) else 0,
-        "total_market_cap": int(total_market_cap) if not pd.isna(total_market_cap) else 0,
-        "marketCapChange": 2.34,  # Mock - cần dữ liệu lịch sử để tính
-        "tradingVolume": int(trading_volume),
-        "volumeChange": 15.2,  # Mock
-        "totalCompanies": total_companies,
-        "total_companies": total_companies,
-        "topGainersCount": int(total_companies * 0.4),  # Giả định 40% tăng
-        "average_market_cap": int(avg_market_cap) if not pd.isna(avg_market_cap) else 0,
-        "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+        **session,
+        "market_status": session["status"],
+        "market_status_message": session["message"],
+        "vn_index": vnindex.get("value") if vnindex else None,
+        "vn_index_change": vnindex.get("change") if vnindex else None,
+        "vn_index_change_percent": vnindex.get("change_percent") if vnindex else None,
+        "vn_index_trading_date": vnindex.get("trading_date") if vnindex else None,
+        "data_source": vnindex.get("source") if vnindex else None,
     }
 
 
 @app.get("/api/market/status")
 async def get_market_status():
-    """Lấy trạng thái thị trường (mở/đóng cửa)"""
-    from datetime import datetime, time
-    
-    now = datetime.now()
-    current_time = now.time()
-    weekday = now.weekday()  # 0=Monday, 6=Sunday
-    
-    # Vietnamese stock market hours: 9:00 - 11:30, 13:00 - 14:45 (Monday-Friday)
-    morning_open = time(9, 0)
-    morning_close = time(11, 30)
-    afternoon_open = time(13, 0)
-    afternoon_close = time(14, 45)
-    
-    is_weekday = weekday < 5  # Monday to Friday
-    is_morning_session = morning_open <= current_time <= morning_close
-    is_afternoon_session = afternoon_open <= current_time <= afternoon_close
-    
-    is_open = is_weekday and (is_morning_session or is_afternoon_session)
-    
-    if is_open:
-        status = "open"
-        message = "Thị trường đang mở cửa"
-        next_event = "Đóng cửa" if is_morning_session else "Kết thúc phiên chiều"
-        next_time = "11:30" if is_morning_session else "14:45"
-    elif is_weekday:
-        if current_time < morning_open:
-            status = "pre-market"
-            message = "Sắp mở cửa"
-            next_event = "Mở cửa"
-            next_time = "09:00"
-        elif morning_close < current_time < afternoon_open:
-            status = "lunch-break"
-            message = "Nghỉ trưa"
-            next_event = "Mở cửa phiên chiều"
-            next_time = "13:00"
-        else:
-            status = "closed"
-            message = "Thị trường đã đóng cửa"
-            next_event = "Mở cửa"
-            next_time = "09:00 (ngày mai)"
-    else:
-        status = "weekend"
-        message = "Cuối tuần"
-        next_event = "Mở cửa"
-        next_time = "09:00 (Thứ 2)"
-    
+    """Lay trang thai thi truong va VN-Index."""
+    session = _market_session()
+    vnindex = _fetch_index("VNINDEX")
+
     return {
-        "status": status,
-        "is_open": is_open,
-        "message": message,
-        "next_event": next_event,
-        "next_time": next_time,
-        "current_time": now.strftime("%H:%M:%S"),
-        "current_date": now.strftime("%Y-%m-%d")
+        **session,
+        "vn_index": vnindex.get("value") if vnindex else None,
+        "vn_index_change": vnindex.get("change") if vnindex else None,
+        "vn_index_change_percent": vnindex.get("change_percent") if vnindex else None,
+        "vn_index_trading_date": vnindex.get("trading_date") if vnindex else None,
+        "data_source": vnindex.get("source") if vnindex else None,
     }
 
 
@@ -1256,7 +1201,12 @@ async def compare_companies(request: CompareRequest):
     if len(tickers) > 5:
         raise HTTPException(status_code=400, detail="Tối đa 5 mã")
     
-    from backend.financial_analysis import calculate_financial_ratios, calculate_piotroski_f_score
+    from backend.financial_analysis import (
+        calculate_financial_ratios,
+        calculate_piotroski_f_score,
+        calculate_health_score,
+        detect_risk_warnings,
+    )
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
@@ -1503,7 +1453,12 @@ async def advanced_screener(
     """
     Bộ lọc nâng cao với đầy đủ tiêu chí
     """
-    from backend.financial_analysis import calculate_financial_ratios, calculate_piotroski_f_score
+    from backend.financial_analysis import (
+        calculate_financial_ratios,
+        calculate_piotroski_f_score,
+        calculate_health_score,
+        detect_risk_warnings,
+    )
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
@@ -1523,23 +1478,34 @@ async def advanced_screener(
         
         for company in companies:
             # Get financial data
-            balance = session.query(BalanceSheet).filter(
+            balance_sheets = session.query(BalanceSheet).filter(
                 BalanceSheet.company_id == company.id
-            ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).first()
+            ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
             
             income_list = session.query(IncomeStatement).filter(
                 IncomeStatement.company_id == company.id
-            ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
+            ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(4).all()
             
-            cash_flow = session.query(CashFlow).filter(
+            cash_flows = session.query(CashFlow).filter(
                 CashFlow.company_id == company.id
-            ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).first()
+            ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(4).all()
             
+            balance = balance_sheets[0] if balance_sheets else None
+            prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
             income = income_list[0] if income_list else None
             prev_income = income_list[1] if len(income_list) > 1 else None
+            cash_flow = cash_flows[0] if cash_flows else None
             
             # Calculate ratios
-            ratios = calculate_financial_ratios(company, balance, income, prev_income, None)
+            ratios = calculate_financial_ratios(company, balance, income, prev_income, prev_balance)
+
+            f_score_data = calculate_piotroski_f_score(
+                balance, prev_balance, income, prev_income, cash_flow,
+                company.shares_outstanding or 0
+            )
+            f_score = f_score_data.get('total_score', 0)
+            warnings = detect_risk_warnings(income_list, cash_flows, balance, ratios)
+            health = calculate_health_score(f_score, ratios, warnings)
             
             # Apply filters
             passed = True
@@ -1597,22 +1563,8 @@ async def advanced_screener(
                 passed = False
             
             # F-Score filter
-            if min_f_score is not None:
-                prev_balance = session.query(BalanceSheet).filter(
-                    BalanceSheet.company_id == company.id,
-                    BalanceSheet.period_year == (balance.period_year - 1 if balance else 2024)
-                ).first()
-                
-                f_score_data = calculate_piotroski_f_score(
-                    balance, prev_balance, income, prev_income, cash_flow,
-                    company.shares_outstanding or 0
-                )
-                f_score = f_score_data['total_score']
-                
-                if f_score < min_f_score:
-                    passed = False
-            else:
-                f_score = None
+            if min_f_score is not None and f_score < min_f_score:
+                passed = False
             
             if passed:
                 results.append({
@@ -1622,6 +1574,9 @@ async def advanced_screener(
                     "price": company.current_price,
                     "market_cap": company.market_cap,
                     "f_score": f_score,
+                    "health_score": health.get('total_score'),
+                    "health_breakdown": health.get('breakdown'),
+                    "health_interpretation": health.get('interpretation'),
                     "pe_ratio": ratios.get('pe_ratio'),
                     "pb_ratio": ratios.get('pb_ratio'),
                     "roe": ratios.get('roe'),

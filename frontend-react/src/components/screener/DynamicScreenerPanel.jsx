@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Badge, Button } from '../ui'
+import { Button } from '../ui'
 import { cn } from '../../utils/helpers'
 import MetricTreeSelector from './MetricTreeSelector'
 import FilterConditionBlock from './FilterConditionBlock'
@@ -123,10 +123,6 @@ export default function DynamicScreenerPanel({ className, onApplyFilters, onSave
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Badge variant="info">{selectedMetricIds.length} chỉ tiêu</Badge>
-            <Badge variant="primary">{payload.length} điều kiện hợp lệ</Badge>
-          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">

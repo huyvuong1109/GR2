@@ -37,6 +37,7 @@ async def add(item: dict, current_user=Depends(get_current_user), db: Session = 
 
     return {"ok": True, "ticker": symbol, "already_exists": already_exists}
 
+@router.post('/remove')
 @router.delete('/remove')
 async def remove(item: dict, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     ticker = item.get('ticker')
