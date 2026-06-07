@@ -1,4 +1,4 @@
-﻿# 📊 Financial Analysis Platform
+# 📊 Financial Analysis Platform
 
 > Nền tảng phân tích tài chính thông minh cho thị trường chứng khoán Việt Nam
 

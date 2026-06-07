@@ -17,6 +17,7 @@ class Company(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticker = Column(String(10), unique=True, nullable=False, index=True)
     name = Column(String(255))
+    company_type = Column(String(20))
     industry = Column(String(100))
     market_cap = Column(BigInteger)
     shares_outstanding = Column(BigInteger)

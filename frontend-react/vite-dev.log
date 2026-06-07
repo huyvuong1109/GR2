@@ -1,0 +1,19 @@
+
+> financial-analysis-platform@1.0.0 dev
+> vite --host 127.0.0.1 --port 5173
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m1206[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m12:52:37 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m12:52:44 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:10:54 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:11:11 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:22:51 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:23:10 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:29:16 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:29:16 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:29:31 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:35:35 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m
+[2m1:35:50 AM[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.vite-build-test/index.html[22m

@@ -126,9 +126,113 @@ const RADAR_METRICS = [
   { key: 'debt_to_equity', label: 'Đòn bẩy score' },
 ]
 
+const SUGGESTED_COMPARISONS = [
+  { label: 'Ngân hàng', tickers: 'VCB,TCB,MBB' },
+  { label: 'Bất động sản', tickers: 'VIC,VHM,NVL' },
+  { label: 'Thép', tickers: 'HPG,HSG,NKG' },
+  { label: 'Chứng khoán', tickers: 'SSI,VND,HCM' },
+  { label: 'Bảo hiểm', tickers: 'BVH,PVI,BMI' },
+  { label: 'Thực phẩm', tickers: 'VNM,MSN,SAB' },
+]
+
+const chartSeriesKey = (index) => `series_${index}`
+const chartSeriesHasDataKey = (index) => `${chartSeriesKey(index)}_hasData`
+const COMPANY_TYPE_ALIASES = {
+  corp: 'corporate',
+  corporate: 'corporate',
+  bank: 'bank',
+  insu: 'insurance',
+  insurance: 'insurance',
+  secur: 'securities',
+  securities: 'securities',
+}
+const COMPANY_TYPE_LABELS = {
+  corporate: 'Doanh nghiệp',
+  bank: 'Ngân hàng',
+  insurance: 'Bảo hiểm',
+  securities: 'Chứng khoán',
+}
+const normalizeCompanyType = (value) => COMPANY_TYPE_ALIASES[String(value || '').trim().toLowerCase()] || 'corporate'
+const companyTypeLabel = (company) => COMPANY_TYPE_LABELS[normalizeCompanyType(company.company_type)] || 'Doanh nghiệp'
 const normalizedIndustry = (company) => String(company.industry || '').trim().toLowerCase()
 const hasMultipleIndustries = (companies) => new Set(companies.map(normalizedIndustry).filter(Boolean)).size > 1
+const hasMultipleCompanyTypes = (companies) => new Set(companies.map((company) => normalizeCompanyType(company.company_type))).size > 1
 const clampScore = (value) => Math.max(0, Math.min(100, Math.round(value)))
+const MIN_VALID_SCORE = 5
+
+const SCORE_BENCHMARKS = {
+  corporate: {
+    pe_ratio: [[8, 100], [15, 85], [25, 55], [40, 25], [60, 5], [80, 0]],
+    pb_ratio: [[0.5, 100], [1, 95], [2, 75], [3, 45], [5, 15], [8, 0]],
+    roe: [[-10, 0], [0, 10], [5, 35], [10, 65], [15, 85], [20, 100]],
+    roa: [[-5, 0], [0, 10], [2, 40], [5, 70], [8, 90], [12, 100]],
+    debt_to_equity: [[0, 100], [0.5, 90], [1, 75], [2, 45], [4, 15], [6, 0]],
+    current_ratio: [[0, 0], [0.8, 35], [1, 55], [1.5, 85], [2, 100], [3, 90], [5, 65]],
+    gross_margin: [[0, 0], [15, 25], [25, 45], [35, 65], [45, 85], [60, 100]],
+    net_margin: [[-10, 0], [0, 10], [5, 35], [10, 60], [15, 80], [25, 100]],
+    revenue_growth: [[-30, 0], [-10, 20], [0, 40], [10, 65], [20, 85], [35, 100]],
+    profit_growth: [[-30, 0], [-10, 20], [0, 40], [10, 65], [20, 85], [35, 100]],
+  },
+  bank: {
+    pe_ratio: [[5, 100], [9, 90], [14, 70], [20, 40], [30, 15], [45, 0]],
+    pb_ratio: [[0.5, 80], [0.8, 100], [1.2, 90], [1.8, 65], [2.5, 35], [4, 0]],
+    roe: [[-5, 0], [0, 10], [8, 40], [15, 75], [22, 100], [30, 85]],
+    roa: [[-1, 0], [0, 10], [0.5, 40], [1, 70], [1.8, 100], [3, 85]],
+    debt_to_equity: [[0, 20], [4, 45], [8, 80], [12, 95], [16, 70], [22, 35], [30, 0]],
+    current_ratio: [[0.9, 0], [1, 45], [1.05, 75], [1.12, 100], [1.25, 85], [1.5, 55]],
+    gross_margin: [[0, 0], [20, 30], [35, 55], [50, 80], [65, 100]],
+    net_margin: [[-10, 0], [0, 10], [10, 35], [20, 65], [30, 90], [40, 100]],
+    revenue_growth: [[-20, 0], [-5, 25], [0, 45], [8, 70], [15, 90], [25, 100]],
+    profit_growth: [[-25, 0], [-10, 20], [0, 45], [10, 70], [20, 90], [35, 100]],
+  },
+  insurance: {
+    pe_ratio: [[6, 100], [12, 85], [20, 60], [32, 30], [50, 5], [70, 0]],
+    pb_ratio: [[0.5, 90], [1, 100], [1.8, 80], [3, 50], [5, 15], [8, 0]],
+    roe: [[-5, 0], [0, 10], [6, 40], [12, 70], [18, 95], [25, 100]],
+    roa: [[-2, 0], [0, 10], [1, 35], [3, 70], [5, 95], [8, 100]],
+    debt_to_equity: [[0, 20], [1, 50], [3, 75], [6, 95], [10, 85], [15, 55], [25, 0]],
+    current_ratio: [[0, 0], [0.8, 35], [1, 60], [1.5, 90], [2.5, 100], [4, 80]],
+    gross_margin: [[-20, 0], [0, 20], [10, 45], [25, 75], [40, 100]],
+    net_margin: [[-10, 0], [0, 10], [5, 35], [12, 65], [20, 90], [30, 100]],
+    revenue_growth: [[-20, 0], [-5, 25], [0, 45], [8, 70], [15, 90], [25, 100]],
+    profit_growth: [[-25, 0], [-10, 20], [0, 45], [10, 70], [20, 90], [35, 100]],
+  },
+  securities: {
+    pe_ratio: [[5, 100], [10, 85], [18, 60], [30, 30], [45, 10], [60, 0]],
+    pb_ratio: [[0.5, 85], [1, 100], [1.8, 80], [3, 50], [5, 20], [8, 0]],
+    roe: [[-10, 0], [0, 10], [6, 35], [12, 65], [20, 95], [30, 100]],
+    roa: [[-5, 0], [0, 10], [2, 35], [5, 70], [8, 90], [12, 100]],
+    debt_to_equity: [[0, 90], [0.5, 100], [1.2, 85], [2, 60], [3.5, 25], [5, 0]],
+    current_ratio: [[0, 0], [1, 45], [1.5, 75], [2.5, 100], [4, 85], [6, 60]],
+    gross_margin: [[0, 0], [20, 30], [35, 55], [50, 80], [65, 100]],
+    net_margin: [[-10, 0], [0, 10], [10, 40], [20, 70], [35, 95], [50, 100]],
+    revenue_growth: [[-30, 0], [-10, 20], [0, 45], [15, 70], [30, 90], [50, 100]],
+    profit_growth: [[-40, 0], [-15, 20], [0, 45], [20, 70], [40, 90], [70, 100]],
+  },
+}
+
+const getScoreBenchmarks = (metric, company) => {
+  const companyType = normalizeCompanyType(company.company_type)
+  return SCORE_BENCHMARKS[companyType]?.[metric] || SCORE_BENCHMARKS.corporate[metric]
+}
+
+const benchmarkScore = (metric, value, company) => {
+  const points = getScoreBenchmarks(metric, company)
+  if (!points || !Number.isFinite(value)) return null
+
+  if (value <= points[0][0]) return Math.max(MIN_VALID_SCORE, clampScore(points[0][1]))
+
+  for (let index = 1; index < points.length; index += 1) {
+    const [rightValue, rightScore] = points[index]
+    const [leftValue, leftScore] = points[index - 1]
+    if (value <= rightValue) {
+      const ratio = (value - leftValue) / (rightValue - leftValue)
+      return Math.max(MIN_VALID_SCORE, clampScore(leftScore + ratio * (rightScore - leftScore)))
+    }
+  }
+
+  return Math.max(MIN_VALID_SCORE, clampScore(points[points.length - 1][1]))
+}
 
 const metricValue = (company, metric) => {
   if (metric === 'f_score') return company.f_score
@@ -151,6 +255,13 @@ const metricScores = (companies, metric) => {
   if (metric === 'f_score') {
     entries.forEach(({ company, value }) => {
       scores[company.ticker] = clampScore((value / 9) * 100)
+    })
+    return scores
+  }
+
+  if (entries.some(({ company }) => getScoreBenchmarks(metric, company))) {
+    entries.forEach(({ company, value }) => {
+      scores[company.ticker] = benchmarkScore(metric, value, company)
     })
     return scores
   }
@@ -207,12 +318,19 @@ const transformForRadar = (companies) => {
   return RADAR_METRICS.map((metric) => {
     const scores = metricScores(companies, metric.key)
     const dataPoint = { metric: metric.label }
-    companies.forEach((company) => {
-      dataPoint[company.ticker] = scores[company.ticker] ?? 0
+    companies.forEach((company, index) => {
+      const score = scores[company.ticker]
+      const hasData = Number.isFinite(score)
+      dataPoint[chartSeriesKey(index)] = hasData ? score : 0
+      dataPoint[chartSeriesHasDataKey(index)] = hasData
     })
     return dataPoint
   })
 }
+
+const hasRadarScoreData = (radarData, companies) => (
+  radarData.some((item) => companies.some((_, index) => item[chartSeriesHasDataKey(index)]))
+)
 
 const getComparableWinner = (companies, metric) => {
   const config = METRIC_CONFIGS[metric]
@@ -225,23 +343,27 @@ const getComparableWinner = (companies, metric) => {
   )).company
 }
 
-function MetricRow({ metric, companies }) {
+function MetricRow({ metric, companies, onMetricTooltip, onMetricTooltipHide }) {
   const config = METRIC_CONFIGS[metric]
   const winner = getComparableWinner(companies, metric)
 
   return (
     <tr>
       <td>
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-100">{config.name}</span>
-          <span className="group relative inline-flex">
-            <Info className="h-3.5 w-3.5 cursor-help text-slate-500 transition group-hover:text-emerald-300" />
-            <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border border-white/10 bg-[#191c1e] p-3 text-xs leading-5 text-slate-300 shadow-2xl group-hover:block">
-              {config.meaning}
-            </span>
+        <button
+          type="button"
+          className="group inline-flex max-w-full cursor-help flex-col items-start text-left"
+          onMouseEnter={(event) => onMetricTooltip(metric, event)}
+          onMouseLeave={onMetricTooltipHide}
+          onFocus={(event) => onMetricTooltip(metric, event)}
+          onBlur={onMetricTooltipHide}
+        >
+          <span className="flex items-center gap-2">
+            <span className="font-bold text-slate-100 transition group-hover:text-emerald-300 group-focus:text-emerald-300">{config.name}</span>
+            <Info className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-emerald-300 group-focus:text-emerald-300" />
           </span>
-        </div>
-        <p className="text-xs text-slate-500">{config.description}</p>
+          <span className="text-xs text-slate-500">{config.description}</span>
+        </button>
       </td>
       {companies.map((company) => {
         const value = metricValue(company, metric)
@@ -273,6 +395,7 @@ export default function Comparison() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [showSearch, setShowSearch] = useState(false)
+  const [metricTooltip, setMetricTooltip] = useState(null)
 
   const tickers = searchParams.get('tickers')?.split(',').filter(Boolean) || []
 
@@ -294,6 +417,7 @@ export default function Comparison() {
         setCompanies(results.map((r) => ({
           ticker: r.ticker,
           name: r.company_name,
+          company_type: r.company_type,
           industry: r.industry,
           f_score: r.f_score?.total_score,
           ratios: r.key_ratios,
@@ -339,10 +463,14 @@ export default function Comparison() {
   const handleExport = () => {
     if (companies.length === 0) return
     const headers = ['Chỉ số', ...companies.map((company) => company.ticker)]
-    const rows = Object.keys(METRIC_CONFIGS).map((metric) => {
-      const config = METRIC_CONFIGS[metric]
-      return [config.name, ...companies.map((company) => company.ratios?.[metric] || '')]
-    })
+    const rows = [
+      ['Loại hình', ...companies.map((company) => companyTypeLabel(company))],
+      ['Ngành', ...companies.map((company) => company.industry || '')],
+      ...Object.keys(METRIC_CONFIGS).map((metric) => {
+        const config = METRIC_CONFIGS[metric]
+        return [config.name, ...companies.map((company) => company.ratios?.[metric] || '')]
+      }),
+    ]
     const csv = [headers, ...rows].map((row) => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -353,13 +481,47 @@ export default function Comparison() {
     URL.revokeObjectURL(url)
   }
 
+  const showMetricTooltip = (metric, event) => {
+    const config = METRIC_CONFIGS[metric]
+    if (!config) return
+
+    const tooltipWidth = 320
+    const tooltipHeight = 150
+    const margin = 12
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+    const targetRect = event.currentTarget.getBoundingClientRect()
+    const preferredX = targetRect.right + 16
+    const fallbackX = targetRect.left - tooltipWidth - 16
+    const baseX = preferredX + tooltipWidth + margin <= viewportWidth ? preferredX : fallbackX
+    const baseY = targetRect.top
+
+    setMetricTooltip({
+      title: config.name,
+      description: config.description,
+      meaning: config.meaning,
+      x: Math.max(margin, Math.min(baseX + 16, viewportWidth - tooltipWidth - margin)),
+      y: Math.max(margin, Math.min(baseY + 16, viewportHeight - tooltipHeight - margin)),
+    })
+  }
+
+  const metricTooltipProps = {
+    onMetricTooltip: showMetricTooltip,
+    onMetricTooltipHide: () => setMetricTooltip(null),
+  }
+
   const radarData = transformForRadar(companies)
+  const radarHasData = hasRadarScoreData(radarData, companies)
   const comparisonScores = buildComparisonScores(companies)
   const multipleIndustries = hasMultipleIndustries(companies)
+  const multipleCompanyTypes = hasMultipleCompanyTypes(companies)
   const barChartData = CATEGORY_CONFIGS.map((category) => ({
     name: category.label,
     ...Object.fromEntries(
-      comparisonScores.map((item) => [item.company.ticker, item.categories[category.key] ?? 0])
+      companies.map((company, index) => {
+        const score = comparisonScores.find((item) => item.company.ticker === company.ticker)
+        return [chartSeriesKey(index), score?.categories[category.key] ?? 0]
+      })
     ),
   }))
 
@@ -368,18 +530,22 @@ export default function Comparison() {
       <div className="space-y-6">
         <PageIntro
           title="So sánh cổ phiếu"
-          description="Đặt 2-5 mã cạnh nhau để nhìn nhanh định giá, sức khỏe tài chính, khả năng sinh lời và tăng trưởng."
+          description="Đánh giá tương quan 2-5 doanh nghiệp theo định giá, sinh lời, tăng trưởng và sức khỏe tài chính. Nên ưu tiên so sánh các mã cùng ngành để kết quả có ý nghĩa hơn."
         />
 
         <div className="glass-card mx-auto max-w-3xl p-8 text-center">
           <Scale className="mx-auto mb-5 h-16 w-16 text-emerald-300/70" />
-          <h2 className="text-2xl font-black text-slate-100">Chọn mã để bắt đầu</h2>
-          <p className="mx-auto mt-3 max-w-xl text-slate-400">Chọn 2-5 mã cổ phiếu để so sánh các chỉ số tài chính quan trọng.</p>
+          <h2 className="text-2xl font-black text-slate-100">Chọn mã để so sánh</h2>
+          <p className="mx-auto mt-3 max-w-xl text-slate-400">Chọn 2-5 cổ phiếu cùng ngành để đặt các chỉ số tài chính cạnh nhau và đánh giá tương quan.</p>
+          <div className="mx-auto mt-5 max-w-xl rounded-lg border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-left text-sm leading-6 text-amber-50/85">
+            <AlertCircle className="mr-2 inline h-4 w-4 text-amber-300" />
+            So sánh khác ngành chỉ mang tính tham khảo, vì cấu trúc tài chính và biên lợi nhuận có thể khác biệt đáng kể giữa các nhóm doanh nghiệp.
+          </div>
 
           <div className="relative mx-auto mt-8 max-w-md">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
             <Input
-              placeholder="Tìm kiếm mã cổ phiếu..."
+              placeholder="Nhập mã hoặc tên doanh nghiệp..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               className="py-3 pl-12 text-lg"
@@ -395,11 +561,17 @@ export default function Comparison() {
           )}
 
           <div className="mt-8">
-            <p className="text-sm text-slate-500">Gợi ý so sánh</p>
+            <p className="text-sm text-slate-500">Nhóm cùng ngành</p>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'VNM,MSN,VCB' })}>VNM vs MSN vs VCB</button>
-              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'VIC,VHM' })}>VIC vs VHM</button>
-              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setSearchParams({ tickers: 'HPG,HSG' })}>HPG vs HSG</button>
+              {SUGGESTED_COMPARISONS.map((suggestion) => (
+                <button
+                  key={suggestion.tickers}
+                  className="btn-outline px-3 py-2 text-sm"
+                  onClick={() => setSearchParams({ tickers: suggestion.tickers })}
+                >
+                  {suggestion.label} · {suggestion.tickers.replaceAll(',', ' · ')}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -471,7 +643,7 @@ export default function Comparison() {
 
       {!loading && companies.length > 0 && (
         <>
-          {multipleIndustries && <IndustryWarning />}
+          {(multipleCompanyTypes || multipleIndustries) && <IndustryWarning hasMultipleCompanyTypes={multipleCompanyTypes} />}
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {companies.map((company, idx) => (
@@ -494,7 +666,10 @@ export default function Comparison() {
                   </div>
 
                   <p className="mb-3 line-clamp-1 text-sm text-slate-400">{company.name}</p>
-                  <Badge variant="outline">{company.industry || 'Không có ngành'}</Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="info">{companyTypeLabel(company)}</Badge>
+                    <Badge variant="outline">{company.industry || 'Không có ngành'}</Badge>
+                  </div>
 
                   <div className="mt-5 space-y-3 text-sm">
                     <DataLine label="Giá" value={company.price ? `${company.price.toLocaleString('vi-VN')}₫` : '-'} />
@@ -510,22 +685,45 @@ export default function Comparison() {
             ))}
           </section>
 
-          <ComparisonConclusion scores={comparisonScores} />
-
           <section className="grid gap-6 lg:grid-cols-2">
             <ChartPanel title="Radar điểm chuẩn hóa" icon={<Activity className="h-5 w-5 text-emerald-300" />}>
-              <ResponsiveContainer width="100%" height={350}>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="rgba(255,255,255,0.12)" />
-                  <PolarAngleAxis dataKey="metric" tick={{ fill: '#c6c6cd', fontSize: 12 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#909097' }} />
-                  {companies.map((company, idx) => (
-                    <Radar key={company.ticker} name={company.ticker} dataKey={company.ticker} stroke={COLORS[idx]} fill={COLORS[idx]} fillOpacity={0.18} />
-                  ))}
-                  <Legend />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)}/100`} />
-                </RadarChart>
-              </ResponsiveContainer>
+              {radarHasData ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <RadarChart
+                    data={radarData}
+                    cx="50%"
+                    cy="49%"
+                    outerRadius="67%"
+                    margin={{ top: 28, right: 72, bottom: 28, left: 72 }}
+                  >
+                    <PolarGrid stroke="rgba(255,255,255,0.12)" radialLines />
+                    <PolarAngleAxis dataKey="metric" tick={{ fill: '#c6c6cd', fontSize: 12 }} />
+                    <PolarRadiusAxis
+                      angle={90}
+                      axisLine={false}
+                      domain={[0, 100]}
+                      tick={{ fill: '#909097', fontSize: 11 }}
+                      tickCount={5}
+                      tickLine={false}
+                    />
+                    {companies.map((company, idx) => (
+                      <Radar
+                        key={company.ticker}
+                        name={company.ticker}
+                        dataKey={chartSeriesKey(idx)}
+                        stroke={COLORS[idx]}
+                        fill={COLORS[idx]}
+                        fillOpacity={0.18}
+                        strokeWidth={2}
+                      />
+                    ))}
+                    <Legend />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)}/100`} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyChartState message="Không đủ dữ liệu chỉ số để vẽ radar điểm chuẩn hóa." />
+              )}
             </ChartPanel>
 
             <ChartPanel title="Điểm theo nhóm tiêu chí" icon={<BarChart3 className="h-5 w-5 text-emerald-300" />}>
@@ -535,7 +733,7 @@ export default function Comparison() {
                   <XAxis dataKey="name" tick={{ fill: '#c6c6cd' }} />
                   <YAxis tick={{ fill: '#c6c6cd' }} domain={[0, 100]} />
                   {companies.map((company, idx) => (
-                    <Bar key={company.ticker} dataKey={company.ticker} fill={COLORS[idx]} radius={[4, 4, 0, 0]} />
+                    <Bar key={company.ticker} name={company.ticker} dataKey={chartSeriesKey(idx)} fill={COLORS[idx]} radius={[4, 4, 0, 0]} />
                   ))}
                   <Legend />
                   <Tooltip contentStyle={tooltipStyle} formatter={(value) => `${Number(value).toFixed(0)}/100`} />
@@ -568,23 +766,27 @@ export default function Comparison() {
                 </thead>
                 <tbody>
                   <GroupRow label="Chỉ số thị trường" colSpan={companies.length + 1} />
-                  <MetricRow metric="pe_ratio" companies={companies} />
-                  <MetricRow metric="pb_ratio" companies={companies} />
+                  <MetricRow metric="pe_ratio" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="pb_ratio" companies={companies} {...metricTooltipProps} />
                   <GroupRow label="Sinh lời" colSpan={companies.length + 1} />
-                  <MetricRow metric="roe" companies={companies} />
-                  <MetricRow metric="roa" companies={companies} />
-                  <MetricRow metric="gross_margin" companies={companies} />
-                  <MetricRow metric="net_margin" companies={companies} />
+                  <MetricRow metric="roe" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="roa" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="gross_margin" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="net_margin" companies={companies} {...metricTooltipProps} />
                   <GroupRow label="Sức khỏe tài chính" colSpan={companies.length + 1} />
-                  <MetricRow metric="debt_to_equity" companies={companies} />
-                  <MetricRow metric="current_ratio" companies={companies} />
+                  <MetricRow metric="debt_to_equity" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="current_ratio" companies={companies} {...metricTooltipProps} />
                   <GroupRow label="Tăng trưởng" colSpan={companies.length + 1} />
-                  <MetricRow metric="revenue_growth" companies={companies} />
-                  <MetricRow metric="profit_growth" companies={companies} />
+                  <MetricRow metric="revenue_growth" companies={companies} {...metricTooltipProps} />
+                  <MetricRow metric="profit_growth" companies={companies} {...metricTooltipProps} />
                 </tbody>
               </table>
             </div>
           </section>
+
+          <ComparisonConclusion scores={comparisonScores} />
+
+          <MetricMeaningTooltip tooltip={metricTooltip} />
         </>
       )}
     </div>
@@ -599,6 +801,24 @@ const tooltipStyle = {
   boxShadow: '0 18px 50px rgba(0,0,0,0.45)',
 }
 
+function MetricMeaningTooltip({ tooltip }) {
+  if (!tooltip) return null
+
+  return (
+    <div
+      className="pointer-events-none fixed w-80 rounded-xl border border-white/10 bg-[#191c1e] p-3 text-xs leading-5 text-slate-300 shadow-2xl"
+      style={{ left: tooltip.x, top: tooltip.y, zIndex: 80 }}
+    >
+      <div className="mb-1 flex items-center gap-2">
+        <Info className="h-3.5 w-3.5 text-emerald-300" />
+        <span className="text-sm font-black text-slate-100">{tooltip.title}</span>
+      </div>
+      <p className="font-semibold text-slate-400">{tooltip.description}</p>
+      <p className="mt-2">{tooltip.meaning}</p>
+    </div>
+  )
+}
+
 function PageIntro({ title, description }) {
   return (
     <div className="max-w-5xl">
@@ -608,12 +828,14 @@ function PageIntro({ title, description }) {
   )
 }
 
-function IndustryWarning() {
+function IndustryWarning({ hasMultipleCompanyTypes }) {
   return (
     <div className="alert-warning flex items-start gap-3 text-sm leading-6">
       <AlertCircle className="mt-0.5 h-5 w-5 flex-none" />
       <p>
-        Các mã đang thuộc nhiều ngành khác nhau. Một số chỉ số như biên lợi nhuận, D/E, thanh toán hiện hành có thể không so sánh trực tiếp. Nên ưu tiên so với trung bình ngành.
+        {hasMultipleCompanyTypes
+          ? 'Các mã đang thuộc nhiều loại hình báo cáo khác nhau. Điểm 0-100 đã được quy đổi theo benchmark riêng cho doanh nghiệp, ngân hàng, bảo hiểm và chứng khoán trước khi so sánh.'
+          : 'Các mã đang thuộc nhiều ngành khác nhau. Điểm 0-100 được chuẩn hóa theo loại hình báo cáo, nhưng vẫn nên đọc kèm bối cảnh ngành khi ra quyết định.'}
       </p>
     </div>
   )
@@ -627,7 +849,7 @@ function ComparisonConclusion({ scores }) {
       <div className="panel-header">
         <h2 className="section-title">Kết luận so sánh</h2>
         <p className="section-subtitle">
-          Mỗi tiêu chí được chuẩn hóa về thang 0-100 trong riêng nhóm mã đang chọn.
+          Mỗi tiêu chí được chấm theo benchmark riêng của từng loại hình báo cáo trước khi quy về thang 0-100.
         </p>
       </div>
 
@@ -636,7 +858,7 @@ function ComparisonConclusion({ scores }) {
           <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-4">
             <p className="text-sm font-bold text-emerald-300">Mã nổi bật nhất trong nhóm hiện tại</p>
             <p className="mt-1 text-sm leading-6 text-slate-300">
-              {leader.company.ticker} đang có điểm so sánh tổng hợp cao nhất với {leader.total}/100. Điểm này phản ánh tương quan định giá, sinh lời, sức khỏe tài chính và tăng trưởng so với các mã còn lại trong nhóm.
+              {leader.company.ticker} đang có điểm so sánh tổng hợp cao nhất với {leader.total}/100. Điểm này phản ánh định giá, sinh lời, sức khỏe tài chính và tăng trưởng sau khi chuẩn hóa theo loại hình báo cáo của từng mã.
             </p>
           </div>
         )}
@@ -671,7 +893,7 @@ function ComparisonConclusion({ scores }) {
         </div>
 
         <p className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-slate-500">
-          Điểm này chỉ dùng để so sánh tương đối trong nhóm mã đang chọn, không phải khuyến nghị mua bán.
+          Điểm này chỉ dùng để tham khảo nhanh chất lượng chỉ số theo thang chuẩn hóa, không phải khuyến nghị mua bán.
         </p>
       </div>
     </section>
@@ -733,6 +955,14 @@ function ChartPanel({ title, icon, children }) {
         <h2 className="section-title flex items-center gap-2">{icon}{title}</h2>
       </div>
       <div className="panel-body">{children}</div>
+    </div>
+  )
+}
+
+function EmptyChartState({ message }) {
+  return (
+    <div className="flex h-[350px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.025] px-6 text-center text-sm font-semibold text-slate-400">
+      {message}
     </div>
   )
 }

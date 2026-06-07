@@ -18,6 +18,34 @@ export const PERIOD_TYPE_OPTIONS = [
   { value: 'year', label: 'Năm' },
 ]
 
+export const METHOD_PRESETS = {
+  method_canslim: {
+    title: 'CANSLIM nguyên mẫu',
+    summary:
+      'Bản mẫu dùng dữ liệu hiện có: tăng trưởng doanh thu và lợi nhuận quý hiện tại so với cùng quý năm trước, cộng thêm ngưỡng ROE tối thiểu. Các chữ N, S, L, I, M cần dữ liệu giá, thanh khoản và sở hữu tổ chức nên được ghi chú theo lý thuyết thay vì tự động lọc bằng báo cáo tài chính.',
+    rules: [
+      'C - Doanh thu quý tăng tối thiểu 25%',
+      'C - Lợi nhuận quý tăng tối thiểu 25%',
+      'A - ROE tối thiểu 17%',
+    ],
+  },
+  method_value: {
+    title: 'Value Investing mẫu',
+    summary: 'Tìm doanh nghiệp có định giá thấp nhưng vẫn đạt ngưỡng sinh lời cơ bản.',
+    rules: ['P/E nhỏ hơn 15', 'P/B nhỏ hơn 1.5', 'ROE lớn hơn 15%'],
+  },
+  method_garp: {
+    title: 'GARP mẫu',
+    summary: 'Kết hợp tăng trưởng và định giá hợp lý: không mua quá đắt, nhưng vẫn yêu cầu lợi nhuận tăng và ROE đủ tốt.',
+    rules: ['P/E nhỏ hơn 25', 'Lợi nhuận tăng tối thiểu 15%', 'ROE lớn hơn 12%'],
+  },
+  method_quality: {
+    title: 'Quality Compounder mẫu',
+    summary: 'Ưu tiên doanh nghiệp có sức khỏe tài chính tốt, sinh lời ổn định và đòn bẩy trong ngưỡng kiểm soát.',
+    rules: ['F-Score tối thiểu 7', 'ROE lớn hơn 15%', 'D/E nhỏ hơn 1', 'Current Ratio lớn hơn 1.2'],
+  },
+}
+
 export const FILTER_GROUPS = [
   {
     id: 'by_index',
@@ -35,6 +63,7 @@ export const FILTER_GROUPS = [
             description: 'Chỉ số giá trên thu nhập',
             apiMinKey: 'min_pe',
             apiMaxKey: 'max_pe',
+            defaultCondition: { operator: 'lt', value: '15' },
           },
           {
             id: 'pb_ratio',
@@ -43,6 +72,7 @@ export const FILTER_GROUPS = [
             description: 'Chỉ số giá trên giá trị sổ sách',
             apiMinKey: 'min_pb',
             apiMaxKey: 'max_pb',
+            defaultCondition: { operator: 'lt', value: '1.5' },
           },
           {
             id: 'market_cap',
@@ -65,6 +95,7 @@ export const FILTER_GROUPS = [
             apiMaxKey: 'max_roe',
             supportsTimeSeries: true,
             defaultPeriodType: 'year',
+            defaultCondition: { operator: 'gt', value: '15' },
           },
           {
             id: 'roa',
@@ -72,6 +103,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Hiệu quả sử dụng tổng tài sản',
             apiMinKey: 'min_roa',
+            defaultCondition: { operator: 'gt', value: '5' },
           },
           {
             id: 'gross_margin',
@@ -79,6 +111,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Lợi nhuận gộp trên doanh thu',
             apiMinKey: 'min_gross_margin',
+            defaultCondition: { operator: 'gt', value: '20' },
           },
           {
             id: 'net_margin',
@@ -86,6 +119,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Lợi nhuận ròng trên doanh thu',
             apiMinKey: 'min_net_margin',
+            defaultCondition: { operator: 'gt', value: '8' },
           },
         ],
       },
@@ -99,6 +133,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Mức độ đòn bẩy tài chính',
             apiMaxKey: 'max_de',
+            defaultCondition: { operator: 'lt', value: '1' },
           },
           {
             id: 'current_ratio',
@@ -106,6 +141,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Khả năng thanh toán ngắn hạn',
             apiMinKey: 'min_current_ratio',
+            defaultCondition: { operator: 'gt', value: '1.2' },
           },
           {
             id: 'f_score',
@@ -113,6 +149,7 @@ export const FILTER_GROUPS = [
             unit: 'điểm',
             description: 'Đánh giá sức khỏe tài chính tổng hợp',
             apiMinKey: 'min_f_score',
+            defaultCondition: { operator: 'gt', value: '6' },
           },
         ],
       },
@@ -128,6 +165,7 @@ export const FILTER_GROUPS = [
             apiMinKey: 'min_revenue_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
+            defaultCondition: { operator: 'gt', value: '15' },
           },
           {
             id: 'profit_growth',
@@ -137,6 +175,7 @@ export const FILTER_GROUPS = [
             apiMinKey: 'min_profit_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
+            defaultCondition: { operator: 'gt', value: '20' },
           },
         ],
       },
@@ -157,6 +196,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Cổ phiếu rẻ theo thu nhập',
             apiMaxKey: 'max_pe',
+            defaultCondition: { operator: 'lt', value: '15' },
           },
           {
             id: 'value_pb',
@@ -164,6 +204,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Mức giá thấp theo giá trị sổ sách',
             apiMaxKey: 'max_pb',
+            defaultCondition: { operator: 'lt', value: '1.5' },
           },
           {
             id: 'value_roe',
@@ -171,6 +212,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Kết hợp giá rẻ và chất lượng',
             apiMinKey: 'min_roe',
+            defaultCondition: { operator: 'gt', value: '15' },
           },
         ],
       },
@@ -186,6 +228,7 @@ export const FILTER_GROUPS = [
             apiMinKey: 'min_revenue_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
+            defaultCondition: { operator: 'gt', value: '25' },
           },
           {
             id: 'canslim_profit_growth',
@@ -195,6 +238,7 @@ export const FILTER_GROUPS = [
             apiMinKey: 'min_profit_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
+            defaultCondition: { operator: 'gt', value: '25' },
           },
           {
             id: 'canslim_roe',
@@ -202,6 +246,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Năng lực sinh lời bền vững',
             apiMinKey: 'min_roe',
+            defaultCondition: { operator: 'gt', value: '17' },
           },
         ],
       },
@@ -215,6 +260,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Không mua quá đắt',
             apiMaxKey: 'max_pe',
+            defaultCondition: { operator: 'lt', value: '25' },
           },
           {
             id: 'garp_profit_growth',
@@ -224,6 +270,7 @@ export const FILTER_GROUPS = [
             apiMinKey: 'min_profit_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
+            defaultCondition: { operator: 'gt', value: '15' },
           },
           {
             id: 'garp_roe',
@@ -231,6 +278,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Hiệu quả sử dụng vốn đạt ngưỡng',
             apiMinKey: 'min_roe',
+            defaultCondition: { operator: 'gt', value: '12' },
           },
         ],
       },
@@ -244,6 +292,7 @@ export const FILTER_GROUPS = [
             unit: 'điểm',
             description: 'Sức khỏe tài chính tổng hợp',
             apiMinKey: 'min_f_score',
+            defaultCondition: { operator: 'gt', value: '6' },
           },
           {
             id: 'quality_roe',
@@ -251,6 +300,7 @@ export const FILTER_GROUPS = [
             unit: '%',
             description: 'Hiệu quả bổ sung cho F-Score',
             apiMinKey: 'min_roe',
+            defaultCondition: { operator: 'gt', value: '15' },
           },
           {
             id: 'quality_de',
@@ -258,6 +308,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Nợ vay trong ngưỡng an toàn',
             apiMaxKey: 'max_de',
+            defaultCondition: { operator: 'lt', value: '1' },
           },
           {
             id: 'quality_current_ratio',
@@ -265,6 +316,7 @@ export const FILTER_GROUPS = [
             unit: 'lần',
             description: 'Current ratio trên ngưỡng',
             apiMinKey: 'min_current_ratio',
+            defaultCondition: { operator: 'gt', value: '1.2' },
           },
         ],
       },

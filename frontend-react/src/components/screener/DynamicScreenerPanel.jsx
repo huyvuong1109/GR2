@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '../ui'
 import { cn } from '../../utils/helpers'
 import MetricTreeSelector from './MetricTreeSelector'
 import FilterConditionBlock from './FilterConditionBlock'
-import { FILTER_GROUPS, METRIC_BY_ID } from './filterCatalog'
+import { FILTER_GROUPS, METHOD_PRESETS, METRIC_BY_ID } from './filterCatalog'
 import {
   buildAdvancedQueryFromPayload,
   buildDynamicPayload,
@@ -21,15 +21,20 @@ const FILTER_MODE_META = {
   },
 }
 
-export default function DynamicScreenerPanel({ className, onApplyFilters, onSaveFilters }) {
-  const [activeFilterMode, setActiveFilterMode] = useState(FILTER_GROUPS[0]?.id || 'by_index')
+export default function DynamicScreenerPanel({ className, loadedSnapshot, onApplyFilters, onSaveFilters }) {
+  const orderedFilterGroups = useMemo(
+    () => [...FILTER_GROUPS].sort((a, b) => (a.id === 'by_method' ? -1 : b.id === 'by_method' ? 1 : 0)),
+    []
+  )
+  const [activeFilterMode, setActiveFilterMode] = useState('by_method')
   const [selectedMetricIds, setSelectedMetricIds] = useState([])
   const [conditionsByMetric, setConditionsByMetric] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
+  const [selectedMethodId, setSelectedMethodId] = useState(null)
 
   const activeFilterGroup = useMemo(
-    () => FILTER_GROUPS.find((group) => group.id === activeFilterMode) || FILTER_GROUPS[0],
-    [activeFilterMode]
+    () => FILTER_GROUPS.find((group) => group.id === activeFilterMode) || orderedFilterGroups[0],
+    [activeFilterMode, orderedFilterGroups]
   )
 
   const selectedMetrics = useMemo(
@@ -48,6 +53,7 @@ export default function DynamicScreenerPanel({ className, onApplyFilters, onSave
   )
 
   const toggleMetric = (metric, checked) => {
+    setSelectedMethodId(null)
     setSelectedMetricIds((prev) => {
       if (checked) return prev.includes(metric.id) ? prev : [...prev, metric.id]
       return prev.filter((metricId) => metricId !== metric.id)
@@ -95,11 +101,51 @@ export default function DynamicScreenerPanel({ className, onApplyFilters, onSave
   const resetAllDynamicFilters = () => {
     setSelectedMetricIds([])
     setConditionsByMetric({})
+    setSelectedMethodId(null)
     setStatusMessage('Đã xóa toàn bộ bộ lọc động')
   }
 
+  const leafMetricsOf = (node) => {
+    if (!node?.children?.length) return METRIC_BY_ID[node?.id] ? [METRIC_BY_ID[node.id]] : []
+    return node.children.flatMap(leafMetricsOf)
+  }
+
+  const applyMethodPreset = (methodNode) => {
+    const methodMetrics = leafMetricsOf(methodNode)
+    const nextConditions = methodMetrics.reduce((acc, metric) => {
+      acc[metric.id] = createDefaultCondition(metric)
+      return acc
+    }, {})
+
+    setSelectedMetricIds(methodMetrics.map((metric) => metric.id))
+    setConditionsByMetric(nextConditions)
+    setSelectedMethodId(methodNode.id)
+    setStatusMessage(`Đã nạp mẫu ${methodNode.label}. Có thể chỉnh từng ngưỡng trước khi lọc.`)
+  }
+
+  const methodPreset = METHOD_PRESETS[selectedMethodId]
+
+  useEffect(() => {
+    if (!loadedSnapshot) return
+
+    setActiveFilterMode(loadedSnapshot.activeFilterMode || 'by_method')
+    setSelectedMetricIds(Array.isArray(loadedSnapshot.selectedMetricIds) ? loadedSnapshot.selectedMetricIds : [])
+    setConditionsByMetric(loadedSnapshot.conditionsByMetric || {})
+    setSelectedMethodId(loadedSnapshot.selectedMethodId || null)
+    setStatusMessage(`Đã tải bộ lọc "${loadedSnapshot.name || 'đã lưu'}".`)
+  }, [loadedSnapshot])
+
   const notifyParent = async (eventType) => {
-    const data = { payload, queryParams, selectedMetricIds, conditionsByMetric }
+    const selectedMethodLabel = activeFilterGroup?.children?.find((group) => group.id === selectedMethodId)?.label || null
+    const data = {
+      payload,
+      queryParams,
+      selectedMetricIds,
+      conditionsByMetric,
+      activeFilterMode,
+      selectedMethodId,
+      selectedMethodLabel,
+    }
 
     if (eventType === 'apply' && onApplyFilters) {
       await onApplyFilters(data)
@@ -126,14 +172,17 @@ export default function DynamicScreenerPanel({ className, onApplyFilters, onSave
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {FILTER_GROUPS.map((group) => {
+          {orderedFilterGroups.map((group) => {
             const active = activeFilterMode === group.id
             const modeMeta = FILTER_MODE_META[group.id] || { title: group.label, hint: group.description }
             return (
               <button
                 key={group.id}
                 type="button"
-                onClick={() => setActiveFilterMode(group.id)}
+                onClick={() => {
+                  setActiveFilterMode(group.id)
+                  if (group.id !== 'by_method') setSelectedMethodId(null)
+                }}
                 className={cn(
                   'rounded-xl border px-3 py-2 text-left transition-all',
                   active
@@ -158,10 +207,25 @@ export default function DynamicScreenerPanel({ className, onApplyFilters, onSave
             tree={activeFilterGroup?.children || []}
             selectedMetricIds={selectedMetricIds}
             onToggleMetric={toggleMetric}
+            onSelectGroup={activeFilterMode === 'by_method' ? applyMethodPreset : undefined}
           />
         </div>
 
         <div className="rounded-xl border border-white/10 bg-black/20 p-4 xl:col-span-7">
+          {activeFilterMode === 'by_method' && methodPreset && (
+            <div className="mb-4 rounded-lg border border-emerald-300/20 bg-emerald-400/[0.07] p-3 text-xs leading-5 text-slate-300">
+              <p className="font-black text-emerald-300">{methodPreset.title}</p>
+              <p className="mt-1 text-slate-400">{methodPreset.summary}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {methodPreset.rules.map((rule) => (
+                  <span key={rule} className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-bold text-slate-200">
+                    {rule}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-slate-200">Khu vực điều kiện lọc</p>
             <div className="flex flex-wrap items-center gap-2">

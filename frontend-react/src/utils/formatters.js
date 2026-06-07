@@ -37,10 +37,10 @@ export const formatCompact = (value) => {
   if (value === null || value === undefined) return '-'
   
   const absValue = Math.abs(value)
-  if (absValue >= 1e12) return numeral(value / 1e12).format('0.0') + ' nghin ty'
-  if (absValue >= 1e9) return numeral(value / 1e9).format('0.0') + ' ty'
-  if (absValue >= 1e6) return numeral(value / 1e6).format('0.0') + ' trieu'
-  if (absValue >= 1e3) return numeral(value / 1e3).format('0.0') + ' nghin'
+  if (absValue >= 1e12) return numeral(value / 1e12).format('0.0') + ' nghìn tỷ'
+  if (absValue >= 1e9) return numeral(value / 1e9).format('0.0') + ' tỷ'
+  if (absValue >= 1e6) return numeral(value / 1e6).format('0.0') + ' triệu'
+  if (absValue >= 1e3) return numeral(value / 1e3).format('0.0') + ' nghìn'
   return numeral(value).format('0,0')
 }
 

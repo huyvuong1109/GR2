@@ -12,12 +12,15 @@ import {
   RefreshCw,
   SlidersHorizontal,
   ArrowUpRight,
+  Calendar,
 } from 'lucide-react'
 import { Button, Badge, Select, SkeletonTable } from '../components/ui'
 import { cn } from '../utils/helpers'
 import api from '../services/api'
 import DynamicScreenerPanel from '../components/screener/DynamicScreenerPanel'
 import StarButton from '../components/StarButton'
+
+const LOCAL_SAVED_FILTERS_KEY = 'dynamic_screener_saved_filters'
 
 const initialFilters = {
   search: '',
@@ -31,6 +34,8 @@ const initialFilters = {
   min_revenue_growth: '',
   min_profit_growth: '',
   min_f_score: '',
+  period_year: '',
+  period_quarter: '',
 }
 
 const ratioTone = {
@@ -71,11 +76,39 @@ export default function Screener() {
   const [error, setError] = useState(null)
   const [dynamicPayload, setDynamicPayload] = useState([])
   const [dynamicNotice, setDynamicNotice] = useState('')
+  const [periodOptions, setPeriodOptions] = useState([])
+  const [savedFilters, setSavedFilters] = useState([])
+  const [loadedDynamicSnapshot, setLoadedDynamicSnapshot] = useState(null)
 
   const groupOptions = useMemo(() => {
     const industries = [...new Set(stocks.map((s) => s.industry).filter(Boolean))].sort()
     return [{ value: '', label: 'Tất cả ngành' }, ...industries.map((industry) => ({ value: industry, label: industry }))]
   }, [stocks])
+
+  const yearOptions = useMemo(() => {
+    const years = [...new Set(periodOptions.map((period) => period.year).filter(Boolean))].sort((a, b) => b - a)
+    return [{ value: '', label: 'Mới nhất' }, ...years.map((year) => ({ value: String(year), label: `Năm ${year}` }))]
+  }, [periodOptions])
+
+  const quarterOptions = useMemo(() => {
+    if (!filters.period_year) return [{ value: '', label: 'Kỳ mới nhất' }]
+    const quarters = periodOptions
+      .filter((period) => String(period.year) === String(filters.period_year))
+      .map((period) => period.quarter)
+      .filter((quarter) => Number(quarter) > 0)
+      .sort((a, b) => b - a)
+
+    return [
+      { value: '', label: 'Cả năm / kỳ mới nhất' },
+      ...quarters.map((quarter) => ({ value: String(quarter), label: `Quý ${quarter}` })),
+    ]
+  }, [periodOptions, filters.period_year])
+
+  const selectedPeriodLabel = useMemo(() => {
+    if (!filters.period_year) return 'Dữ liệu mới nhất'
+    if (!filters.period_quarter) return `Năm ${filters.period_year}`
+    return `Quý ${filters.period_quarter}/${filters.period_year}`
+  }, [filters.period_year, filters.period_quarter])
 
   const fetchStocks = async (filterParams = {}, activeDynamicPayload = []) => {
     setLoading(true)
@@ -108,9 +141,50 @@ export default function Screener() {
 
   useEffect(() => {
     fetchStocks()
+    fetchPeriodOptions()
+    fetchSavedFilters()
   }, [])
 
-  const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }))
+  const readLocalSavedFilters = () => {
+    try {
+      const raw = localStorage.getItem(LOCAL_SAVED_FILTERS_KEY)
+      const items = raw ? JSON.parse(raw) : []
+      return Array.isArray(items) ? items : []
+    } catch {
+      return []
+    }
+  }
+
+  const writeLocalSavedFilters = (items) => {
+    localStorage.setItem(LOCAL_SAVED_FILTERS_KEY, JSON.stringify(items))
+  }
+
+  const fetchSavedFilters = async () => {
+    try {
+      const response = await api.get('/user/saved-filters/')
+      setSavedFilters(Array.isArray(response) ? response : [])
+    } catch {
+      setSavedFilters(readLocalSavedFilters())
+    }
+  }
+
+  const fetchPeriodOptions = async () => {
+    try {
+      const response = await api.get('/screener/periods')
+      setPeriodOptions(Array.isArray(response?.periods) ? response.periods : [])
+    } catch (err) {
+      console.warn('Không thể tải danh sách kỳ lọc:', err)
+      setPeriodOptions([])
+    }
+  }
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+      ...(key === 'period_year' ? { period_quarter: '' } : {}),
+    }))
+  }
 
   const buildApiFiltersFromQuickInputs = () => {
     const apiFilters = {}
@@ -126,6 +200,7 @@ export default function Screener() {
     setFilters(initialFilters)
     setDynamicPayload([])
     setDynamicNotice('')
+    setLoadedDynamicSnapshot(null)
     fetchStocks()
   }
 
@@ -183,11 +258,65 @@ export default function Screener() {
     fetchStocks(mergedFilters, payload)
   }
 
-  const handleDynamicSave = async ({ payload, queryParams }) => {
+  const buildSavedFilterName = (snapshot) => {
+    const base = snapshot.selectedMethodLabel || 'Bộ lọc cổ phiếu'
+    return `${base} - ${selectedPeriodLabel} - ${new Date().toLocaleString('vi-VN', { hour12: false })}`
+  }
+
+  const handleDynamicSave = async (snapshotData) => {
+    const { payload } = snapshotData
+    const snapshot = {
+      ...snapshotData,
+      quickFilters: buildApiFiltersFromQuickInputs(),
+      savedAt: new Date().toISOString(),
+    }
+    const name = buildSavedFilterName(snapshot)
+
     setDynamicPayload(payload)
-    localStorage.setItem('dynamic_screener_snapshot', JSON.stringify({ savedAt: new Date().toISOString(), payload, queryParams }))
-    await pushDynamicPayloadToApi(payload, queryParams)
-    setDynamicNotice(`Đã lưu ${payload.length} điều kiện lọc động.`)
+
+    try {
+      const saved = await api.post('/user/saved-filters/', {
+        name,
+        conditions: JSON.stringify(snapshot),
+      })
+      setSavedFilters((prev) => [saved, ...prev])
+      setDynamicNotice(`Đã lưu bộ lọc "${name}".`)
+    } catch {
+      const fallbackSaved = {
+        id: `local-${Date.now()}`,
+        name,
+        conditions: JSON.stringify(snapshot),
+        created_at: new Date().toISOString(),
+        local: true,
+      }
+      const nextSavedFilters = [fallbackSaved, ...readLocalSavedFilters()]
+      writeLocalSavedFilters(nextSavedFilters)
+      setSavedFilters(nextSavedFilters)
+      setDynamicNotice('Đã lưu bộ lọc vào trình duyệt vì chưa lưu được lên tài khoản.')
+    }
+  }
+
+  const parseSavedFilter = (savedFilter) => {
+    try {
+      return JSON.parse(savedFilter.conditions || '{}')
+    } catch {
+      return null
+    }
+  }
+
+  const applySavedFilter = (savedFilter) => {
+    const snapshot = parseSavedFilter(savedFilter)
+    if (!snapshot) {
+      setDynamicNotice('Không đọc được bộ lọc đã lưu.')
+      return
+    }
+
+    const quickFilters = snapshot.quickFilters || {}
+    setFilters((prev) => ({ ...prev, ...quickFilters }))
+    setDynamicPayload(snapshot.payload || [])
+    setLoadedDynamicSnapshot({ ...snapshot, name: savedFilter.name, loadedAt: Date.now() })
+    fetchStocks({ ...quickFilters, ...(snapshot.queryParams || {}) }, snapshot.payload || [])
+    setDynamicNotice(`Đã áp dụng bộ lọc "${savedFilter.name}".`)
   }
 
   return (
@@ -210,7 +339,7 @@ export default function Screener() {
 
       <section className="glass-card overflow-hidden">
         <div className="border-b border-white/10 p-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_260px_auto_auto] lg:items-end">
+          <div className="grid gap-4 lg:grid-cols-[1fr_220px_150px_150px_auto_auto] lg:items-end">
             <div>
               <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">Tìm kiếm</label>
               <div className="relative">
@@ -234,6 +363,30 @@ export default function Screener() {
               />
             </div>
 
+            <div>
+              <label className="mb-2 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-slate-400">
+                <Calendar className="h-3.5 w-3.5" />
+                Năm
+              </label>
+              <Select
+                value={filters.period_year}
+                onChange={(e) => handleFilterChange('period_year', e.target.value)}
+                options={yearOptions}
+                placeholder="Mới nhất"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">Quý</label>
+              <Select
+                value={filters.period_quarter}
+                onChange={(e) => handleFilterChange('period_quarter', e.target.value)}
+                options={quarterOptions}
+                placeholder="Kỳ mới nhất"
+                disabled={!filters.period_year}
+              />
+            </div>
+
             <button type="button" onClick={applyFilters} className="btn-primary flex items-center justify-center gap-2 px-5 py-3">
               <Filter className="h-4 w-4" />
               Lọc
@@ -247,8 +400,26 @@ export default function Screener() {
         </div>
 
         <div className="p-5">
-          <DynamicScreenerPanel onApplyFilters={handleDynamicApply} onSaveFilters={handleDynamicSave} />
+          <DynamicScreenerPanel loadedSnapshot={loadedDynamicSnapshot} onApplyFilters={handleDynamicApply} onSaveFilters={handleDynamicSave} />
           {dynamicNotice && <p className="mt-3 text-xs font-bold text-emerald-300">{dynamicNotice}</p>}
+          <p className="mt-2 text-xs font-bold text-slate-500">Kỳ lọc đang dùng: {selectedPeriodLabel}</p>
+          {savedFilters.length > 0 && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Bộ lọc đã lưu</p>
+              <div className="flex flex-wrap gap-2">
+                {savedFilters.slice(0, 8).map((savedFilter) => (
+                  <button
+                    key={savedFilter.id}
+                    type="button"
+                    onClick={() => applySavedFilter(savedFilter)}
+                    className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-bold text-slate-300 transition-colors hover:border-emerald-300/30 hover:text-emerald-200"
+                  >
+                    {savedFilter.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -327,7 +498,7 @@ export default function Screener() {
                     <SortHead label="Mã CK" sortKey="ticker" sortConfig={sortConfig} onSort={handleSort} />
                     <th className="px-2 text-center text-[11px] leading-4">Thêm vào watchlist</th>
                     <th className="px-2 text-center">Ngành</th>
-                    <SortHead label="Giá" sortKey="price" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead label="Giá hiện tại" sortKey="price" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="Vốn hóa" sortKey="market_cap" align="right" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="P/E" sortKey="pe_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="P/B" sortKey="pb_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />

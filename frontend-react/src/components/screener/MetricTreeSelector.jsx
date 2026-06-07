@@ -17,7 +17,11 @@ function isLeafNode(node) {
   return !node.children || node.children.length === 0
 }
 
-export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMetric }) {
+function hasOnlyLeafChildren(node) {
+  return node.children?.length > 0 && node.children.every(isLeafNode)
+}
+
+export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMetric, onSelectGroup }) {
   const [expandedNodes, setExpandedNodes] = useState(() => buildExpandedState(tree))
   const selectedSet = useMemo(() => new Set(selectedMetricIds), [selectedMetricIds])
 
@@ -63,17 +67,33 @@ export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMe
     }
 
     const isExpanded = expandedNodes[node.id]
+    const selectableGroup = onSelectGroup && hasOnlyLeafChildren(node)
 
     return (
       <div key={node.id} className="space-y-2">
         <button
           type="button"
-          onClick={() => toggleExpandNode(node.id)}
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold text-slate-300 hover:bg-white/[0.05]"
+          onClick={() => {
+            if (selectableGroup) {
+              onSelectGroup(node)
+              setExpandedNodes((prev) => ({ ...prev, [node.id]: true }))
+              return
+            }
+            toggleExpandNode(node.id)
+          }}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold text-slate-300 hover:bg-white/[0.05]',
+            selectableGroup && 'border border-white/10 bg-white/[0.03] hover:border-emerald-300/30 hover:text-emerald-200'
+          )}
           style={{ marginLeft: `${depth * 12}px` }}
         >
           <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
           <span>{node.label}</span>
+          {selectableGroup && (
+            <Badge variant="secondary" size="sm" className="ml-auto">
+              Mẫu
+            </Badge>
+          )}
         </button>
 
         {isExpanded && (

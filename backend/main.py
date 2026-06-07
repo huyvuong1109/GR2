@@ -771,6 +771,7 @@ async def get_financial_ratios(ticker: str, year: Optional[int] = None):
         return {
             "ticker": ticker.upper(),
             "company_name": company.name,
+            "company_type": company.company_type,
             "industry": company.industry,
             "period": {
                 "year": balance_sheet.period_year if balance_sheet else None,
@@ -895,6 +896,7 @@ async def get_health_score(ticker: str):
         return {
             "ticker": ticker.upper(),
             "company_name": company.name,
+            "company_type": company.company_type,
             "industry": company.industry,
             "health_score": health,
             "f_score": f_score_data,
@@ -906,6 +908,7 @@ async def get_health_score(ticker: str):
                 "debt_to_equity": ratios.get('debt_to_equity'),
                 "current_ratio": ratios.get('current_ratio'),
                 "gross_margin": ratios.get('gross_margin'),
+                "net_margin": ratios.get('net_margin'),
                 "revenue_growth": ratios.get('revenue_growth'),
                 "profit_growth": ratios.get('profit_growth')
             },
@@ -1254,6 +1257,7 @@ async def compare_companies(request: CompareRequest):
             results.append({
                 "ticker": ticker.upper(),
                 "name": company.name,
+                "company_type": company.company_type,
                 "industry": company.industry,
                 "price": company.current_price,
                 "market_cap": company.market_cap,
@@ -1416,6 +1420,55 @@ async def export_company_data(ticker: str, format: str = "json"):
         session.close()
 
 
+@app.get("/api/screener/periods")
+async def get_screener_periods():
+    """Return periods that have both income statement and balance sheet data."""
+    from sqlalchemy import create_engine, func
+    from sqlalchemy.orm import sessionmaker
+    from Database.models import BalanceSheet, IncomeStatement
+
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        rows = session.query(
+            IncomeStatement.period_year,
+            IncomeStatement.period_quarter,
+            IncomeStatement.period_type,
+            func.count(IncomeStatement.company_id.distinct()).label("company_count"),
+        ).join(
+            BalanceSheet,
+            (IncomeStatement.company_id == BalanceSheet.company_id) &
+            (IncomeStatement.period_year == BalanceSheet.period_year) &
+            (IncomeStatement.period_type == BalanceSheet.period_type) &
+            (func.coalesce(IncomeStatement.period_quarter, 0) == func.coalesce(BalanceSheet.period_quarter, 0)),
+        ).group_by(
+            IncomeStatement.period_year,
+            IncomeStatement.period_quarter,
+            IncomeStatement.period_type,
+        ).order_by(
+            IncomeStatement.period_year.desc(),
+            IncomeStatement.period_quarter.desc(),
+        ).all()
+
+        periods = [
+            {
+                "year": row.period_year,
+                "quarter": row.period_quarter,
+                "period_type": row.period_type,
+                "label": f"Q{row.period_quarter}/{row.period_year}" if row.period_quarter else f"{row.period_year}",
+                "company_count": row.company_count,
+            }
+            for row in rows
+            if row.period_year
+        ]
+
+        return {"periods": periods}
+    finally:
+        session.close()
+
+
 @app.get("/api/screener/advanced")
 async def advanced_screener(
     # Market ratio filters
@@ -1444,6 +1497,10 @@ async def advanced_screener(
     
     # Industry
     industry: Optional[str] = None,
+
+    # Reporting period. Empty means latest available data.
+    period_year: Optional[int] = None,
+    period_quarter: Optional[int] = None,
     
     # Sorting
     sort_by: str = "market_cap",
@@ -1459,15 +1516,56 @@ async def advanced_screener(
         calculate_health_score,
         detect_risk_warnings,
     )
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, text
     from sqlalchemy.orm import sessionmaker
     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
+    import copy
     
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
     
     try:
+        def selected_period_end_date():
+            if not period_year:
+                return None
+
+            if period_quarter and period_quarter > 0:
+                quarter_end = {
+                    1: "03-31",
+                    2: "06-30",
+                    3: "09-30",
+                    4: "12-31",
+                }.get(period_quarter, "12-31")
+                return f"{period_year}-{quarter_end}"
+
+            return f"{period_year}-12-31"
+
+        period_end_date = selected_period_end_date()
+
+        def get_price_at_or_before(ticker: str, end_date: Optional[str]):
+            if not end_date:
+                return None, None
+
+            row = session.execute(
+                text(
+                    """
+                    SELECT close_price, trade_date
+                    FROM price_history
+                    WHERE UPPER(ticker) = :ticker
+                      AND trade_date <= :end_date
+                    ORDER BY trade_date DESC, id DESC
+                    LIMIT 1
+                    """
+                ),
+                {"ticker": ticker.upper(), "end_date": end_date},
+            ).first()
+
+            if not row:
+                return None, None
+
+            return row.close_price, row.trade_date
+
         # Get all companies
         companies = session.query(Company).all()
         
@@ -1477,27 +1575,105 @@ async def advanced_screener(
         results = []
         
         for company in companies:
-            # Get financial data
-            balance_sheets = session.query(BalanceSheet).filter(
-                BalanceSheet.company_id == company.id
-            ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
+            def latest_query(model):
+                return session.query(model).filter(model.company_id == company.id).order_by(
+                    model.period_year.desc(),
+                    model.period_quarter.desc(),
+                )
+
+            def period_query(model):
+                query = session.query(model).filter(model.company_id == company.id)
+                if not period_year:
+                    return query.order_by(model.period_year.desc(), model.period_quarter.desc()).first()
+
+                if period_quarter and period_quarter > 0:
+                    return query.filter(
+                        model.period_type == 'quarterly',
+                        model.period_year == period_year,
+                        model.period_quarter == period_quarter,
+                    ).first()
+
+                annual = query.filter(
+                    model.period_type == 'annual',
+                    model.period_year == period_year,
+                ).first()
+                if annual:
+                    return annual
+
+                return query.filter(
+                    model.period_type == 'quarterly',
+                    model.period_year == period_year,
+                    model.period_quarter == 4,
+                ).first()
+
+            def previous_comparable(model, current):
+                if not current:
+                    return None
+
+                current_quarter = current.period_quarter or 0
+                if current_quarter > 0:
+                    comparable = session.query(model).filter(
+                        model.company_id == company.id,
+                        model.period_type == 'quarterly',
+                        model.period_year == current.period_year - 1,
+                        model.period_quarter == current_quarter,
+                    ).first()
+                    if comparable:
+                        return comparable
+                else:
+                    comparable = session.query(model).filter(
+                        model.company_id == company.id,
+                        model.period_type == 'annual',
+                        model.period_year == current.period_year - 1,
+                    ).first()
+                    if comparable:
+                        return comparable
+
+                return session.query(model).filter(
+                    model.company_id == company.id,
+                    (
+                        (model.period_year < current.period_year) |
+                        (
+                            (model.period_year == current.period_year) &
+                            (model.period_quarter < current_quarter)
+                        )
+                    ),
+                ).order_by(model.period_year.desc(), model.period_quarter.desc()).first()
+
+            def history_until(model, current, count):
+                query = session.query(model).filter(model.company_id == company.id)
+                if current:
+                    current_quarter = current.period_quarter or 0
+                    query = query.filter(
+                        (
+                            (model.period_year < current.period_year) |
+                            (
+                                (model.period_year == current.period_year) &
+                                (model.period_quarter <= current_quarter)
+                            )
+                        )
+                    )
+                return query.order_by(model.period_year.desc(), model.period_quarter.desc()).limit(count).all()
+
+            balance = period_query(BalanceSheet)
+            income = period_query(IncomeStatement)
+            cash_flow = period_query(CashFlow)
+            if period_year and (not balance or not income):
+                continue
+            prev_balance = previous_comparable(BalanceSheet, balance)
+            prev_income = previous_comparable(IncomeStatement, income)
+            income_list = history_until(IncomeStatement, income, 4) if income else latest_query(IncomeStatement).limit(4).all()
+            cash_flows = history_until(CashFlow, cash_flow, 4) if cash_flow else latest_query(CashFlow).limit(4).all()
             
-            income_list = session.query(IncomeStatement).filter(
-                IncomeStatement.company_id == company.id
-            ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(4).all()
-            
-            cash_flows = session.query(CashFlow).filter(
-                CashFlow.company_id == company.id
-            ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(4).all()
-            
-            balance = balance_sheets[0] if balance_sheets else None
-            prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
-            income = income_list[0] if income_list else None
-            prev_income = income_list[1] if len(income_list) > 1 else None
-            cash_flow = cash_flows[0] if cash_flows else None
-            
-            # Calculate ratios
-            ratios = calculate_financial_ratios(company, balance, income, prev_income, prev_balance)
+            filter_price, filter_price_date = get_price_at_or_before(company.ticker, period_end_date)
+            analysis_company = copy.copy(company)
+            if period_end_date:
+                analysis_company.current_price = filter_price
+                analysis_company.market_cap = filter_price * company.shares_outstanding if filter_price and company.shares_outstanding else None
+
+            # Calculate ratios. For historical periods, price-dependent ratios use only
+            # prices available at or before the selected period end date.
+            ratios = calculate_financial_ratios(analysis_company, balance, income, prev_income, prev_balance)
 
             f_score_data = calculate_piotroski_f_score(
                 balance, prev_balance, income, prev_income, cash_flow,
@@ -1571,7 +1747,11 @@ async def advanced_screener(
                     "ticker": company.ticker,
                     "name": company.name,
                     "industry": company.industry,
+                    "period_year": income.period_year if income else (balance.period_year if balance else None),
+                    "period_quarter": income.period_quarter if income else (balance.period_quarter if balance else None),
                     "price": company.current_price,
+                    "filter_price": filter_price if period_end_date else company.current_price,
+                    "filter_price_date": filter_price_date,
                     "market_cap": company.market_cap,
                     "f_score": f_score,
                     "health_score": health.get('total_score'),
@@ -1614,7 +1794,9 @@ async def advanced_screener(
                 "min_revenue_growth": min_revenue_growth,
                 "min_profit_growth": min_profit_growth,
                 "min_f_score": min_f_score,
-                "industry": industry
+                "industry": industry,
+                "period_year": period_year,
+                "period_quarter": period_quarter,
             },
             "results": results[:limit]
         }

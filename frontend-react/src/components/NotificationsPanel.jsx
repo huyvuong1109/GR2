@@ -9,9 +9,16 @@ import { cn } from '../utils/helpers'
 export default function NotificationsPanel({ isOpen, onClose }) {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
   const [filter, setFilter] = useState('all')
   const panelRef = useRef(null)
   const wsRef = useRef(null)
+
+  const extractNotifications = (payload) => {
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.notifications)) return payload.notifications
+    return []
+  }
 
   const normalizeNotification = (notification) => {
     let data = notification.data
@@ -90,14 +97,26 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   }, [isOpen, onClose])
 
   const fetchNotifications = async () => {
+    const token = window.sessionStorage.getItem('auth_token')
+    if (!token) {
+      setNotifications([])
+      setFetchError('Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại để xem thông báo.')
+      return
+    }
+
     try {
       setLoading(true)
+      setFetchError(null)
       const data = await notificationsApi.getAll(filter === 'unread')
-      const items = Array.isArray(data) ? data : []
+      const items = extractNotifications(data)
       setNotifications(items.map(normalizeNotification))
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
-      toast.error('Không thể tải thông báo')
+      const message = error.response?.status === 401
+        ? 'Phiên đăng nhập đã hết hạn hoặc token không hợp lệ. Vui lòng đăng nhập lại.'
+        : 'Không thể tải thông báo. Kiểm tra backend hoặc kết nối mạng rồi thử lại.'
+      setFetchError(message)
+      setNotifications([])
     } finally {
       setLoading(false)
     }
@@ -178,6 +197,12 @@ export default function NotificationsPanel({ isOpen, onClose }) {
               {loading ? (
                 <div className="flex h-64 items-center justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-300 border-t-transparent" />
+                </div>
+              ) : fetchError ? (
+                <div className="flex h-64 flex-col items-center justify-center px-6 text-center text-amber-200">
+                  <AlertTriangle className="mb-3 h-12 w-12 opacity-80" />
+                  <p className="text-sm font-bold">Không thể tải thông báo</p>
+                  <p className="mt-2 text-xs leading-5 text-amber-100/70">{fetchError}</p>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="flex h-64 flex-col items-center justify-center px-6 text-center text-slate-500">

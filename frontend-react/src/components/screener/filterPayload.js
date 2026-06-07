@@ -20,15 +20,17 @@ function periodUnitFromType(periodType) {
 }
 
 export function createDefaultCondition(metric) {
+  const defaultCondition = metric?.defaultCondition || {}
+
   return {
-    operator: 'all',
-    value: '',
-    rangeFrom: '',
-    rangeTo: '',
+    operator: defaultCondition.operator || 'all',
+    value: defaultCondition.value ?? '',
+    rangeFrom: defaultCondition.rangeFrom ?? '',
+    rangeTo: defaultCondition.rangeTo ?? '',
     timeSeries: {
-      comparator: '>',
-      threshold: '',
-      periods: '3',
+      comparator: defaultCondition.timeSeries?.comparator || '>',
+      threshold: defaultCondition.timeSeries?.threshold ?? '',
+      periods: defaultCondition.timeSeries?.periods || '3',
       periodType: metric?.defaultPeriodType || 'quarter',
     },
   }
