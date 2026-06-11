@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { WatchlistProvider } from './contexts/WatchlistContext'
+import { AuthRequiredModalHost } from './components/AuthRequired'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <AuthProvider>
           <WatchlistProvider>
             <App />
+            <AuthRequiredModalHost />
           </WatchlistProvider>
         </AuthProvider>
         <Toaster 

@@ -29,14 +29,14 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
-          <Route path="screener" element={<Screener />} />
-          <Route path="company/:ticker" element={<CompanyAnalysis />} />
-          <Route path="company/:ticker/reports" element={<CompanyReports />} />
-          <Route path="compare" element={<Comparison />} />
-          <Route path="reports" element={<FinancialReports />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="screener" element={<ProtectedRoute><Screener /></ProtectedRoute>} />
+          <Route path="company/:ticker" element={<ProtectedRoute><CompanyAnalysis /></ProtectedRoute>} />
+          <Route path="company/:ticker/reports" element={<ProtectedRoute><CompanyReports /></ProtectedRoute>} />
+          <Route path="compare" element={<ProtectedRoute><Comparison /></ProtectedRoute>} />
+          <Route path="reports" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

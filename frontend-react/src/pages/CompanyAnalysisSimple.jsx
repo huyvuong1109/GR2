@@ -39,19 +39,27 @@ const toSafeNumber = (value) => {
 
 const valueOrZero = (value) => Number(value || 0)
 
+const toBillions = (value) => valueOrZero(value) / 1e9
+
 const formatVnd = (value) => {
   const number = toSafeNumber(value)
   if (number === null) return 'Chưa có dữ liệu'
   return `${number.toLocaleString('vi-VN')} VND`
 }
 
-const formatCompact = (value) => {
+const formatBillions = (value) => {
   const number = Number(value || 0)
   const abs = Math.abs(number)
-  if (abs >= 1e12) return `${(number / 1e12).toFixed(1)} nghìn tỷ`
-  if (abs >= 1e9) return `${(number / 1e9).toFixed(0)} tỷ`
-  if (abs >= 1e6) return `${(number / 1e6).toFixed(0)} triệu`
-  return number.toLocaleString('vi-VN')
+  const maximumFractionDigits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2
+  return `${number.toLocaleString('vi-VN', { maximumFractionDigits })} tỷ`
+}
+
+const formatBillionsAxis = (value) => {
+  const number = Number(value || 0)
+  const abs = Math.abs(number)
+  if (abs >= 1000) return `${(number / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}k`
+  if (abs >= 100) return number.toLocaleString('vi-VN', { maximumFractionDigits: 0 })
+  return number.toLocaleString('vi-VN', { maximumFractionDigits: 1 })
 }
 
 const formatMarketCap = (value) => {
@@ -383,17 +391,17 @@ function FinancialTab({ chartData }) {
 function buildFinancialChartData({ balanceSheets, incomeStatements }) {
   const income = sortByPeriodAsc(incomeStatements).slice(-12).map((record) => ({
     period: periodLabel(record),
-    revenue: valueOrZero(record.net_revenue ?? record.revenue),
-    netIncome: valueOrZero(record.net_income ?? record.profit),
+    revenue: toBillions(record.net_revenue ?? record.revenue),
+    netIncome: toBillions(record.net_income ?? record.profit),
   }))
 
   const sortedBalance = sortByPeriodAsc(balanceSheets).slice(-12)
   const assets = sortedBalance.map((record) => {
-    const cash = valueOrZero(record.cash)
-    const shortTermInvestments = valueOrZero(record.short_term_investments)
-    const receivables = valueOrZero(record.accounts_receivable)
-    const inventories = valueOrZero(record.inventories)
-    const totalAssets = valueOrZero(record.total_assets)
+    const cash = toBillions(record.cash)
+    const shortTermInvestments = toBillions(record.short_term_investments)
+    const receivables = toBillions(record.accounts_receivable)
+    const inventories = toBillions(record.inventories)
+    const totalAssets = toBillions(record.total_assets)
     const known = cash + shortTermInvestments + receivables + inventories
     return {
       period: periodLabel(record),
@@ -406,10 +414,10 @@ function buildFinancialChartData({ balanceSheets, incomeStatements }) {
   })
 
   const capital = sortedBalance.map((record) => {
-    const shortDebt = valueOrZero(record.short_term_debt)
-    const longDebt = valueOrZero(record.long_term_debt)
-    const totalLiabilities = valueOrZero(record.total_liabilities)
-    const equity = valueOrZero(record.total_equity ?? record.shareholders_equity)
+    const shortDebt = toBillions(record.short_term_debt)
+    const longDebt = toBillions(record.long_term_debt)
+    const totalLiabilities = toBillions(record.total_liabilities)
+    const equity = toBillions(record.total_equity ?? record.shareholders_equity)
     return {
       period: periodLabel(record),
       shortDebt,
@@ -428,11 +436,27 @@ function StackedBarChart({ data, bars }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <BarChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+    <ResponsiveContainer width="100%" height={360}>
+      <BarChart data={data} margin={{ top: 18, right: 18, left: 12, bottom: 42 }} barCategoryGap="18%" barGap={4}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
-        <XAxis dataKey="period" tick={{ fill: '#c6c6cd', fontSize: 12 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: '#c6c6cd', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={formatCompact} />
+        <XAxis
+          dataKey="period"
+          interval={0}
+          angle={-28}
+          textAnchor="end"
+          height={48}
+          tick={{ fill: '#c6c6cd', fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          width={72}
+          unit=" tỷ"
+          tick={{ fill: '#c6c6cd', fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={formatBillionsAxis}
+        />
         <Tooltip
           contentStyle={{
             backgroundColor: 'rgba(25, 28, 30, 0.96)',
@@ -440,11 +464,20 @@ function StackedBarChart({ data, bars }) {
             borderRadius: 12,
             color: '#e0e3e5',
           }}
-          formatter={(value, name) => [formatCompact(value), name]}
+          formatter={(value, name) => [formatBillions(value), name]}
         />
-        <Legend wrapperStyle={{ color: '#c6c6cd', paddingTop: 12 }} />
+        <Legend wrapperStyle={{ color: '#c6c6cd', paddingTop: 8, fontSize: 12 }} />
         {bars.map((bar, index) => (
-          <Bar key={bar.key} dataKey={bar.key} name={bar.name} stackId={bars.length > 2 ? 'total' : undefined} fill={bar.color || CHART_COLORS[index % CHART_COLORS.length]} radius={index === bars.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+          <Bar
+            key={bar.key}
+            dataKey={bar.key}
+            name={bar.name}
+            stackId={bars.length > 2 ? 'total' : undefined}
+            fill={bar.color || CHART_COLORS[index % CHART_COLORS.length]}
+            radius={index === bars.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+            minPointSize={2}
+            maxBarSize={34}
+          />
         ))}
       </BarChart>
     </ResponsiveContainer>

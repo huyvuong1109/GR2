@@ -21,7 +21,14 @@ function hasOnlyLeafChildren(node) {
   return node.children?.length > 0 && node.children.every(isLeafNode)
 }
 
-export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMetric, onSelectGroup }) {
+export default function MetricTreeSelector({
+  tree,
+  selectedMetricIds,
+  onToggleMetric,
+  onSelectGroup,
+  collapsedGroupId,
+  onExpandCollapsedGroup,
+}) {
   const [expandedNodes, setExpandedNodes] = useState(() => buildExpandedState(tree))
   const selectedSet = useMemo(() => new Set(selectedMetricIds), [selectedMetricIds])
 
@@ -66,35 +73,64 @@ export default function MetricTreeSelector({ tree, selectedMetricIds, onToggleMe
       )
     }
 
-    const isExpanded = expandedNodes[node.id]
+    const isExpanded = expandedNodes[node.id] && node.id !== collapsedGroupId
     const selectableGroup = onSelectGroup && hasOnlyLeafChildren(node)
+
+    const toggleNodeOnly = () => {
+      if (node.id === collapsedGroupId) {
+        onExpandCollapsedGroup?.(node.id)
+        setExpandedNodes((prev) => ({ ...prev, [node.id]: true }))
+        return
+      }
+
+      toggleExpandNode(node.id)
+    }
+
+    const applyGroup = () => {
+      if (!selectableGroup) {
+        toggleNodeOnly()
+        return
+      }
+
+      onSelectGroup(node)
+      onExpandCollapsedGroup?.(node.id)
+      setExpandedNodes((prev) => ({ ...prev, [node.id]: true }))
+    }
 
     return (
       <div key={node.id} className="space-y-2">
-        <button
-          type="button"
-          onClick={() => {
-            if (selectableGroup) {
-              onSelectGroup(node)
-              setExpandedNodes((prev) => ({ ...prev, [node.id]: true }))
-              return
-            }
-            toggleExpandNode(node.id)
-          }}
+        <div
           className={cn(
-            'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold text-slate-300 hover:bg-white/[0.05]',
+            'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-bold text-slate-300 transition-colors hover:bg-white/[0.05]',
             selectableGroup && 'border border-white/10 bg-white/[0.03] hover:border-emerald-300/30 hover:text-emerald-200'
           )}
           style={{ marginLeft: `${depth * 12}px` }}
         >
-          <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
-          <span>{node.label}</span>
+          <button
+            type="button"
+            onClick={toggleNodeOnly}
+            className="rounded-md p-1 text-slate-400 transition hover:bg-white/[0.07] hover:text-emerald-300"
+            aria-label={isExpanded ? `Thu gọn ${node.label}` : `Mở rộng ${node.label}`}
+          >
+            <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
+          </button>
+
+          <button
+            type="button"
+            onClick={applyGroup}
+            className="min-w-0 flex-1 truncate rounded-md px-1 py-1 text-left transition hover:text-emerald-200"
+            title={selectableGroup ? `Áp dụng ${node.label}` : node.label}
+          >
+            {node.label}
+          </button>
           {selectableGroup && (
-            <Badge variant="secondary" size="sm" className="ml-auto">
-              Mẫu
-            </Badge>
+            <button type="button" onClick={applyGroup} className="ml-auto" title={`Áp dụng ${node.label}`}>
+              <Badge variant="secondary" size="sm">
+                Mẫu
+              </Badge>
+            </button>
           )}
-        </button>
+        </div>
 
         {isExpanded && (
           <div className="space-y-2">

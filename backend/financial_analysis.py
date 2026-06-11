@@ -128,13 +128,18 @@ def calculate_financial_ratios(
         gross_profit = income_statement.gross_profit or 0
         operating_income = income_statement.operating_income or 0
         net_profit = income_statement.net_profit or 0
+        net_profit_to_shareholders = (
+            getattr(income_statement, 'net_profit_to_shareholders', None)
+            if getattr(income_statement, 'net_profit_to_shareholders', None) is not None
+            else net_profit
+        )
         
         ratios['revenue'] = revenue
         ratios['net_profit'] = net_profit
         
         # EPS
-        if shares and shares > 0 and net_profit:
-            ratios['eps'] = net_profit / shares
+        if shares and shares > 0 and net_profit_to_shareholders:
+            ratios['eps'] = net_profit_to_shareholders / shares
         
         # P/E
         if price and ratios['eps'] and ratios['eps'] > 0:

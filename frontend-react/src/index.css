@@ -38,6 +38,7 @@
 
   body {
     margin: 0;
+    overflow-x: hidden;
     background:
       radial-gradient(circle at 22% 0%, rgba(190, 198, 224, 0.1), transparent 34rem),
       radial-gradient(circle at 82% 18%, rgba(78, 222, 163, 0.06), transparent 28rem),
@@ -450,6 +451,41 @@
   .app-compact .text-lg {
     font-size: 0.96rem;
     line-height: 1.55;
+  }
+
+  @media (max-width: 640px) {
+    .glass-card,
+    .card,
+    .panel {
+      border-radius: 0.75rem;
+    }
+
+    .panel-header,
+    .app-compact .panel-header {
+      padding: 0.9rem;
+    }
+
+    .panel-body,
+    .app-compact .panel-body {
+      padding: 0.9rem;
+    }
+
+    .app-compact .text-5xl {
+      font-size: 2rem;
+      line-height: 1.12;
+    }
+
+    .app-compact .text-4xl {
+      font-size: 1.75rem;
+      line-height: 1.16;
+    }
+
+    .table-financial th,
+    .table-financial td,
+    .app-compact .table-financial th,
+    .app-compact .table-financial td {
+      padding: 0.6rem 0.55rem;
+    }
   }
 
   @media (min-width: 1024px) {

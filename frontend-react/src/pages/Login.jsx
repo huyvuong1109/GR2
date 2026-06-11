@@ -89,11 +89,8 @@ export default function Login() {
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2">
               <label className="block text-xs font-black uppercase tracking-widest text-slate-300">Mật khẩu</label>
-              <Link to="#" className="text-xs font-bold text-emerald-300 transition hover:text-emerald-200">
-                Quên mật khẩu?
-              </Link>
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />

@@ -111,6 +111,7 @@ const TOKEN_LABELS = {
   hang: 'hàng',
   hang_ton_kho: 'hàng tồn kho',
   no: 'nợ',
+  nhom: 'nhóm',
   tra: 'trả',
   von: 'vốn',
   chu: 'chủ',
@@ -119,6 +120,7 @@ const TOKEN_LABELS = {
   loi: 'lợi',
   nhuan: 'nhuận',
   sau: 'sau',
+  truoc: 'trước',
   thue: 'thuế',
   chua: 'chưa',
   phan: 'phân',
@@ -138,6 +140,22 @@ const TOKEN_LABELS = {
   da: 'đã',
   cuoi: 'cuối',
   ky: 'kỳ',
+  vay: 'vay',
+  gui: 'gửi',
+  giay: 'giấy',
+  to: 'tờ',
+  du: 'dự',
+  phong: 'phòng',
+  nghiep: 'nghiệp',
+  vu: 'vụ',
+  thuan: 'thuần',
+  lai: 'lãi',
+  gop: 'gộp',
+  khau: 'khấu',
+  hao: 'hao',
+  ccdv: 'cung cấp dịch vụ',
+  cddv: 'cung cấp dịch vụ',
+  dn: 'doanh nghiệp',
   lctt: 'LCTT',
   hdkd: 'HĐKD',
   hddt: 'HĐĐT',
@@ -411,29 +429,6 @@ const buildCapitalData = (reports, mode, companyType) => {
       : {}),
   }
 }
-
-const buildNplData = (reports, mode) =>
-  getBalanceSeriesRecords(reports, mode)
-    .map((record) => {
-      const loans = pickNumber(record, ['cho_vay_khach_hang', 'accounts_receivable'])
-      const hasNplFields = ['no_nhom_2', 'no_nhom_3', 'no_nhom_4', 'no_nhom_5'].some((field) => toSafeNumber(record?.[field]) !== null)
-      if (!hasNplFields) {
-        return {
-          period: getPeriodLabel(record),
-          badDebtRatio: null,
-          group2Ratio: null,
-        }
-      }
-
-      const group2 = valueOrZero(record?.no_nhom_2)
-      const badDebt = sumFields(record, ['no_nhom_3', 'no_nhom_4', 'no_nhom_5'])
-      return {
-        period: getPeriodLabel(record),
-        badDebtRatio: loans ? (badDebt / Math.abs(loans)) * 100 : null,
-        group2Ratio: loans ? (group2 / Math.abs(loans)) * 100 : null,
-      }
-    })
-    .filter((item) => item.badDebtRatio !== null || item.group2Ratio !== null)
 
 const hasAnySeriesValue = (data, keys) =>
   data.some((item) => keys.some((key) => Math.abs(Number(item?.[key] || 0)) > 0))
@@ -777,32 +772,6 @@ function FundingComparisonChart({ funding }) {
   )
 }
 
-function NplComparisonChart({ data, isBank }) {
-  if (!data.length) {
-    return (
-      <ChartEmptyState>
-        {isBank
-          ? 'Chưa có dữ liệu nợ nhóm 2-5 trong báo cáo đã map, nên chưa thể tính tỷ lệ nợ xấu.'
-          : 'Biểu đồ nợ xấu chỉ hiển thị khi dữ liệu có các khoản nợ nhóm 2-5.'}
-      </ChartEmptyState>
-    )
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <BarChart data={data} margin={{ top: 10, right: 6, left: -8, bottom: 0 }}>
-        <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-        <XAxis dataKey="period" tick={{ fill: '#c6c6cd', fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: '#c6c6cd', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value}%`} />
-        <Tooltip content={<ChartTooltip />} />
-        <Legend wrapperStyle={{ paddingTop: 4, color: '#c6c6cd', fontSize: 11 }} />
-        <Bar dataKey="badDebtRatio" name="Tỷ lệ nợ xấu" stackId="npl" fill="#3fb0dc" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="group2Ratio" name="Tỷ lệ nợ nhóm 2" stackId="npl" fill="#67dec0" radius={[3, 3, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  )
-}
-
 function FinancialPositionChart({ data }) {
   if (!data.length || !hasAnySeriesValue(data, ['assets', 'liabilities'])) return <ChartEmptyState />
 
@@ -847,7 +816,6 @@ function FinancialChartDashboard({ company, reports, chartMode, onChartModeChang
   const companyType = normalizeCompanyType(company, reports)
   const performanceData = useMemo(() => buildPerformanceData(reports, chartMode), [reports, chartMode])
   const capitalData = useMemo(() => buildCapitalData(reports, chartMode, companyType), [reports, chartMode, companyType])
-  const nplData = useMemo(() => buildNplData(reports, chartMode), [reports, chartMode])
   const positionData = useMemo(() => buildFinancialPositionData(reports, selectedPeriod, companyType), [reports, selectedPeriod, companyType])
   const securitiesAssetsData = useMemo(() => buildSecuritiesAssetsData(reports, chartMode), [reports, chartMode])
   const activeIncomeRecord = useMemo(() => {
@@ -868,11 +836,7 @@ function FinancialChartDashboard({ company, reports, chartMode, onChartModeChang
       ? 'Năm: cộng tổng các quý trong năm; bảng cân đối lấy cuối năm. Đơn vị: tỷ VND, tỷ lệ: %.'
       : 'Quý: 4 quý gần nhất. Đơn vị: tỷ VND/quý, tỷ lệ: %.'
   const fourthChart =
-    companyType === 'bank' ? (
-      <ChartCard title="Tỷ lệ nợ xấu và nợ nhóm 2">
-        <NplComparisonChart data={nplData} isBank={capitalData.bank} />
-      </ChartCard>
-    ) : companyType === 'securities' ? (
+    companyType === 'bank' ? null : companyType === 'securities' ? (
       <ChartCard title="Tài sản tài chính và Các khoản cho vay">
         <SecuritiesAssetsChart data={securitiesAssetsData} />
       </ChartCard>

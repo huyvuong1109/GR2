@@ -279,9 +279,17 @@ class DatabaseManager:
     """Quản lý kết nối và truy vấn Database"""
     
     def __init__(self, database_url: str = DATABASE_URL):
-        self.engine = create_engine(database_url, echo=False)
+        self.engine = create_engine(database_url, echo=False, connect_args={"timeout": 30})
         self.SessionLocal = sessionmaker(bind=self.engine)
+        self._configure_sqlite()
         self._ensure_legacy_compatibility()
+
+    def _configure_sqlite(self):
+        """Use SQLite settings that tolerate concurrent API reads and updater writes."""
+        with self.engine.begin() as conn:
+            conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+            conn.exec_driver_sql("PRAGMA busy_timeout=30000")
+            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
 
     def _object_exists(self, conn, object_name: str) -> bool:
         """Kiểm tra table/view có tồn tại trong SQLite hay không."""
@@ -710,15 +718,98 @@ class DatabaseManager:
         finally:
             session.close()
     
+    def _companies_with_latest_metrics_query(self, where_clause: str = "") -> str:
+        """Build company list query with metrics recalculated from latest financial views."""
+        return f"""
+        WITH latest_income AS (
+            SELECT
+                i.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY i.company_id
+                    ORDER BY i.period_year DESC, COALESCE(i.period_quarter, 0) DESC
+                ) AS rn
+            FROM income_statements i
+        ),
+        latest_balance AS (
+            SELECT
+                b.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY b.company_id
+                    ORDER BY b.period_year DESC, COALESCE(b.period_quarter, 0) DESC
+                ) AS rn
+            FROM balance_sheets b
+        )
+        SELECT
+            c.id,
+            c.ticker,
+            c.name,
+            c.industry,
+            c.company_type,
+            CASE
+                WHEN c.current_price IS NOT NULL
+                     AND c.current_price > 0
+                     AND c.shares_outstanding IS NOT NULL
+                     AND c.shares_outstanding > 0
+                THEN CAST(c.current_price * c.shares_outstanding AS INTEGER)
+                ELSE c.market_cap
+            END AS market_cap,
+            c.shares_outstanding,
+            c.current_price,
+            c.current_price AS price,
+            c.price_updated_at,
+            li.period_year,
+            li.period_quarter,
+            li.revenue,
+            li.net_profit,
+            lb.total_assets,
+            lb.total_equity,
+            lb.total_liabilities,
+            CASE
+                WHEN c.shares_outstanding > 0
+                THEN COALESCE(li.net_profit_to_shareholders, li.net_profit) * 1.0 / c.shares_outstanding
+                ELSE NULL
+            END AS eps,
+            CASE
+                WHEN c.shares_outstanding > 0
+                THEN lb.total_equity * 1.0 / c.shares_outstanding
+                ELSE NULL
+            END AS bvps,
+            CASE
+                WHEN c.current_price > 0
+                     AND c.shares_outstanding > 0
+                     AND COALESCE(li.net_profit_to_shareholders, li.net_profit) > 0
+                THEN ROUND(c.current_price / (COALESCE(li.net_profit_to_shareholders, li.net_profit) * 1.0 / c.shares_outstanding), 2)
+                ELSE NULL
+            END AS pe_ratio,
+            CASE
+                WHEN c.current_price > 0 AND c.shares_outstanding > 0 AND lb.total_equity > 0
+                THEN ROUND(c.current_price / (lb.total_equity * 1.0 / c.shares_outstanding), 2)
+                ELSE NULL
+            END AS pb_ratio,
+            CASE
+                WHEN lb.total_equity > 0
+                THEN ROUND(li.net_profit * 100.0 / lb.total_equity, 2)
+                ELSE NULL
+            END AS roe,
+            CASE
+                WHEN lb.total_assets > 0
+                THEN ROUND(li.net_profit * 100.0 / lb.total_assets, 2)
+                ELSE NULL
+            END AS roa,
+            CASE
+                WHEN lb.total_equity > 0
+                THEN ROUND(lb.total_liabilities * 1.0 / lb.total_equity, 2)
+                ELSE NULL
+            END AS debt_to_equity
+        FROM companies c
+        LEFT JOIN latest_income li ON li.company_id = c.id AND li.rn = 1
+        LEFT JOIN latest_balance lb ON lb.company_id = c.id AND lb.rn = 1
+        {where_clause}
+        """
+
     def get_all_companies(self) -> pd.DataFrame:
         """Lấy danh sách tất cả công ty"""
-        query = """
-        SELECT 
-            c.id, c.ticker, c.name, c.industry,
-            c.market_cap, c.shares_outstanding, c.current_price, c.price_updated_at
-        FROM companies c
-        ORDER BY c.ticker
-        """
+        query = self._companies_with_latest_metrics_query("ORDER BY c.ticker")
         return pd.read_sql(query, self.engine)
 
     def get_companies_by_tickers(self, tickers: list[str]) -> pd.DataFrame:
@@ -729,13 +820,9 @@ class DatabaseManager:
 
         placeholders = ", ".join([f":t{i}" for i in range(len(normalized))])
         params = {f"t{i}": symbol for i, symbol in enumerate(normalized)}
-        query = f"""
-        SELECT
-            c.id, c.ticker, c.name, c.industry,
-            c.market_cap, c.shares_outstanding, c.current_price, c.price_updated_at
-        FROM companies c
-        WHERE UPPER(c.ticker) IN ({placeholders})
-        """
+        query = self._companies_with_latest_metrics_query(
+            f"WHERE UPPER(c.ticker) IN ({placeholders})"
+        )
         return pd.read_sql(text(query), self.engine, params=params)
 
     def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
@@ -1008,7 +1095,7 @@ class DatabaseManager:
             return []
 
         df["company_type"] = company_type
-        return df.where(pd.notnull(df), None).to_dict("records")
+        return df.astype(object).where(pd.notnull(df), None).to_dict("records")
 
     def get_company_balance_sheets_mapped(self, ticker: str) -> list[dict[str, Any]]:
         """CDKT đã map theo loại công ty cho frontend."""
@@ -1234,6 +1321,8 @@ class DatabaseManager:
                 c.shares_outstanding,
                 c.market_cap,
                 i.period_year,
+                i.period_quarter,
+                i.period_type,
                 i.revenue,
                 i.net_profit,
                 i.net_profit_to_shareholders,
@@ -1260,11 +1349,14 @@ class DatabaseManager:
                 AND i.period_year = b.period_year 
                 AND i.period_type = b.period_type
                 AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
-            WHERE i.period_type = 'annual'
-               OR (i.period_type = 'quarterly' AND i.period_quarter = 4)
         ),
-        latest_year AS (
-            SELECT MAX(period_year) as max_year FROM yearly_metrics
+        latest_period AS (
+            SELECT
+                period_year,
+                MAX(COALESCE(period_quarter, 0)) AS period_quarter
+            FROM yearly_metrics
+            WHERE period_year = (SELECT MAX(period_year) FROM yearly_metrics)
+            GROUP BY period_year
         ),
         latest_metrics AS (
             SELECT 
@@ -1275,8 +1367,10 @@ class DatabaseManager:
                 CASE WHEN ym.shares_outstanding > 0 THEN 
                     ROUND(ym.total_equity * 1.0 / ym.shares_outstanding, 2) 
                 ELSE 0 END as bvps
-            FROM yearly_metrics ym, latest_year ly
-            WHERE ym.period_year = ly.max_year
+            FROM yearly_metrics ym
+            JOIN latest_period lp
+                ON ym.period_year = lp.period_year
+               AND COALESCE(ym.period_quarter, 0) = lp.period_quarter
         ),
         growth_calc AS (
             SELECT 
@@ -1288,14 +1382,22 @@ class DatabaseManager:
                     ROUND((ym1.revenue - ym0.revenue) * 100.0 / ym0.revenue, 2)
                 ELSE 0 END as revenue_growth
             FROM yearly_metrics ym1
-            JOIN yearly_metrics ym0 ON ym1.id = ym0.id AND ym1.period_year = ym0.period_year + 1
-            JOIN latest_year ly ON ym1.period_year = ly.max_year
+            JOIN yearly_metrics ym0
+                ON ym1.id = ym0.id
+               AND ym1.period_year = ym0.period_year + 1
+               AND COALESCE(ym1.period_quarter, 0) = COALESCE(ym0.period_quarter, 0)
+            JOIN latest_period lp
+                ON ym1.period_year = lp.period_year
+               AND COALESCE(ym1.period_quarter, 0) = lp.period_quarter
         )
         SELECT 
             lm.ticker,
             lm.name,
             lm.industry,
+            lm.period_year,
+            lm.period_quarter,
             lm.current_price,
+            lm.current_price as price,
             lm.market_cap,
             lm.revenue,
             lm.net_profit,

@@ -4,6 +4,7 @@ import { X, Bell, Check, Trash2, ExternalLink, Info, AlertTriangle, CheckCircle,
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { notificationsApi } from '../services/api'
+import { tokenStore } from '../services/auth'
 import { cn } from '../utils/helpers'
 
 export default function NotificationsPanel({ isOpen, onClose }) {
@@ -11,6 +12,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState(null)
   const [filter, setFilter] = useState('all')
+  const [socketToken, setSocketToken] = useState(null)
   const panelRef = useRef(null)
   const wsRef = useRef(null)
 
@@ -38,11 +40,14 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   }
 
   useEffect(() => {
-    if (isOpen) fetchNotifications()
+    if (isOpen) {
+      setSocketToken(tokenStore.getAccess())
+      fetchNotifications()
+    }
   }, [isOpen, filter])
 
   useEffect(() => {
-    const token = window.sessionStorage.getItem('auth_token')
+    const token = socketToken
     if (!isOpen || !token) {
       if (wsRef.current) {
         wsRef.current.close()
@@ -85,7 +90,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
       ws.close()
       wsRef.current = null
     }
-  }, [isOpen])
+  }, [isOpen, socketToken])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -97,8 +102,8 @@ export default function NotificationsPanel({ isOpen, onClose }) {
   }, [isOpen, onClose])
 
   const fetchNotifications = async () => {
-    const token = window.sessionStorage.getItem('auth_token')
-    if (!token) {
+    const hasSession = tokenStore.getAccess() || tokenStore.getRefresh()
+    if (!hasSession) {
       setNotifications([])
       setFetchError('Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại để xem thông báo.')
       return
@@ -110,6 +115,7 @@ export default function NotificationsPanel({ isOpen, onClose }) {
       const data = await notificationsApi.getAll(filter === 'unread')
       const items = extractNotifications(data)
       setNotifications(items.map(normalizeNotification))
+      setSocketToken(tokenStore.getAccess())
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
       const message = error.response?.status === 401

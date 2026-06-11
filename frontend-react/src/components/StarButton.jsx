@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react'
 import { Star } from 'lucide-react'
 import { AuthContext } from '../contexts/AuthContext'
 import { WatchlistContext } from '../contexts/WatchlistContext'
+import { showAuthRequiredToast } from './AuthRequired'
 
 export default function StarButton({ ticker }) {
   const { user } = useContext(AuthContext)
@@ -13,7 +14,10 @@ export default function StarButton({ ticker }) {
     event?.preventDefault()
     event?.stopPropagation()
     if (pending) return
-    if (!user) return alert('Vui lòng đăng nhập')
+    if (!user) {
+      showAuthRequiredToast()
+      return
+    }
 
     setPending(true)
     try {

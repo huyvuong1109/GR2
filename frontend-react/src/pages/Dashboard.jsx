@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react'
 import { AuthContext } from '../contexts/AuthContext'
 import { WatchlistContext } from '../contexts/WatchlistContext'
+import { ProtectedActionLink } from '../components/AuthRequired'
 import { advancedScreenerApi, analysisApi, companiesApi, marketApi } from '../services/api'
 import { cn } from '../utils/helpers'
 
@@ -483,10 +483,10 @@ function WatchlistSection({ items, rawItems, loading }) {
               <p className="section-subtitle">Theo dõi nhanh các mã đã lưu trong danh mục quan tâm.</p>
             </div>
           </div>
-          <Link to="/settings" className="btn-outline inline-flex items-center gap-2 px-3 py-2 text-sm">
+          <ProtectedActionLink to="/settings" className="btn-outline inline-flex items-center gap-2 px-3 py-2 text-sm">
             Quản lý
             <ArrowUpRight className="h-4 w-4" />
-          </Link>
+          </ProtectedActionLink>
         </div>
       </div>
 
@@ -498,7 +498,7 @@ function WatchlistSection({ items, rawItems, loading }) {
         {!loading && visibleItems.length > 0 && (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {visibleItems.map((company) => (
-              <Link
+              <ProtectedActionLink
                 key={company.ticker}
                 to={`/company/${company.ticker}`}
                 className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:border-emerald-300/25 hover:bg-white/[0.06]"
@@ -524,7 +524,7 @@ function WatchlistSection({ items, rawItems, loading }) {
                     </p>
                   </div>
                 </div>
-              </Link>
+              </ProtectedActionLink>
             ))}
           </div>
         )}
@@ -547,10 +547,10 @@ function OpportunitySection({ activeTab, setActiveTab, opportunities, loading })
               {opportunities.length} mã đáng nghiên cứu theo bộ tiêu chí hiện tại. Bấm vào chi tiết mã để xem phân tích đầy đủ.
             </p>
           </div>
-          <Link to="/screener" className="btn-outline inline-flex items-center gap-2 px-3 py-2 text-sm">
+          <ProtectedActionLink to="/screener" className="btn-outline inline-flex items-center gap-2 px-3 py-2 text-sm">
             Mở bộ lọc
             <ArrowUpRight className="h-4 w-4" />
-          </Link>
+          </ProtectedActionLink>
         </div>
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -607,10 +607,10 @@ function OpportunityRow({ company }) {
         {thesisFor(company)}
       </div>
       <p className="mt-2 text-xs text-slate-500">Rủi ro: {riskFor(company)}</p>
-      <Link to={`/company/${company.ticker}`} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-emerald-300 hover:text-emerald-200">
+      <ProtectedActionLink to={`/company/${company.ticker}`} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-emerald-300 hover:text-emerald-200">
         Xem chi tiết mã
         <ArrowUpRight className="h-3.5 w-3.5" />
-      </Link>
+      </ProtectedActionLink>
     </div>
   )
 }
@@ -645,7 +645,7 @@ function HealthySection({ companies, loading }) {
 function HealthyRow({ company, index }) {
   const score = company.computed_health_score ?? healthScore(company)
   return (
-    <Link to={`/company/${company.ticker}`} className="block rounded-xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-emerald-300/25 hover:bg-white/[0.06]">
+    <ProtectedActionLink to={`/company/${company.ticker}`} className="block rounded-xl border border-white/10 bg-white/[0.04] p-3 transition hover:border-emerald-300/25 hover:bg-white/[0.06]">
       <div className="flex items-start gap-3">
         <div className="flex h-8 w-8 flex-none items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-400/10 text-xs font-black text-emerald-300">
           {index + 1}
@@ -659,7 +659,7 @@ function HealthyRow({ company, index }) {
           <p className="mt-2 text-xs leading-5 text-slate-400">Lý do: {thesisFor(company)}</p>
         </div>
       </div>
-    </Link>
+    </ProtectedActionLink>
   )
 }
 
@@ -714,10 +714,10 @@ function RiskAlert({ alert }) {
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-400">{alert.message || 'Cần kiểm tra chi tiết báo cáo tài chính.'}</p>
       {alert.recommendation && <p className="mt-2 text-xs leading-5 text-slate-500">{alert.recommendation}</p>}
-      <Link to={`/company/${alert.ticker}`} className="mt-3 inline-flex items-center gap-2 text-xs font-black text-red-200 hover:text-red-100">
+      <ProtectedActionLink to={`/company/${alert.ticker}`} className="mt-3 inline-flex items-center gap-2 text-xs font-black text-red-200 hover:text-red-100">
         Kiểm tra chi tiết
         <ArrowUpRight className="h-3.5 w-3.5" />
-      </Link>
+      </ProtectedActionLink>
     </div>
   )
 }

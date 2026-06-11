@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button } from '../ui'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Button, Input } from '../ui'
 import { cn } from '../../utils/helpers'
 import MetricTreeSelector from './MetricTreeSelector'
 import FilterConditionBlock from './FilterConditionBlock'
@@ -31,6 +32,10 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
   const [conditionsByMetric, setConditionsByMetric] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedMethodId, setSelectedMethodId] = useState(null)
+  const [methodFiltersCollapsed, setMethodFiltersCollapsed] = useState(false)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [saveFilterName, setSaveFilterName] = useState('')
+  const [saveNameError, setSaveNameError] = useState('')
 
   const activeFilterGroup = useMemo(
     () => FILTER_GROUPS.find((group) => group.id === activeFilterMode) || orderedFilterGroups[0],
@@ -102,6 +107,7 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
     setSelectedMetricIds([])
     setConditionsByMetric({})
     setSelectedMethodId(null)
+    setMethodFiltersCollapsed(false)
     setStatusMessage('Đã xóa toàn bộ bộ lọc động')
   }
 
@@ -120,6 +126,7 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
     setSelectedMetricIds(methodMetrics.map((metric) => metric.id))
     setConditionsByMetric(nextConditions)
     setSelectedMethodId(methodNode.id)
+    setMethodFiltersCollapsed(false)
     setStatusMessage(`Đã nạp mẫu ${methodNode.label}. Có thể chỉnh từng ngưỡng trước khi lọc.`)
   }
 
@@ -132,8 +139,49 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
     setSelectedMetricIds(Array.isArray(loadedSnapshot.selectedMetricIds) ? loadedSnapshot.selectedMetricIds : [])
     setConditionsByMetric(loadedSnapshot.conditionsByMetric || {})
     setSelectedMethodId(loadedSnapshot.selectedMethodId || null)
+    setMethodFiltersCollapsed(false)
     setStatusMessage(`Đã tải bộ lọc "${loadedSnapshot.name || 'đã lưu'}".`)
   }, [loadedSnapshot])
+
+  const createSnapshotData = () => {
+    const selectedMethodLabel = activeFilterGroup?.children?.find((group) => group.id === selectedMethodId)?.label || null
+    return {
+      payload,
+      queryParams,
+      selectedMetricIds,
+      conditionsByMetric,
+      activeFilterMode,
+      selectedMethodId,
+      selectedMethodLabel,
+    }
+  }
+
+  const openSaveDialog = () => {
+    if (selectedMetricIds.length === 0) return
+    setSaveFilterName('')
+    setSaveNameError('')
+    setSaveDialogOpen(true)
+  }
+
+  const closeSaveDialog = () => {
+    setSaveDialogOpen(false)
+    setSaveNameError('')
+  }
+
+  const saveWithCustomName = async (event) => {
+    event.preventDefault()
+    const name = saveFilterName.trim()
+    if (!name) {
+      setSaveNameError('Vui lòng nhập tên bộ lọc.')
+      return
+    }
+
+    if (onSaveFilters) {
+      await onSaveFilters({ ...createSnapshotData(), name })
+      setStatusMessage(`Đã lưu bộ lọc "${name}"`)
+    }
+    closeSaveDialog()
+  }
 
   const notifyParent = async (eventType) => {
     const selectedMethodLabel = activeFilterGroup?.children?.find((group) => group.id === selectedMethodId)?.label || null
@@ -208,6 +256,8 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
             selectedMetricIds={selectedMetricIds}
             onToggleMetric={toggleMetric}
             onSelectGroup={activeFilterMode === 'by_method' ? applyMethodPreset : undefined}
+            collapsedGroupId={activeFilterMode === 'by_method' && methodFiltersCollapsed ? selectedMethodId : null}
+            onExpandCollapsedGroup={() => setMethodFiltersCollapsed(false)}
           />
         </div>
 
@@ -229,10 +279,21 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-bold text-slate-200">Khu vực điều kiện lọc</p>
             <div className="flex flex-wrap items-center gap-2">
+              {activeFilterMode === 'by_method' && selectedMetricIds.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setMethodFiltersCollapsed((value) => !value)}
+                >
+                  {methodFiltersCollapsed ? <ChevronDown className="mr-1.5 h-4 w-4" /> : <ChevronUp className="mr-1.5 h-4 w-4" />}
+                  {methodFiltersCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                </Button>
+              )}
               <Button type="button" size="sm" variant="ghost" onClick={resetAllDynamicFilters}>
                 Xóa tất cả
               </Button>
-              <Button type="button" size="sm" variant="outline" disabled={selectedMetricIds.length === 0} onClick={() => notifyParent('save')}>
+              <Button type="button" size="sm" variant="outline" disabled={selectedMetricIds.length === 0} onClick={openSaveDialog}>
                 Lưu bộ lọc
               </Button>
               <Button type="button" size="sm" disabled={selectedMetricIds.length === 0} onClick={() => notifyParent('apply')}>
@@ -245,6 +306,15 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
             <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-500">
               Chưa có chỉ tiêu nào được chọn. Tick bên trái để tạo các khối điều kiện.
             </div>
+          ) : activeFilterMode === 'by_method' && methodFiltersCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setMethodFiltersCollapsed(false)}
+              className="w-full rounded-xl border border-dashed border-emerald-300/20 bg-emerald-400/[0.05] px-4 py-5 text-left text-sm text-slate-300 transition hover:border-emerald-300/35 hover:bg-emerald-400/[0.08]"
+            >
+              <span className="block font-black text-emerald-300">Đã thu gọn {selectedMetrics.length} điều kiện theo phương pháp</span>
+              <span className="mt-1 block text-xs text-slate-500">Bấm để mở rộng và chỉnh từng ngưỡng lọc.</span>
+            </button>
           ) : (
             <div className="space-y-3">
               {selectedMetrics.map((metric) => (
@@ -262,6 +332,64 @@ export default function DynamicScreenerPanel({ className, loadedSnapshot, onAppl
       </div>
 
       {statusMessage && <p className="text-xs font-bold text-emerald-300">{statusMessage}</p>}
+
+      {saveDialogOpen && (
+        <div className="fixed inset-0 z-[110] flex min-h-dvh items-center justify-center px-4 py-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            aria-label="Đóng hộp thoại lưu bộ lọc"
+            onClick={closeSaveDialog}
+          />
+          <form
+            onSubmit={saveWithCustomName}
+            className="glass-card relative w-full max-w-md overflow-hidden p-6 shadow-[0_28px_90px_rgba(0,0,0,0.55)]"
+          >
+            <button
+              type="button"
+              onClick={closeSaveDialog}
+              className="btn-ghost absolute right-3 top-3 p-2"
+              aria-label="Đóng"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="pr-8">
+              <p className="text-xs font-black uppercase tracking-widest text-emerald-300">Lưu bộ lọc</p>
+              <h3 className="mt-2 text-xl font-black text-slate-100">Đặt tên bộ lọc của bạn</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Tên này sẽ hiển thị trong danh sách bộ lọc đã lưu để bạn dễ áp dụng lại sau.
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+                Tên bộ lọc
+              </label>
+              <Input
+                autoFocus
+                value={saveFilterName}
+                onChange={(event) => {
+                  setSaveFilterName(event.target.value)
+                  if (saveNameError) setSaveNameError('')
+                }}
+                placeholder="Ví dụ: Value cổ phiếu giá rẻ"
+                className="h-11 px-3 text-sm font-semibold"
+              />
+              {saveNameError && <p className="mt-2 text-sm text-red-300">{saveNameError}</p>}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={closeSaveDialog}>
+                Hủy
+              </Button>
+              <Button type="submit">
+                Lưu bộ lọc
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

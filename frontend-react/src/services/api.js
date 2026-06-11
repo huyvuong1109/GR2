@@ -1,10 +1,12 @@
 import axios from 'axios'
+import { refresh as refreshAuth, tokenStore } from './auth'
 
 // Use one backend origin for both financial data and authenticated user APIs.
 const API_ORIGIN = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '')
 const API_BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
 const USER_API_BASE_URL = (import.meta.env.VITE_AUTH_API_URL || API_ORIGIN || '').replace(/\/$/, '')
-const getAuthToken = () => window.sessionStorage.getItem('auth_token')
+const getAuthToken = () => tokenStore.getAccess()
+let refreshPromise = null
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -22,48 +24,65 @@ const userApi = axios.create({
   },
 })
 
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = getAuthToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-userApi.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    const message = error.response?.data?.detail || error.message || 'Có lỗi xảy ra'
-    console.error('API Error:', message)
-    return Promise.reject(error)
+const attachAuthToken = (config) => {
+  const token = getAuthToken()
+  if (token) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${token}`
   }
-)
+  return config
+}
 
-userApi.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    const message = error.response?.data?.detail || error.message || 'Có lỗi xảy ra'
-    console.error('User API Error:', message)
-    return Promise.reject(error)
+const refreshAccessToken = async () => {
+  if (!tokenStore.getRefresh()) {
+    throw new Error('Missing refresh token')
   }
-)
+
+  if (!refreshPromise) {
+    refreshPromise = refreshAuth().finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  const data = await refreshPromise
+  return data?.access_token || tokenStore.getAccess()
+}
+
+const handleApiError = (client, label) => async (error) => {
+  const originalRequest = error.config
+  const canRefresh =
+    error.response?.status === 401 &&
+    originalRequest &&
+    !originalRequest._retry &&
+    tokenStore.getRefresh()
+
+  if (canRefresh) {
+    originalRequest._retry = true
+
+    try {
+      const token = await refreshAccessToken()
+      if (token) {
+        originalRequest.headers = originalRequest.headers || {}
+        originalRequest.headers.Authorization = `Bearer ${token}`
+      }
+      return client(originalRequest)
+    } catch {
+      tokenStore.clear()
+      window.dispatchEvent(new Event('auth:expired'))
+      return Promise.reject(error)
+    }
+  }
+
+  const message = error.response?.data?.detail || error.message || 'Có lỗi xảy ra'
+  console.error(`${label} Error:`, message)
+  return Promise.reject(error)
+}
+
+api.interceptors.request.use(attachAuthToken, (error) => Promise.reject(error))
+userApi.interceptors.request.use(attachAuthToken, (error) => Promise.reject(error))
+
+api.interceptors.response.use((response) => response.data, handleApiError(api, 'API'))
+userApi.interceptors.response.use((response) => response.data, handleApiError(userApi, 'User API'))
 
 // ==================== Companies API ====================
 export const companiesApi = {

@@ -10,6 +10,7 @@ from functools import lru_cache
 
 def _norm(text: str) -> str:
     text = (text or "").replace("Đ", "D").replace("đ", "d").replace("Đ", "d")
+    text = text.replace("Đ", "D").replace("đ", "d")
     nfkd = unicodedata.normalize("NFKD", text or "")
     t = "".join(c for c in nfkd if unicodedata.category(c) != "Mn")
     t = re.sub(r"[^a-zA-Z0-9\s]", " ", t).lower()
@@ -377,11 +378,14 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "lai lo khac",              # "Lãi/(lỗ) khác" sau khi bỏ "/(lỗ)"
         "lai khac",
         "lai tu hoat dong dau tu",
+        "thu nhap khac rong",
     ],
     "loi_nhuan_truoc_thue": [
         "tong loi nhuan ke toan truoc thue", "profit before tax",
         "loi nhuan truoc thue", "earnings before tax", "ebt",
         "ln truoc thue",
+        "lai lo truoc thue",
+        "loi nhuan lo truoc thue",
     ],
     "chi_phi_thue_tndn_hien_hanh": [
         "chi phi thue thu nhap doanh nghiep hien hanh",
@@ -402,6 +406,7 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "loi nhuan sau thue thu nhap doanh nghiep", "profit after tax",
         "net profit", "loi nhuan sau thue", "net income",
         "loi nhuan thuan",
+        "lai lo thuan sau thue",
         "loi nhuan lo sau thue",        # "Lợi nhuận/(lỗ) sau thuế" sau preprocess
     ],
     "loi_nhuan_cua_co_dong_khong_kiem_soat": [
@@ -429,6 +434,8 @@ CORPORATE_MAP: dict[str, list[str]] = {
         "luu chuyen tien thuan tu hoat dong kinh doanh truoc",
         "luu chuyen tien thuan tu hdkd truoc thay doi von luu dong",
         "luu chuyen tien te rong tu cac hoat dong sxkd",
+        "loi nhuan lo tu hoat dong kinh doanh truoc nhung thay doi von luu dong",
+        "loi nhuan tu hoat dong kinh doanh truoc nhung thay doi von luu dong",
     ],
     "khau_hao_tscd": [
         "khau hao tscd",
@@ -467,10 +474,12 @@ CORPORATE_MAP: dict[str, list[str]] = {
     "tien_mua_tai_san_co_dinh": [
         "tien chi de mua sam tai san co dinh", "purchase of fixed assets",
         "mua sam tscd",
+        "tien chi de mua sam xay dung tscd va cac tai san dai han khac",
     ],
     "tien_thu_thanh_ly_tscdd": [
         "tien thu tu thanh ly nhuong ban tai san co dinh",
         "tien thu duoc tu thanh ly tai san co dinh",
+        "tien thu tu thanh ly nhuong ban tscd va cac tai san dai han khac",
     ],
     "tien_chi_dau_tu_gop_von": [
         "tien chi dau tu gop von vao don vi khac",
@@ -621,7 +630,10 @@ BANK_MAP: dict[str, list[str]] = {
         "lai chua phan phoi",
     ],
     "tong_von_chu_so_huu":  ["tong von chu so huu", "total equity", "von chu so huu"],
-    "tong_nguon_von":       ["tong nguon von", "tong cong nguon von", "total liabilities and equity"],
+    "tong_nguon_von":       [
+        "tong nguon von", "tong cong nguon von", "total liabilities and equity",
+        "tong cong nguon von dong",
+    ],
     # NPL
     "no_nhom_1":  ["no nhom 1", "no du tieu chuan", "nhom 1", "standard"],
     "no_nhom_2":  ["no nhom 2", "no can chu y", "nhom 2", "watch"],
@@ -641,10 +653,12 @@ BANK_MAP: dict[str, list[str]] = {
     ],
     "thu_nhap_tu_dich_vu": [               # THÊM MỚI
         "thu nhap tu hoat dong dich vu",
+        "thu nhap tu dich vu",
         "income from service activities",
     ],
     "chi_phi_dich_vu": [                   # THÊM MỚI
         "chi phi hoat dong dich vu",
+        "chi phi dich vu",
         "service activity expenses",
     ],
     "thu_nhap_lai_thuan": [
@@ -654,6 +668,7 @@ BANK_MAP: dict[str, list[str]] = {
     "lai_thuan_tu_dich_vu": [
         "lai thuan tu hoat dong dich vu", "net fee income",
         "lai thuan tu dich vu",
+        "lai lo thuan tu hoat dong dich vu",
     ],
     "lai_thuan_ngoai_hoi": [
         "lai thuan tu kinh doanh ngoai hoi va vang", "net forex gain",
@@ -676,13 +691,13 @@ BANK_MAP: dict[str, list[str]] = {
     "tong_thu_nhap_hoat_dong": [
         "tong thu nhap hoat dong", "total operating income",
         "tong thu nhap truoc du phong", "tong thu nhap",
-        "doanh thu dong",
     ],
     "chi_phi_hoat_dong": [
         "chi phi hoat dong", "operating expenses", "opex",
         "tong chi phi hoat dong",
         "chi phi hoat dong khac",       # "Chi phí hoạt động khác"
         "chi phi quan ly dn",
+        "chi phi quan ly doanh nghiep",
     ],
     "loi_nhuan_thuan_truoc_du_phong": [
         "loi nhuan thuan tu hoat dong kinh doanh truoc chi phi du phong",
@@ -691,13 +706,19 @@ BANK_MAP: dict[str, list[str]] = {
         "lai thuan tu hoat dong kinh doanh truoc chi phi du phong",
         "lai thuan tu hoat dong kinh doanh truoc",  
         "lai thuan tu hoat dong kinh doanh truoc chi phi du phong rui ro tin dung",
+        "loi nhuan thuan hoat dong truoc khi trich lap du phong ton that tin dung",
     ],
     "chi_phi_du_phong_rui_ro": [
         "chi phi du phong rui ro tin dung", "provision expenses",
         "chi phi trich lap du phong",
         "chi phi du phong rui ro tin dung",
+        "trich lap du phong ton that tin dung",
     ],
-    "loi_nhuan_truoc_thue":     ["loi nhuan truoc thue", "profit before tax", "ln truoc thue"],
+    "loi_nhuan_truoc_thue":     [
+        "loi nhuan truoc thue", "profit before tax", "ln truoc thue",
+        "tong loi nhuan lo truoc thue",
+        "lai lo truoc thue",
+    ],
     "chi_phi_thue_tndn": [
         "chi phi thue thu nhap doanh nghiep", "income tax expense",
         "chi phi thue tndn hien hanh",
@@ -742,6 +763,7 @@ BANK_MAP: dict[str, list[str]] = {
     "tien_cuoi_ky": [
         "tien va tuong duong tien cuoi ky", "cash at end",
         "tien va tuong duong tien",
+        "tien va cac khoan tuong duong tien tai thoi diem cuoi ky",
     ],
     "chenh_lech_ty_gia_hoi_doai": [
         "chenh lech ty gia hoi doai",
@@ -797,10 +819,12 @@ SECURITIES_MAP: dict[str, list[str]] = {
     "vay_ngan_han":               ["vay ngan han", "short term borrowings", "vay va no thue tai chinh ngan han"],
     "tong_no_ngan_han":           [
         "tong no ngan han", "total current liabilities", "no ngan han", "no ngan han dong",
+        "no phai tra ngan han",
     ],
     "vay_dai_han":                ["vay dai han", "long term borrowings"],
     "tong_no_dai_han":            [
         "tong no dai han", "total non current liabilities", "no dai han", "no dai han dong",
+        "no phai tra dai han",
     ],
     "tong_no_phai_tra":           [
         "tong no phai tra", "total liabilities", "no phai tra",
@@ -840,6 +864,7 @@ SECURITIES_MAP: dict[str, list[str]] = {
     "lctt_thuan_hdkd":            [
         "luu chuyen tien thuan tu hoat dong kinh doanh", "luu chuyen tien te rong tu cac hoat dong sxkd",
         "luu chuyen tien thuan tu hdkd truoc thay doi von luu dong", "luu chuyen tien thuan tu hdkd truoc thay doi vld",
+        "luu chuyen thuan tu hoat dong kinh doanh",
     ],
     "lctt_thuan_hddt":            [
         "luu chuyen tien thuan tu hoat dong dau tu", "luu chuyen tu hoat dong dau tu",
@@ -848,9 +873,16 @@ SECURITIES_MAP: dict[str, list[str]] = {
     "lctt_thuan_hdtc":            [
         "luu chuyen tien thuan tu hoat dong tai chinh", "luu chuyen tien tu hoat dong tai chinh",
         "tang von co phan tu gop von va hoac phat hanh co phieu",
+        "luu chuyen thuan tu hoat dong tai chinh",
     ],
-    "tien_dau_ky":                ["tien va tuong duong tien dau ky", "cash at beginning"],
-    "tien_cuoi_ky":               ["tien va tuong duong tien cuoi ky", "cash at end"],
+    "tien_dau_ky":                [
+        "tien va tuong duong tien dau ky", "cash at beginning",
+        "tien va cac khoan tuong duong tien dau ky",
+    ],
+    "tien_cuoi_ky":               [
+        "tien va tuong duong tien cuoi ky", "cash at end",
+        "tien va cac khoan tuong duong tien cuoi ky",
+    ],
 }
 
 
@@ -893,6 +925,9 @@ INSURANCE_MAP: dict[str, list[str]] = {
     ],
     "loi_nhuan_chua_phan_phoi":     [
         "loi nhuan chua phan phoi", "retained earnings", "lai chua phan phoi", "lai chua phan phoi dong",
+        "loi nhuan sau thue chua phan phoi",
+        "lnst chua phan phoi ky nay",
+        "lnst chua phan phoi luy ke den cuoi ky truoc",
     ],
     "tong_von_chu_so_huu":          [
         "tong von chu so huu", "total equity", "von chu so huu", "von chu so huu dong",
@@ -913,7 +948,10 @@ INSURANCE_MAP: dict[str, list[str]] = {
         "doanh thu hoat dong tai chinh", "financial income", "thu nhap tai chinh", "thu nhap lai",
     ],
     "loi_nhuan_hoat_dong_bao_hiem":   ["loi nhuan hoat dong kinh doanh bao hiem", "underwriting profit"],
-    "loi_nhuan_truoc_thue":         ["loi nhuan truoc thue", "profit before tax", "ln truoc thue", "lai lo rong truoc thue"],
+    "loi_nhuan_truoc_thue":         [
+        "loi nhuan truoc thue", "profit before tax", "ln truoc thue", "lai lo rong truoc thue",
+        "tong loi nhuan ke toan truoc thue",
+    ],
     "chi_phi_thue_tndn":            ["chi phi thue thu nhap doanh nghiep", "income tax expense"],
     "loi_nhuan_sau_thue":           ["loi nhuan sau thue", "net profit", "loi nhuan thuan"],
     "eps_co_ban":                   ["lai co ban tren co phieu", "basic eps"],
@@ -930,7 +968,10 @@ INSURANCE_MAP: dict[str, list[str]] = {
         "tang von co phan tu gop von va hoac phat hanh co phieu",
     ],
     "tien_dau_ky":                  ["tien va tuong duong tien dau ky"],
-    "tien_cuoi_ky":                 ["tien va tuong duong tien cuoi ky"],
+    "tien_cuoi_ky":                 [
+        "tien va tuong duong tien cuoi ky",
+        "tien va tuong duong cuoi ky",
+    ],
 }
 
 

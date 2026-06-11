@@ -31,6 +31,12 @@ export function AuthProvider({ children }) {
     init()
   }, [])
 
+  useEffect(() => {
+    const handleExpiredSession = () => setUser(null)
+    window.addEventListener('auth:expired', handleExpiredSession)
+    return () => window.removeEventListener('auth:expired', handleExpiredSession)
+  }, [])
+
   const register = async (payload) => {
     return authService.register(payload)
   }

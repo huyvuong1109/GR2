@@ -270,7 +270,7 @@ export default function Screener() {
       quickFilters: buildApiFiltersFromQuickInputs(),
       savedAt: new Date().toISOString(),
     }
-    const name = buildSavedFilterName(snapshot)
+    const name = snapshotData.name?.trim() || buildSavedFilterName(snapshot)
 
     setDynamicPayload(payload)
 
@@ -323,14 +323,14 @@ export default function Screener() {
     <div className="space-y-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-100 md:text-5xl">Bộ lọc cổ phiếu</h1>
-          <p className="mt-3 max-w-3xl text-lg leading-8 text-slate-400">
+          <h1 className="text-3xl font-black tracking-tight text-slate-100 sm:text-4xl md:text-5xl">Bộ lọc cổ phiếu</h1>
+          <p className="mt-3 max-w-3xl text-base leading-7 text-slate-400 sm:text-lg sm:leading-8">
             Lọc các doanh nghiệp theo chất lượng vốn, tăng trưởng, định giá và rủi ro tài chính.
           </p>
         </div>
 
         {selectedStocks.length >= 2 && (
-          <button type="button" onClick={handleCompare} className="btn-primary flex items-center justify-center gap-2 px-5 py-3">
+          <button type="button" onClick={handleCompare} className="btn-primary flex w-full items-center justify-center gap-2 px-5 py-3 sm:w-auto">
             <Scale className="h-4 w-4" />
             So sánh ({selectedStocks.length})
           </button>

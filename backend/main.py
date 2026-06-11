@@ -14,6 +14,9 @@ import subprocess
 import sys
 import os
 import json
+import threading
+import time
+from datetime import datetime
 
 from backend.database import get_db
 from backend.config import APP_NAME, APP_VERSION, APP_DESCRIPTION, API_HOST, API_PORT, DATABASE_URL
@@ -32,9 +35,32 @@ from backend.fastapi_auth.app.routes.market_router import _fetch_index, _market_
 from backend.fastapi_auth.app.ws import manager as notification_manager
 from backend.fastapi_auth.app.ws import serialize_notification
 
-# Global variable to track background task
+# Global state for the background price updater.
 price_update_task = None
 price_update_running = False
+price_update_lock = threading.Lock()
+price_update_lock_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".price_update.lock")
+
+PRICE_UPDATE_INTERVAL_SECONDS = int(os.getenv("PRICE_UPDATE_INTERVAL_SECONDS", "120"))
+MARKET_STATUS_CHECK_INTERVAL_SECONDS = int(os.getenv("MARKET_STATUS_CHECK_INTERVAL_SECONDS", "900"))
+AUTO_PRICE_UPDATE_ENABLED = os.getenv("AUTO_PRICE_UPDATE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+
+price_update_state = {
+    "enabled": AUTO_PRICE_UPDATE_ENABLED,
+    "scheduler_status": "starting",
+    "market_status": None,
+    "market_is_open": False,
+    "last_market_check": None,
+    "next_market_check": None,
+    "last_run_started_at": None,
+    "last_run_finished_at": None,
+    "last_run_success": None,
+    "last_run_message": None,
+    "last_updated_count": None,
+    "last_total_count": None,
+    "next_price_update": None,
+    "skipped_reason": None,
+}
 
 def get_project_root():
     """Lấy đường dẫn thư mục gốc của project"""
@@ -106,6 +132,44 @@ def load_ticker_groups(limit: int = 4) -> List[Dict[str, Any]]:
 
     return grouped
 
+
+def _now_iso() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _set_price_update_state(**updates):
+    price_update_state.update(updates)
+
+
+def _acquire_price_update_file_lock() -> bool:
+    """Prevent multiple app workers from running the price updater at the same time."""
+    stale_after = max(PRICE_UPDATE_INTERVAL_SECONDS * 3, 600)
+
+    try:
+        if os.path.exists(price_update_lock_file):
+            lock_age = time.time() - os.path.getmtime(price_update_lock_file)
+            if lock_age > stale_after:
+                os.remove(price_update_lock_file)
+
+        fd = os.open(price_update_lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w", encoding="utf-8") as lock_file:
+            lock_file.write(f"{os.getpid()} {time.time()}\n")
+        return True
+    except FileExistsError:
+        return False
+    except Exception as error:
+        print(f"[Price Update] Khong tao duoc lock file: {error}")
+        return False
+
+
+def _release_price_update_file_lock():
+    try:
+        if os.path.exists(price_update_lock_file):
+            os.remove(price_update_lock_file)
+    except Exception as error:
+        print(f"[Price Update] Khong xoa duoc lock file: {error}")
+
+
 def run_price_update_sync():
     """Chạy script cập nhật giá cổ phiếu (đồng bộ)"""
     global price_update_running
@@ -169,15 +233,134 @@ def run_price_update_sync():
     
     price_update_running = False
 
+
+def run_price_update_sync_locked():
+    """Run update_stock_prices.py with process-safe locking and observable state."""
+    global price_update_running
+
+    if not price_update_lock.acquire(blocking=False):
+        message = "Dang co tien trinh cap nhat gia trong process nay, bo qua."
+        print(f"[Price Update] {message}")
+        _set_price_update_state(skipped_reason=message, last_run_message=message)
+        return {"started": False, "success": False, "message": message}
+
+    if not _acquire_price_update_file_lock():
+        price_update_lock.release()
+        message = "Dang co worker/process khac cap nhat gia, bo qua."
+        print(f"[Price Update] {message}")
+        _set_price_update_state(skipped_reason=message, last_run_message=message)
+        return {"started": False, "success": False, "message": message}
+
+    price_update_running = True
+    _set_price_update_state(
+        scheduler_status="updating",
+        last_run_started_at=_now_iso(),
+        last_run_finished_at=None,
+        last_run_success=None,
+        last_run_message="Dang cap nhat gia",
+        skipped_reason=None,
+    )
+
+    project_root = get_project_root()
+    script_path = os.path.join(project_root, "update_stock_prices.py")
+
+    try:
+        if not os.path.exists(script_path):
+            message = f"Khong tim thay script: {script_path}"
+            _set_price_update_state(
+                last_run_finished_at=_now_iso(),
+                last_run_success=False,
+                last_run_message=message,
+            )
+            return {"started": True, "success": False, "message": message}
+
+        print("[Price Update] Dang cap nhat gia co phieu...")
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+
+        result = subprocess.run(
+            [sys.executable, script_path],
+            capture_output=True,
+            text=True,
+            timeout=240,
+            cwd=project_root,
+            env=env,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        output = result.stdout.strip() if result.stdout else ""
+        if result.returncode == 0:
+            import re
+
+            updated_count = None
+            total_count = None
+            match = re.search(r"(\d+)/(\d+)", output)
+            if match:
+                updated_count, total_count = [int(value) for value in match.groups()]
+                message = f"Cap nhat gia thanh cong ({updated_count}/{total_count} ma)"
+            else:
+                message = "Cap nhat gia thanh cong"
+
+            print(f"[Price Update] {message}")
+            _set_price_update_state(
+                last_run_finished_at=_now_iso(),
+                last_run_success=True,
+                last_run_message=message,
+                last_updated_count=updated_count,
+                last_total_count=total_count,
+            )
+            return {
+                "started": True,
+                "success": True,
+                "message": message,
+                "updated_count": updated_count,
+                "total_count": total_count,
+            }
+
+        error_msg = result.stderr[:500] if result.stderr else "Unknown error"
+        message = f"Cap nhat gia loi: {error_msg}"
+        print(f"[Price Update] {message}")
+        _set_price_update_state(
+            last_run_finished_at=_now_iso(),
+            last_run_success=False,
+            last_run_message=message,
+        )
+        return {"started": True, "success": False, "message": message}
+
+    except subprocess.TimeoutExpired:
+        message = "Cap nhat gia qua thoi gian 4 phut, bo qua."
+        print(f"[Price Update] {message}")
+        _set_price_update_state(
+            last_run_finished_at=_now_iso(),
+            last_run_success=False,
+            last_run_message=message,
+        )
+        return {"started": True, "success": False, "message": message}
+    except Exception as error:
+        message = f"Loi cap nhat gia: {error}"
+        print(f"[Price Update] {message}")
+        _set_price_update_state(
+            last_run_finished_at=_now_iso(),
+            last_run_success=False,
+            last_run_message=message,
+        )
+        return {"started": True, "success": False, "message": message}
+    finally:
+        price_update_running = False
+        _release_price_update_file_lock()
+        price_update_lock.release()
+
+
 async def update_stock_prices_async():
     """Chạy script cập nhật giá cổ phiếu trong thread pool"""
     import concurrent.futures
     
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
-        await loop.run_in_executor(pool, run_price_update_sync)
+        return await loop.run_in_executor(pool, run_price_update_sync_locked)
 
-async def periodic_price_update():
+async def _legacy_periodic_price_update_unused():
     """Task chạy ngầm cập nhật giá mỗi 2 phút"""
     # Cập nhật ngay khi khởi động
     await update_stock_prices_async()
@@ -188,6 +371,66 @@ async def periodic_price_update():
         print(f"\n🔄 [Auto Update] Bắt đầu cập nhật giá định kỳ...")
         await update_stock_prices_async()
 
+async def market_aware_price_update_scheduler():
+    """Update prices only while the market is open."""
+    if not AUTO_PRICE_UPDATE_ENABLED:
+        _set_price_update_state(
+            scheduler_status="disabled",
+            skipped_reason="AUTO_PRICE_UPDATE_ENABLED=0",
+        )
+        print("[Price Scheduler] Auto price update disabled by environment.")
+        return
+
+    next_market_check = 0.0
+    market_snapshot = None
+
+    while True:
+        now = time.monotonic()
+
+        if market_snapshot is None or now >= next_market_check:
+            market_snapshot = _market_session()
+            next_market_check = now + MARKET_STATUS_CHECK_INTERVAL_SECONDS
+            _set_price_update_state(
+                scheduler_status="market_open" if market_snapshot.get("is_open") else "market_closed",
+                market_status=market_snapshot.get("status"),
+                market_is_open=bool(market_snapshot.get("is_open")),
+                last_market_check=_now_iso(),
+                next_market_check=datetime.fromtimestamp(
+                    time.time() + MARKET_STATUS_CHECK_INTERVAL_SECONDS
+                ).isoformat(timespec="seconds"),
+                skipped_reason=None if market_snapshot.get("is_open") else market_snapshot.get("message"),
+            )
+            print(
+                "[Price Scheduler] Market status:",
+                market_snapshot.get("status"),
+                "-",
+                market_snapshot.get("message"),
+            )
+
+        if not market_snapshot.get("is_open"):
+            _set_price_update_state(
+                scheduler_status="market_closed",
+                next_price_update=None,
+            )
+            await asyncio.sleep(MARKET_STATUS_CHECK_INTERVAL_SECONDS)
+            continue
+
+        _set_price_update_state(
+            scheduler_status="market_open",
+            next_price_update=datetime.fromtimestamp(
+                time.time() + PRICE_UPDATE_INTERVAL_SECONDS
+            ).isoformat(timespec="seconds"),
+        )
+        await update_stock_prices_async()
+        _set_price_update_state(
+            scheduler_status="market_open",
+            next_price_update=datetime.fromtimestamp(
+                time.time() + PRICE_UPDATE_INTERVAL_SECONDS
+            ).isoformat(timespec="seconds"),
+        )
+        await asyncio.sleep(PRICE_UPDATE_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Quản lý vòng đời ứng dụng - khởi động và dừng background tasks"""
@@ -195,7 +438,7 @@ async def lifespan(app: FastAPI):
     
     print("🚀 Khởi động background task cập nhật giá cổ phiếu...")
     # Khởi động task cập nhật giá
-    price_update_task = asyncio.create_task(periodic_price_update())
+    price_update_task = asyncio.create_task(market_aware_price_update_scheduler())
     
     yield  # Ứng dụng chạy
     
@@ -332,7 +575,7 @@ async def root():
         "message": f"Welcome to {APP_NAME}",
         "version": APP_VERSION,
         "status": "running",
-        "price_update": "Auto-update every 2 minutes"
+        "price_update": "Auto-update every 2 minutes while market is open"
     }
 
 
@@ -365,10 +608,39 @@ async def get_price_status():
             """)).fetchone()
             
             last_update = result[0] if result else None
+
+        return {
+            **price_update_state,
+            "status": price_update_state.get("scheduler_status", "unknown"),
+            "auto_update_enabled": AUTO_PRICE_UPDATE_ENABLED,
+            "auto_update_interval_seconds": PRICE_UPDATE_INTERVAL_SECONDS,
+            "market_check_interval_seconds": MARKET_STATUS_CHECK_INTERVAL_SECONDS,
+            "auto_update_interval": "2 minutes while market is open",
+            "scheduler_message": (
+                "Gia co phieu chi duoc cap nhat tu dong khi thi truong mo cua."
+                if AUTO_PRICE_UPDATE_ENABLED
+                else "Auto price update is disabled."
+            ),
+            "last_update": last_update,
+            "message": (
+                "Gia co phieu chi duoc cap nhat tu dong khi thi truong mo cua."
+                if AUTO_PRICE_UPDATE_ENABLED
+                else "Auto price update is disabled."
+            ),
+        }
             
         return {
-            "status": "active",
-            "auto_update_interval": "2 minutes",
+            **price_update_state,
+            "status": price_update_state.get("scheduler_status", "unknown"),
+            "auto_update_enabled": AUTO_PRICE_UPDATE_ENABLED,
+            "auto_update_interval_seconds": PRICE_UPDATE_INTERVAL_SECONDS,
+            "market_check_interval_seconds": MARKET_STATUS_CHECK_INTERVAL_SECONDS,
+            "auto_update_interval": "2 minutes while market is open",
+            "scheduler_message": (
+                "Gia co phieu chi duoc cap nhat tu dong khi thi truong mo cua."
+                if AUTO_PRICE_UPDATE_ENABLED
+                else "Auto price update is disabled."
+            ),
             "last_update": last_update,
             "message": "Giá cổ phiếu đang được cập nhật tự động mỗi 2 phút"
         }
@@ -1666,13 +1938,24 @@ async def advanced_screener(
             cash_flows = history_until(CashFlow, cash_flow, 4) if cash_flow else latest_query(CashFlow).limit(4).all()
             
             filter_price, filter_price_date = get_price_at_or_before(company.ticker, period_end_date)
+            price_for_ratios = filter_price
+            price_source = filter_price_date
+            if period_end_date and not price_for_ratios:
+                price_for_ratios = company.current_price
+                price_source = "current_price"
+
             analysis_company = copy.copy(company)
             if period_end_date:
-                analysis_company.current_price = filter_price
-                analysis_company.market_cap = filter_price * company.shares_outstanding if filter_price and company.shares_outstanding else None
+                analysis_company.current_price = price_for_ratios
+                analysis_company.market_cap = (
+                    price_for_ratios * company.shares_outstanding
+                    if price_for_ratios and company.shares_outstanding
+                    else company.market_cap
+                )
 
-            # Calculate ratios. For historical periods, price-dependent ratios use only
-            # prices available at or before the selected period end date.
+            # Calculate ratios. For historical periods, prefer prices available at
+            # or before the selected period end date; fall back to current_price
+            # when the short retained price history cannot cover that date.
             ratios = calculate_financial_ratios(analysis_company, balance, income, prev_income, prev_balance)
 
             f_score_data = calculate_piotroski_f_score(
@@ -1750,9 +2033,9 @@ async def advanced_screener(
                     "period_year": income.period_year if income else (balance.period_year if balance else None),
                     "period_quarter": income.period_quarter if income else (balance.period_quarter if balance else None),
                     "price": company.current_price,
-                    "filter_price": filter_price if period_end_date else company.current_price,
-                    "filter_price_date": filter_price_date,
-                    "market_cap": company.market_cap,
+                    "filter_price": price_for_ratios if period_end_date else company.current_price,
+                    "filter_price_date": price_source,
+                    "market_cap": ratios.get('market_cap') or company.market_cap,
                     "f_score": f_score,
                     "health_score": health.get('total_score'),
                     "health_breakdown": health.get('breakdown'),
@@ -1824,6 +2107,15 @@ async def get_company_cash_flows(ticker: str):
 
 @app.post("/api/update-prices")
 async def trigger_price_update():
+    """Trigger a manual price update through the shared lock-protected updater."""
+    result = await update_stock_prices_async()
+    return {
+        "success": bool(result and result.get("success")),
+        "started": bool(result and result.get("started")),
+        "message": result.get("message") if result else "Price update did not start",
+        "state": price_update_state,
+    }
+
     """Trigger cập nhật giá cổ phiếu (admin only)"""
     import subprocess
     

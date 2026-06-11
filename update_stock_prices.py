@@ -27,6 +27,15 @@ TCBS_API_URL = "https://apipubaws.tcbs.com.vn/stock-insight/v1/stock/second-tc-p
 VCI_API_URL = "https://bgapidatafeed.vps.com.vn/getliststockdata"
 
 
+def create_db_engine():
+    """Create a SQLite engine that waits for short concurrent API reads/writes."""
+    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"timeout": 30})
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.execute(text("PRAGMA busy_timeout=30000"))
+    return engine
+
+
 def normalize_price(value):
     """Normalize provider prices to VND/share."""
     if value is None or value == "":
@@ -171,7 +180,7 @@ def update_database(prices: dict):
         print(f"❌ Không tìm thấy database: {DB_PATH}")
         return 0
     
-    engine = create_engine(f"sqlite:///{DB_PATH}")
+    engine = create_db_engine()
     updated = 0
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -251,7 +260,7 @@ def ensure_price_columns():
         print(f"❌ Không tìm thấy database: {DB_PATH}")
         return False
     
-    engine = create_engine(f"sqlite:///{DB_PATH}")
+    engine = create_db_engine()
     
     with engine.connect() as conn:
         # Kiểm tra và thêm cột current_price
@@ -283,7 +292,7 @@ def ensure_price_columns():
 
 def ensure_price_history_table():
     """Đảm bảo bảng lưu lịch sử giá 7 phiên tồn tại"""
-    engine = create_engine(f"sqlite:///{DB_PATH}")
+    engine = create_db_engine()
 
     with engine.connect() as conn:
         conn.execute(
@@ -333,7 +342,7 @@ def main():
         return
     
     # Lấy danh sách ticker từ DB
-    engine = create_engine(f"sqlite:///{DB_PATH}")
+    engine = create_db_engine()
     with engine.connect() as conn:
         result = conn.execute(text("SELECT ticker FROM companies")).fetchall()
         db_tickers = [str(row[0]).strip().upper() for row in result if row[0]]

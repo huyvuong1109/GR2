@@ -16,6 +16,7 @@ import { AuthContext } from '../contexts/AuthContext'
 import NotificationsPanel from './NotificationsPanel'
 import SearchModal from './SearchModal'
 import { marketApi } from '../services/api'
+import { showAuthRequiredToast } from './AuthRequired'
 
 const navigation = [
   { name: 'Bảng điều khiển', href: '/', icon: LayoutDashboard },
@@ -49,6 +50,30 @@ export default function Layout() {
   const displayName = user?.full_name || user?.username || user?.email || 'Người dùng'
   const displayInitial = displayName.trim().slice(0, 1).toUpperCase() || 'U'
 
+  const requireAuthAction = (callback) => {
+    if (!user) {
+      showAuthRequiredToast()
+      return
+    }
+    callback?.()
+  }
+
+  const handleProtectedNavClick = (event, href) => {
+    if (href === '/') {
+      setSidebarOpen(false)
+      return
+    }
+
+    if (!user) {
+      event.preventDefault()
+      setSidebarOpen(false)
+      showAuthRequiredToast({ from: { ...location, pathname: href } })
+      return
+    }
+
+    setSidebarOpen(false)
+  }
+
   useEffect(() => {
     const fetchMarketStatus = async () => {
       try {
@@ -68,13 +93,13 @@ export default function Layout() {
     const handleKeyDown = (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
         event.preventDefault()
-        setSearchOpen(true)
+        requireAuthAction(() => setSearchOpen(true))
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [user])
 
   const statusText = marketStatus?.message || 'Đang cập nhật'
 
@@ -105,7 +130,7 @@ export default function Layout() {
                 <TrendingUp className="h-5 w-5" />
               </div>
               <div className="min-w-0 transition-opacity lg:w-0 lg:opacity-0 lg:group-hover:w-auto lg:group-hover:opacity-100">
-                <h1 className="truncate text-sm font-black tracking-tight text-slate-100">WealthArch</h1>
+                <h1 className="truncate text-sm font-black tracking-tight text-slate-100">FinAnalytics</h1>
                 <p className="truncate text-[9px] font-bold uppercase tracking-widest text-slate-500">Phân tích tài chính</p>
               </div>
             </NavLink>
@@ -117,7 +142,7 @@ export default function Layout() {
                 key={item.name}
                 to={item.href}
                 end={item.href === '/'}
-                onClick={() => setSidebarOpen(false)}
+                onClick={(event) => handleProtectedNavClick(event, item.href)}
                 title={item.name}
                 className={({ isActive }) => cn('nav-link mx-auto min-h-10 w-12 justify-center gap-0 overflow-hidden px-0 lg:group-hover:mx-0 lg:group-hover:w-full lg:group-hover:justify-start lg:group-hover:gap-2.5 lg:group-hover:px-3', isActive && 'active')}
               >
@@ -132,6 +157,7 @@ export default function Layout() {
           <div className="border-t border-white/10 pt-4">
             <NavLink
               to="/settings"
+              onClick={(event) => handleProtectedNavClick(event, '/settings')}
               title="Cài đặt tài khoản"
               className="mx-auto flex w-12 items-center justify-center gap-0 overflow-hidden rounded-xl px-0 py-2.5 text-left transition hover:bg-white/[0.06] lg:group-hover:mx-0 lg:group-hover:w-full lg:group-hover:justify-start lg:group-hover:gap-2.5 lg:group-hover:px-3"
             >
@@ -149,7 +175,7 @@ export default function Layout() {
 
       <div className="lg:pl-20">
         <header className="header sticky top-0 z-30">
-          <div className="grid h-14 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-4 px-4 md:px-6">
+          <div className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 sm:px-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -169,7 +195,7 @@ export default function Layout() {
 
             <button
               type="button"
-              onClick={() => setSearchOpen(true)}
+              onClick={() => requireAuthAction(() => setSearchOpen(true))}
               className="hidden w-[340px] items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-left text-sm text-slate-400 transition hover:border-emerald-300/35 hover:text-slate-200 md:flex"
             >
               <Search className="h-4 w-4 flex-none" />
@@ -197,7 +223,7 @@ export default function Layout() {
 
               <button
                 type="button"
-                onClick={() => setNotificationsOpen(true)}
+                onClick={() => requireAuthAction(() => setNotificationsOpen(true))}
                 className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-300/30 hover:text-emerald-300"
                 aria-label="Thông báo"
               >
@@ -207,7 +233,7 @@ export default function Layout() {
 
               <button
                 type="button"
-                onClick={() => setSearchOpen(true)}
+                onClick={() => requireAuthAction(() => setSearchOpen(true))}
                 className="btn-ghost p-2 md:hidden"
                 aria-label="Tìm kiếm"
               >
@@ -226,7 +252,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="px-4 py-6 md:px-6 2xl:px-8">
+        <main className="px-3 py-5 sm:px-4 md:px-6 md:py-6 2xl:px-8">
           <div className="mx-auto flex max-w-[1600px] items-start gap-6">
             <motion.div
               key={location.pathname}
