@@ -35,7 +35,7 @@ STOCK_CODES_TO_DOWNLOAD = [
     "AAA","APH","NHH","DPR","DRC","CSM","SRC","PAC","SVC","TMT"
 ]
 
-START_YEAR = 2023
+START_YEAR = 2026
 
 KEYWORD_SETS = [
     ["bctc", "hop nhat", "quy"],

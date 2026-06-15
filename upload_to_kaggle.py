@@ -46,8 +46,23 @@ DEFAULT_GROUPS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "
 # ==============================================================================
 
 def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    # If the command is the `kaggle` CLI, prefer running it as a module
+    # with the same Python interpreter to avoid PATH / executable not found
+    # issues on Windows: `python -m kaggle ...`.
+    if cmd and os.path.basename(str(cmd[0])).lower().startswith("kaggle"):
+        cmd = [sys.executable, "-m", "kaggle"] + [str(c) for c in cmd[1:]]
+
     print(f"  $ {' '.join(str(c) for c in cmd)}")
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        # Last-resort: try running via `python -m kaggle` if possible
+        if not (cmd and cmd[0] == sys.executable and len(cmd) > 1 and cmd[1] == "-m"):
+            fallback = [sys.executable, "-m", "kaggle"] + [str(c) for c in cmd[1:]]
+            print(f"  [fallback] {' '.join(fallback)}")
+            r = subprocess.run(fallback, capture_output=True, text=True)
+        else:
+            raise
     if r.stdout.strip():
         print(f"    {r.stdout.strip()}")
     if r.stderr.strip():
@@ -102,7 +117,9 @@ def zip_ticker(pdf_root: Path, ticker: str, out_zip: Path) -> int:
 
 
 def dataset_exists(kaggle_user: str, slug: str) -> bool:
-    r = _run(["kaggle", "datasets", "list", kaggle_user, "--csv"], check=False)
+    # Use the `--user` option: passing username as a positional argument
+    # is not supported by the Kaggle CLI and causes an argument error.
+    r = _run(["kaggle", "datasets", "list", "--user", kaggle_user, "--csv"], check=False)
     return slug in r.stdout
 
 
