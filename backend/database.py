@@ -5,6 +5,7 @@ Kết nối Database và truy vấn dữ liệu
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
+from functools import lru_cache
 import pandas as pd
 import sys
 from pathlib import Path
@@ -32,6 +33,75 @@ from Database.models_new import (
     SECURITIES_LCTT,
 )
 from backend.config import DATABASE_URL
+
+
+DEFAULT_INDUSTRY_BY_TYPE = {
+    "bank": "Ngân hàng",
+    "securities": "Chứng khoán",
+    "insurance": "Bảo hiểm",
+}
+
+
+@lru_cache(maxsize=1)
+def _load_market_industry_map() -> dict[str, str]:
+    """Load ticker -> industry from vnstock once and cache it."""
+    try:
+        from vnstock import Vnstock
+    except Exception:
+        return {}
+
+    try:
+        listing = Vnstock().stock(symbol="VNM", source="KBS").listing
+        df = listing.symbols_by_industries()
+        if df is None or df.empty:
+            return {}
+
+        industry_map: dict[str, str] = {}
+        for _, row in df.iterrows():
+            ticker = str(row.get("symbol") or "").strip().upper()
+            industry = str(row.get("industry_name") or "").strip()
+            if ticker and industry:
+                industry_map[ticker] = industry
+        return industry_map
+    except Exception:
+        return {}
+
+
+def _resolve_industry(ticker: Any, industry: Any, company_type: Any = None) -> Any:
+    """Prefer DB industry, then vnstock industry, then company_type default."""
+    if industry is not None and not pd.isna(industry):
+        industry_text = str(industry).strip()
+        if industry_text:
+            return industry_text
+
+    ticker_code = str(ticker or "").strip().upper()
+    if ticker_code:
+        industry_map = _load_market_industry_map()
+        mapped = industry_map.get(ticker_code)
+        if mapped:
+            return mapped
+
+    company_type_code = str(company_type or "").strip().lower()
+    return DEFAULT_INDUSTRY_BY_TYPE.get(company_type_code)
+
+
+def _apply_industry_fallback(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "industry" not in df.columns:
+        return df
+
+    resolved = []
+    for _, row in df.iterrows():
+        resolved.append(
+            _resolve_industry(
+                row.get("ticker"),
+                row.get("industry"),
+                row.get("company_type"),
+            )
+        )
+
+    df = df.copy()
+    df["industry"] = resolved
+    return df
 
 
 _COMPANY_TYPE_TABLE_MAP = {
@@ -810,7 +880,7 @@ class DatabaseManager:
     def get_all_companies(self) -> pd.DataFrame:
         """Lấy danh sách tất cả công ty"""
         query = self._companies_with_latest_metrics_query("ORDER BY c.ticker")
-        return pd.read_sql(query, self.engine)
+        return _apply_industry_fallback(pd.read_sql(query, self.engine))
 
     def get_companies_by_tickers(self, tickers: list[str]) -> pd.DataFrame:
         """Lấy thông tin công ty theo danh sách mã"""
@@ -823,7 +893,7 @@ class DatabaseManager:
         query = self._companies_with_latest_metrics_query(
             f"WHERE UPPER(c.ticker) IN ({placeholders})"
         )
-        return pd.read_sql(text(query), self.engine, params=params)
+        return _apply_industry_fallback(pd.read_sql(text(query), self.engine, params=params))
 
     def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
         """Lấy lịch sử giá gần nhất theo mã"""
@@ -943,6 +1013,7 @@ class DatabaseManager:
             return None
 
         company = dict(row)
+        company["industry"] = _resolve_industry(company.get("ticker"), company.get("industry"), company.get("company_type"))
         company["officers"] = self.get_company_officers(ticker)
         return company
 

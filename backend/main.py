@@ -62,6 +62,26 @@ price_update_state = {
     "skipped_reason": None,
 }
 
+
+def _json_safe(value):
+    """Recursively convert pandas/numpy null-like values to JSON-safe None."""
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+
+    if pd.isna(value):
+        return None
+
+    return value
+
 def get_project_root():
     """Lấy đường dẫn thư mục gốc của project"""
     # __file__ = backend/main.py -> cần lên 1 cấp
@@ -681,7 +701,7 @@ async def get_companies_batch(tickers: str = Query(..., description="Comma-separ
     df = db.get_companies_by_tickers(symbols)
     if df.empty:
         return []
-    return df.where(pd.notnull(df), None).to_dict(orient='records')
+    return _json_safe(df.to_dict(orient='records'))
 
 
 @app.get("/api/price-history")

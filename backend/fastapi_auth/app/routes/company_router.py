@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 import sqlite3
 from pathlib import Path
-from backend.database import get_db
+from backend.database import get_db, _resolve_industry
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 BASE = Path(__file__).resolve().parents[4]
@@ -24,7 +24,13 @@ def get_company_from_db(ticker: str):
     conn.close()
     
     if row:
-        return dict(row)
+        company = dict(row)
+        company["industry"] = _resolve_industry(
+            company.get("ticker"),
+            company.get("industry"),
+            company.get("company_type"),
+        )
+        return company
     return None
 
 @router.get('')
@@ -39,8 +45,18 @@ def list_companies(limit: int = 100):
     cur.execute("SELECT id, ticker, name, company_type, industry, current_price, market_cap, shares_outstanding FROM companies LIMIT ?", (limit,))
     rows = cur.fetchall()
     conn.close()
-    
-    return [dict(row) for row in rows]
+
+    results = []
+    for row in rows:
+        company = dict(row)
+        company["industry"] = _resolve_industry(
+            company.get("ticker"),
+            company.get("industry"),
+            company.get("company_type"),
+        )
+        results.append(company)
+
+    return results
 
 
 @router.get('/search')
@@ -66,7 +82,16 @@ def search_companies(q: str = Query(..., min_length=1, description="Search query
     rows = cur.fetchall()
     conn.close()
 
-    results = [dict(row) for row in rows]
+    results = []
+    for row in rows:
+        company = dict(row)
+        company["industry"] = _resolve_industry(
+            company.get("ticker"),
+            company.get("industry"),
+            company.get("company_type"),
+        )
+        results.append(company)
+
     return {
         "query": q,
         "count": len(results),
