@@ -1,7 +1,39 @@
-system/downloads_vietstock_final/ 
-system/downloads_vietstock_final/ 
-system/downloads_vietstock_final/ 
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv/
+.venv313/
+
+# Environment variables
+.env
+**/.env
+
+# Node
+frontend-react/node_modules/
+frontend-react/dist/
+
+# Vite
+.vite/
+
+# System/data folders
+system/downloads_vietstock_final/
 system/downloads/
 system/pdf/
-frontend-react/node_modules/
-Database/__pycache__/
+
+# SQLite temp files
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Lock files
+.price_update.lock
+
+# Temp/scratch files
+fill_industry.py
+test_kbs.py

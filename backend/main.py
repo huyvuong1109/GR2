@@ -17,6 +17,32 @@ import json
 import threading
 import time
 from datetime import datetime
+import logging
+
+class UvicornAccessFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if "/api/market/status" in msg or "/api/companies" in msg or "/ws/notifications" in msg:
+            return False
+        return True
+
+class OutputFilter:
+    def __init__(self, original_stdout):
+        self.original_stdout = original_stdout
+
+    def write(self, text):
+        if "Vnstock 4" in text or "Vnai 2" in text or "Update: pip install" in text or "Release: https" in text or "Current:" in text or "📦" in text:
+            return
+        self.original_stdout.write(text)
+
+    def flush(self):
+        self.original_stdout.flush()
+
+sys.stdout = OutputFilter(sys.stdout)
+sys.stderr = OutputFilter(sys.stderr)
+
+# Apply logging filter
+logging.getLogger("uvicorn.access").addFilter(UvicornAccessFilter())
 
 from backend.database import get_db
 from backend.config import APP_NAME, APP_VERSION, APP_DESCRIPTION, API_HOST, API_PORT, DATABASE_URL
