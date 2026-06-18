@@ -418,7 +418,7 @@ async def _legacy_periodic_price_update_unused():
         await update_stock_prices_async()
 
 async def market_aware_price_update_scheduler():
-    """Update prices only while the market is open."""
+    """Update prices: always once on startup, then only while market is open."""
     if not AUTO_PRICE_UPDATE_ENABLED:
         _set_price_update_state(
             scheduler_status="disabled",
@@ -427,6 +427,17 @@ async def market_aware_price_update_scheduler():
         print("[Price Scheduler] Auto price update disabled by environment.")
         return
 
+    # --- Always run one update on startup regardless of market status ---
+    print("[Price Scheduler] Startup: running initial price update...")
+    _set_price_update_state(
+        scheduler_status="startup_update",
+        last_run_message="Dang cap nhat gia lan dau khi khoi dong",
+        skipped_reason=None,
+    )
+    await update_stock_prices_async()
+    print("[Price Scheduler] Startup price update completed.")
+
+    # --- After initial update, follow market-aware schedule ---
     next_market_check = 0.0
     market_snapshot = None
 
