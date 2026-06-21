@@ -68,8 +68,8 @@ price_update_running = False
 price_update_lock = threading.Lock()
 price_update_lock_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".price_update.lock")
 
-PRICE_UPDATE_INTERVAL_SECONDS = int(os.getenv("PRICE_UPDATE_INTERVAL_SECONDS", "120"))
-MARKET_STATUS_CHECK_INTERVAL_SECONDS = int(os.getenv("MARKET_STATUS_CHECK_INTERVAL_SECONDS", "900"))
+PRICE_UPDATE_INTERVAL_SECONDS = int(os.getenv("PRICE_UPDATE_INTERVAL_SECONDS", "900")) # 15 minutes
+MARKET_STATUS_CHECK_INTERVAL_SECONDS = int(os.getenv("MARKET_STATUS_CHECK_INTERVAL_SECONDS", "900")) # 15 minutes
 AUTO_PRICE_UPDATE_ENABLED = os.getenv("AUTO_PRICE_UPDATE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
 
 price_update_state = {

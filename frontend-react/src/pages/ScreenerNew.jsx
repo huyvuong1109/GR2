@@ -563,7 +563,7 @@ export default function Screener() {
                       onSort={handleSort}
                     />
                     <SortHead label="ROE" sortKey="roe" align="center" sortConfig={sortConfig} onSort={handleSort} />
-                    <SortHead label="D/E" sortKey="debt_to_equity" align="center" sortConfig={sortConfig} onSort={handleSort} />
+
                     <SortHead label="TT DT" sortKey="revenue_growth" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <th className="text-center">F-Score</th>
                     <th className="text-center">Xem</th>
@@ -604,7 +604,7 @@ export default function Screener() {
                       <td className="text-center"><RatioValue value={stock.pe_ratio} type="pe" /></td>
                       <td className="text-center"><RatioValue value={stock.pb_ratio} type="pb" /></td>
                       <td className="text-center"><RatioValue value={stock.roe} type="roe" />%</td>
-                      <td className="text-center"><RatioValue value={stock.debt_to_equity} type="de" /></td>
+
                       <td className="text-center"><RatioValue value={stock.revenue_growth} type="growth" />%</td>
                       <td className="text-center"><HealthScoreBadge score={stock.f_score} /></td>
                       <td className="text-center">

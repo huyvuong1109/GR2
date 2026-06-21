@@ -413,15 +413,6 @@ export default function Screener() {
                     </th>
                     <th 
                       className="text-right cursor-pointer hover:text-primary-400"
-                      onClick={() => handleSort('de')}
-                    >
-                      <span className="inline-flex items-center">
-                        D/E
-                        <SortIcon column="de" />
-                      </span>
-                    </th>
-                    <th 
-                      className="text-right cursor-pointer hover:text-primary-400"
                       onClick={() => handleSort('dividendYield')}
                     >
                       <span className="inline-flex items-center">
@@ -499,13 +490,6 @@ export default function Screener() {
                         >
                           {formatPercent(stock.roe)}
                         </Badge>
-                      </td>
-                      <td className="text-right font-mono">
-                        <span className={cn(
-                          stock.de <= 0.5 ? 'text-success-400' : stock.de <= 1 ? 'text-warning-400' : 'text-danger-400'
-                        )}>
-                          {formatRatio(stock.de)}
-                        </span>
                       </td>
                       <td className="text-right font-mono text-slate-500">
                         {formatPercent(stock.dividendYield)}

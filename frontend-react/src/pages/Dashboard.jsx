@@ -380,7 +380,7 @@ export default function Dashboard() {
           </p>
         </div>
         <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
-          {loadingMarket ? 'Đang cập nhật thị trường...' : 'Tự cập nhật mỗi 2 phút'}
+          {loadingMarket ? 'Đang cập nhật thị trường...' : ''}
         </p>
       </motion.section>
 

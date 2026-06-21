@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from fastapi import APIRouter
+import time
 
 from backend.config import DATABASE_PATH
 
@@ -120,11 +121,31 @@ def _fetch_index_from_vci(symbol: str = "VNINDEX", count_back: int = 8) -> dict 
     }
 
 
+# Simple in-memory cache for the index
+_index_cache = {}
+CACHE_TTL_SECONDS = 900  # 15 minutes
+
 def _fetch_index(symbol: str = "VNINDEX") -> dict | None:
+    now = time.time()
+    session = _market_session()
+    is_market_open = session.get("is_open", False)
+
+    if symbol in _index_cache:
+        cached_data, timestamp = _index_cache[symbol]
+        # Nếu thị trường đóng cửa, HOẶC cache chưa quá 15 phút, trả về cache
+        if not is_market_open or (now - timestamp < CACHE_TTL_SECONDS):
+            return cached_data
+
     try:
-        return _fetch_index_from_vci(symbol)
+        data = _fetch_index_from_vci(symbol)
+        if data:
+            _index_cache[symbol] = (data, now)
+        return data
     except Exception as error:
         print(f"Failed to fetch {symbol} from Vietcap chart API: {error}")
+        # Return old cache if available, even if expired, on failure
+        if symbol in _index_cache:
+             return _index_cache[symbol][0]
         return None
 
 
