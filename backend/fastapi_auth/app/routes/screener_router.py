@@ -252,8 +252,7 @@ def advanced_screener(
         """
 
     try:
-        with db.engine.connect() as conn:
-            df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, db.engine)
 
         # P/E và P/B — nếu price=NULL (kỳ quá khứ không có giá lịch sử) → NaN → hiển thị "-"
         df['pe_ratio'] = np.where(
@@ -326,8 +325,7 @@ def get_periods():
     ORDER BY period_year DESC, period_quarter DESC
     """
     try:
-        with db.engine.connect() as conn:
-            df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, db.engine)
         return {"periods": df.to_dict(orient='records')}
     except Exception as e:
         print(f"Error fetching periods: {e}")
