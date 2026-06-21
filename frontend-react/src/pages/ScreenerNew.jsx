@@ -79,6 +79,8 @@ export default function Screener() {
   const [periodOptions, setPeriodOptions] = useState([])
   const [savedFilters, setSavedFilters] = useState([])
   const [loadedDynamicSnapshot, setLoadedDynamicSnapshot] = useState(null)
+  const [priceWarning, setPriceWarning] = useState(null)
+  const [isPastPeriod, setIsPastPeriod] = useState(false)
 
   const groupOptions = useMemo(() => {
     const industries = [...new Set(stocks.map((s) => s.industry).filter(Boolean))].sort()
@@ -110,9 +112,13 @@ export default function Screener() {
     return `Quý ${filters.period_quarter}/${filters.period_year}`
   }, [filters.period_year, filters.period_quarter])
 
+  // Các filter phụ thuộc vào giá cổ phiếu
+  const PRICE_DEPENDENT_FILTER_KEYS = ['min_pe', 'max_pe', 'min_pb', 'max_pb']
+
   const fetchStocks = async (filterParams = {}, activeDynamicPayload = []) => {
     setLoading(true)
     setError(null)
+    setPriceWarning(null)
     try {
       const params = new URLSearchParams()
       Object.entries(filterParams).forEach(([key, value]) => {
@@ -125,6 +131,8 @@ export default function Screener() {
 
       const response = await api.get(`/screener/advanced?${params.toString()}`)
       setStocks(response.results || [])
+      setIsPastPeriod(response.is_past_period || false)
+      if (response.price_warning) setPriceWarning(response.price_warning)
     } catch (err) {
       console.error('Error fetching stocks:', err)
       setError('Không thể tải dữ liệu. Vui lòng thử lại.')
@@ -201,6 +209,8 @@ export default function Screener() {
     setDynamicPayload([])
     setDynamicNotice('')
     setLoadedDynamicSnapshot(null)
+    setPriceWarning(null)
+    setIsPastPeriod(false)
     fetchStocks()
   }
 
@@ -423,6 +433,38 @@ export default function Screener() {
         </div>
       </section>
 
+      {/* Banner cảnh báo giá kỳ quá khứ */}
+      {priceWarning && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-5 py-4"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-400" />
+          <div>
+            <p className="text-sm font-bold text-amber-300">Cảnh báo: Bộ lọc giá không chính xác với kỳ quá khứ</p>
+            <p className="mt-1 text-xs text-amber-200/70">{priceWarning}</p>
+            <p className="mt-1 text-xs text-amber-200/50">Các chỉ tiêu khác (ROE, ROA, F-Score, tăng trưởng...) vẫn chính xác vì không phụ thuộc vào giá cổ phiếu.</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Banner thông tin kỳ quá khứ (không có cảnh báo giá) */}
+      {isPastPeriod && !priceWarning && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 rounded-xl border border-sky-400/20 bg-sky-400/5 px-5 py-3"
+        >
+          <Calendar className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-400" />
+          <p className="text-xs text-sky-300">
+            Đang xem dữ liệu tài chính của kỳ <span className="font-bold">{selectedPeriodLabel}</span>.
+            Cột <span className="font-bold">Giá</span>, <span className="font-bold">P/E</span> và <span className="font-bold">P/B</span> sẽ hiển thị
+            giá lịch sử tại kỳ đó nếu có trong hệ thống, ngược lại sẽ hiển thị dấu &ldquo;-&rdquo;.
+          </p>
+        </motion.div>
+      )}
+
       <section className="panel">
         <div className="panel-header flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -498,10 +540,28 @@ export default function Screener() {
                     <SortHead label="Mã CK" sortKey="ticker" sortConfig={sortConfig} onSort={handleSort} />
                     <th className="px-2 text-center text-[11px] leading-4">Thêm vào watchlist</th>
                     <th className="px-2 text-center">Ngành</th>
-                    <SortHead label="Giá hiện tại" sortKey="price" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead
+                      label={isPastPeriod ? 'Giá (N/A)' : 'Giá hiện tại'}
+                      sortKey="price"
+                      align="center"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    />
                     <SortHead label="Vốn hóa" sortKey="market_cap" align="right" sortConfig={sortConfig} onSort={handleSort} />
-                    <SortHead label="P/E" sortKey="pe_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
-                    <SortHead label="P/B" sortKey="pb_ratio" align="center" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHead
+                      label={isPastPeriod ? 'P/E (N/A)' : 'P/E'}
+                      sortKey="pe_ratio"
+                      align="center"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    />
+                    <SortHead
+                      label={isPastPeriod ? 'P/B (N/A)' : 'P/B'}
+                      sortKey="pb_ratio"
+                      align="center"
+                      sortConfig={sortConfig}
+                      onSort={handleSort}
+                    />
                     <SortHead label="ROE" sortKey="roe" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="D/E" sortKey="debt_to_equity" align="center" sortConfig={sortConfig} onSort={handleSort} />
                     <SortHead label="TT DT" sortKey="revenue_growth" align="center" sortConfig={sortConfig} onSort={handleSort} />

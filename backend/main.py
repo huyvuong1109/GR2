@@ -57,6 +57,7 @@ from backend.fastapi_auth.app.routes.watchlist_router import router as watchlist
 from backend.fastapi_auth.app.routes.notifications_router import router as notifications_router
 from backend.fastapi_auth.app.routes.value_router import router as value_router
 from backend.fastapi_auth.app.routes.saved_filter_router import router as saved_filter_router
+from backend.fastapi_auth.app.routes.screener_router import router as screener_router
 from backend.fastapi_auth.app.routes.market_router import _fetch_index, _market_session
 from backend.fastapi_auth.app.ws import manager as notification_manager
 from backend.fastapi_auth.app.ws import serialize_notification
@@ -538,6 +539,7 @@ app.include_router(watchlist_router)
 app.include_router(notifications_router)
 app.include_router(value_router)
 app.include_router(saved_filter_router)
+app.include_router(screener_router)
 
 
 @app.websocket("/ws/notifications")
