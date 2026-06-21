@@ -3,6 +3,7 @@ Database Connection & Query Layer
 Kết nối Database và truy vấn dữ liệu
 """
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 from functools import lru_cache
@@ -349,7 +350,15 @@ class DatabaseManager:
     """Quản lý kết nối và truy vấn Database"""
     
     def __init__(self, database_url: str = DATABASE_URL):
-        self.engine = create_engine(database_url, echo=False, connect_args={"timeout": 30})
+        # NullPool: mỗi request dùng connection riêng, trả về ngay sau dùng xong.
+        # Phù hợp với SQLite vì SQLite không hưởng lợi từ connection pooling
+        # và tránh lỗi QueuePool exhausted khi có nhiều request đồng thời.
+        self.engine = create_engine(
+            database_url,
+            echo=False,
+            poolclass=NullPool,
+            connect_args={"timeout": 30, "check_same_thread": False},
+        )
         self.SessionLocal = sessionmaker(bind=self.engine)
         self._configure_sqlite()
         self._ensure_legacy_compatibility()
