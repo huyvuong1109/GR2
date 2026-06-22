@@ -37,7 +37,7 @@ export const METHOD_PRESETS = {
   method_sepa: {
     title: 'SEPA (Tăng trưởng)',
     summary: 'Lọc cổ phiếu siêu hạng theo Mark Minervini: tập trung vào tăng trưởng đột biến (Doanh thu, LNST, EPS) và biên lãi gộp cải thiện so với cùng kỳ năm trước (YoY) để loại bỏ tính mùa vụ.',
-    rules: ['Doanh thu tăng YoY >= 30%', 'Biên lãi gộp tăng YoY > 0%', 'LNST tăng YoY > 0%', 'EPS tăng YoY >= 40%'],
+    rules: ['Doanh thu tăng YoY >= 15%', 'Biên lãi gộp tăng YoY > 0%', 'LNST tăng YoY > 0%', 'EPS tăng YoY >= 40%'],
   },
   method_quality: {
     title: 'Quality Compounder mẫu',
@@ -258,11 +258,11 @@ export const FILTER_GROUPS = [
             id: 'sepa_revenue_growth',
             label: 'Tăng trưởng doanh thu',
             unit: '%',
-            description: 'Tăng trưởng doanh thu YoY tối thiểu 30%',
+            description: 'Tăng trưởng doanh thu YoY tối thiểu 15%',
             apiMinKey: 'min_revenue_growth',
             supportsTimeSeries: true,
             defaultPeriodType: 'quarter',
-            defaultCondition: { operator: 'gt', value: '30' },
+            defaultCondition: { operator: 'gt', value: '15' },
           },
           {
             id: 'sepa_gross_margin_growth',
