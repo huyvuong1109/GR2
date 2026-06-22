@@ -46,19 +46,19 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
     <>
       <tr className="bg-emerald-900/10 border-t border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">Chỉ số P/E (Lần)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatNumber(stock.pe_ratio)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
         <td className="px-4 py-3 font-bold text-emerald-400">Chỉ số P/B (Lần)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatNumber(stock.pb_ratio)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5 border-b border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">ROE (%)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatPercent(stock.roe)}
         </td>
       </tr>
@@ -69,19 +69,19 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
     <>
       <tr className="bg-emerald-900/10 border-t border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">Tốc độ Tăng Doanh thu</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatPercent(stock.revenue_growth)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
         <td className="px-4 py-3 font-bold text-emerald-400">Tốc độ Tăng LNST</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatPercent(stock.profit_growth)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5 border-b border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">ROE (%)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatPercent(stock.roe)}
         </td>
       </tr>
@@ -92,25 +92,25 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
     <>
       <tr className="bg-emerald-900/10 border-t border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">Piotroski F-Score (Điểm)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatNumber(stock.f_score)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
         <td className="px-4 py-3 font-bold text-emerald-400">ROE (%)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatPercent(stock.roe)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
         <td className="px-4 py-3 font-bold text-emerald-400">Nợ / Vốn chủ sở hữu (Lần)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatNumber(stock.de_ratio)}
         </td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5 border-b border-emerald-500/20">
         <td className="px-4 py-3 font-bold text-emerald-400">Thanh khoản ngắn hạn (Lần)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
           {formatNumber(stock.current_ratio)}
         </td>
       </tr>
@@ -211,7 +211,9 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
                   <tr>
                     <th className="border-b border-white/5 px-4 py-3 bg-amber-500/10 text-amber-300">{getTableTitle()}</th>
                     <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300">{currentHeader}</th>
-                    <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300">{prevHeader}</th>
+                    {activeMethodId === 'method_sepa' && (
+                      <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300">{prevHeader}</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
