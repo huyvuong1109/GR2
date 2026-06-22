@@ -274,6 +274,9 @@ def update_companies(limit: int | None = None) -> None:
                 or market_data.get(ticker, {}).get("industry")
                 or _clean_text(row.get("industry"))
             )
+            
+            if industry and industry.strip().lower() in ("khác", "khac", "other", "others"):
+                industry = None
 
             # --- Company type: ticker_type.json -> DB cu -> corporate ---
             company_type = (
