@@ -31,6 +31,8 @@ def advanced_screener(
     min_f_score: float = Query(None),
     min_revenue_growth: float = Query(None),
     min_profit_growth: float = Query(None),
+    min_eps_growth: float = Query(None),
+    min_gross_margin_growth: float = Query(None),
 ):
     """Screener nâng cao - dữ liệu thực từ database analytics(final).db"""
     db = get_db()
@@ -57,9 +59,9 @@ def advanced_screener(
         period_where_lm = f"i.period_year = {period_year} AND i.period_type = 'quarterly' AND i.period_quarter = {period_quarter}"
         period_where_lm_b = f"b.period_year = {period_year} AND b.period_type = 'quarterly' AND b.period_quarter = {period_quarter}"
         period_where_lm_cf = f"cf.period_year = {period_year} AND cf.period_type = 'quarterly' AND cf.period_quarter = {period_quarter}"
-        # Kỳ trước: quý liền trước (trong cùng năm hoặc sang năm trước)
-        prev_year = period_year if period_quarter > 1 else period_year - 1
-        prev_quarter = period_quarter - 1 if period_quarter > 1 else 4
+        # Kỳ trước: cùng kỳ năm trước (Year-over-Year - YoY)
+        prev_year = period_year - 1
+        prev_quarter = period_quarter
         period_where_pm = f"i.period_year = {prev_year} AND i.period_type = 'quarterly' AND i.period_quarter = {prev_quarter}"
         period_where_pm_b = f"b.period_year = {prev_year} AND b.period_type = 'quarterly' AND b.period_quarter = {prev_quarter}"
         period_where_pm_cf = f"cf.period_year = {prev_year} AND cf.period_type = 'quarterly' AND cf.period_quarter = {prev_quarter}"
@@ -128,7 +130,7 @@ def advanced_screener(
             SELECT
                 c.id, c.ticker,
                 i.period_year,
-                i.revenue, i.net_profit, i.gross_profit,
+                i.revenue, i.net_profit, i.gross_profit, i.net_profit_to_shareholders,
                 b.total_assets, b.total_liabilities, b.total_equity,
                 b.current_assets, b.current_liabilities, b.long_term_debt,
                 c.shares_outstanding as shares
@@ -160,6 +162,18 @@ def advanced_screener(
             CASE WHEN lm.current_liabilities > 0 THEN lm.current_assets * 1.0 / lm.current_liabilities ELSE 0 END as current_ratio,
             CASE WHEN pm.revenue > 0 THEN (lm.revenue - pm.revenue) * 100.0 / pm.revenue ELSE 0 END as revenue_growth,
             CASE WHEN pm.net_profit > 0 THEN (lm.net_profit - pm.net_profit) * 100.0 / pm.net_profit ELSE 0 END as profit_growth,
+            CASE WHEN pm.shares > 0 AND pm.net_profit_to_shareholders IS NOT NULL AND ABS(pm.net_profit_to_shareholders) > 0 THEN
+                ((CASE WHEN lm.shares > 0 THEN lm.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END) - 
+                 (pm.net_profit_to_shareholders * 1.0 / pm.shares)) * 100.0 / ABS(pm.net_profit_to_shareholders * 1.0 / pm.shares)
+            ELSE 0 END as eps_growth,
+            CASE WHEN lm.revenue > 0 THEN lm.gross_profit * 100.0 / lm.revenue ELSE 0 END - 
+            CASE WHEN pm.revenue > 0 THEN pm.gross_profit * 100.0 / pm.revenue ELSE 0 END as gross_margin_growth,
+            
+            lm.revenue as lm_revenue, pm.revenue as pm_revenue,
+            lm.gross_profit as lm_gross_profit, pm.gross_profit as pm_gross_profit,
+            lm.net_profit as lm_net_profit, pm.net_profit as pm_net_profit,
+            CASE WHEN lm.shares > 0 THEN lm.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as lm_eps,
+            CASE WHEN pm.shares > 0 THEN pm.net_profit_to_shareholders * 1.0 / pm.shares ELSE 0 END as pm_eps,
             CASE WHEN lm.net_profit > 0 THEN 1 ELSE 0 END +
             CASE WHEN lm.operating_cash_flow > 0 THEN 1 ELSE 0 END +
             CASE WHEN (CASE WHEN lm.total_assets>0 THEN lm.net_profit*1.0/lm.total_assets ELSE 0 END) >
@@ -210,7 +224,7 @@ def advanced_screener(
         pm AS (
             SELECT
                 c.ticker,
-                i.revenue, i.net_profit, i.gross_profit,
+                i.revenue, i.net_profit, i.gross_profit, i.net_profit_to_shareholders,
                 b.total_assets, b.total_liabilities, b.total_equity,
                 b.current_assets, b.current_liabilities, b.long_term_debt,
                 c.shares_outstanding as shares
@@ -234,6 +248,18 @@ def advanced_screener(
             CASE WHEN lm.current_liabilities > 0 THEN lm.current_assets * 1.0 / lm.current_liabilities ELSE 0 END as current_ratio,
             CASE WHEN pm.revenue > 0 THEN (lm.revenue - pm.revenue) * 100.0 / pm.revenue ELSE 0 END as revenue_growth,
             CASE WHEN pm.net_profit > 0 THEN (lm.net_profit - pm.net_profit) * 100.0 / pm.net_profit ELSE 0 END as profit_growth,
+            CASE WHEN pm.shares > 0 AND pm.net_profit_to_shareholders IS NOT NULL AND ABS(pm.net_profit_to_shareholders) > 0 THEN
+                ((CASE WHEN lm.shares > 0 THEN lm.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END) - 
+                 (pm.net_profit_to_shareholders * 1.0 / pm.shares)) * 100.0 / ABS(pm.net_profit_to_shareholders * 1.0 / pm.shares)
+            ELSE 0 END as eps_growth,
+            CASE WHEN lm.revenue > 0 THEN lm.gross_profit * 100.0 / lm.revenue ELSE 0 END - 
+            CASE WHEN pm.revenue > 0 THEN pm.gross_profit * 100.0 / pm.revenue ELSE 0 END as gross_margin_growth,
+            
+            lm.revenue as lm_revenue, pm.revenue as pm_revenue,
+            lm.gross_profit as lm_gross_profit, pm.gross_profit as pm_gross_profit,
+            lm.net_profit as lm_net_profit, pm.net_profit as pm_net_profit,
+            CASE WHEN lm.shares > 0 THEN lm.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as lm_eps,
+            CASE WHEN pm.shares > 0 THEN pm.net_profit_to_shareholders * 1.0 / pm.shares ELSE 0 END as pm_eps,
             CASE WHEN lm.net_profit > 0 THEN 1 ELSE 0 END +
             CASE WHEN lm.operating_cash_flow > 0 THEN 1 ELSE 0 END +
             CASE WHEN (CASE WHEN lm.total_assets>0 THEN lm.net_profit*1.0/lm.total_assets ELSE 0 END) >
@@ -268,6 +294,9 @@ def advanced_screener(
             'roe': -9999, 'roa': -9999, 'gross_margin': -9999, 'net_margin': -9999,
             'de_ratio': 9999, 'current_ratio': -9999, 'f_score': 0,
             'revenue_growth': -9999, 'profit_growth': -9999,
+            'eps_growth': -9999, 'gross_margin_growth': -9999,
+            'lm_revenue': 0, 'pm_revenue': 0, 'lm_gross_profit': 0, 'pm_gross_profit': 0,
+            'lm_net_profit': 0, 'pm_net_profit': 0, 'lm_eps': 0, 'pm_eps': 0
         })
 
         # Áp dụng filter — bỏ qua P/E, P/B nếu kỳ quá khứ (không có giá)
@@ -287,6 +316,8 @@ def advanced_screener(
         if min_f_score is not None: df = df[df['f_score'] >= min_f_score]
         if min_revenue_growth is not None: df = df[df['revenue_growth'] >= min_revenue_growth]
         if min_profit_growth is not None: df = df[df['profit_growth'] >= min_profit_growth]
+        if min_eps_growth is not None: df = df[df['eps_growth'] >= min_eps_growth]
+        if min_gross_margin_growth is not None: df = df[df['gross_margin_growth'] >= min_gross_margin_growth]
 
         # Convert sentinel → None
         df = df.replace([-9999, 9999], [None, None])

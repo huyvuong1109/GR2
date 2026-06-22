@@ -19,6 +19,7 @@ import { cn } from '../utils/helpers'
 import api from '../services/api'
 import DynamicScreenerPanel from '../components/screener/DynamicScreenerPanel'
 import StarButton from '../components/StarButton'
+import ResultDetailModal from '../components/screener/ResultDetailModal'
 
 const LOCAL_SAVED_FILTERS_KEY = 'dynamic_screener_saved_filters'
 
@@ -81,6 +82,8 @@ export default function Screener() {
   const [loadedDynamicSnapshot, setLoadedDynamicSnapshot] = useState(null)
   const [priceWarning, setPriceWarning] = useState(null)
   const [isPastPeriod, setIsPastPeriod] = useState(false)
+  const [detailModalStock, setDetailModalStock] = useState(null)
+  const [activeMethodId, setActiveMethodId] = useState(null)
 
   const groupOptions = useMemo(() => {
     const industries = [...new Set(stocks.map((s) => s.industry).filter(Boolean))].sort()
@@ -260,8 +263,9 @@ export default function Screener() {
     }
   }
 
-  const handleDynamicApply = async ({ payload, queryParams }) => {
+  const handleDynamicApply = async ({ payload, queryParams, selectedMethodId }) => {
     setDynamicPayload(payload)
+    setActiveMethodId(selectedMethodId)
     setDynamicNotice(`Đã tạo payload ${payload.length} điều kiện và gửi API lọc.`)
     const mergedFilters = { ...buildApiFiltersFromQuickInputs(), ...queryParams }
     await pushDynamicPayloadToApi(payload, queryParams)
@@ -324,6 +328,7 @@ export default function Screener() {
     const quickFilters = snapshot.quickFilters || {}
     setFilters((prev) => ({ ...prev, ...quickFilters }))
     setDynamicPayload(snapshot.payload || [])
+    setActiveMethodId(snapshot.selectedMethodId || null)
     setLoadedDynamicSnapshot({ ...snapshot, name: savedFilter.name, loadedAt: Date.now() })
     fetchStocks({ ...quickFilters, ...(snapshot.queryParams || {}) }, snapshot.payload || [])
     setDynamicNotice(`Đã áp dụng bộ lọc "${savedFilter.name}".`)
@@ -607,8 +612,15 @@ export default function Screener() {
 
                       <td className="text-center"><RatioValue value={stock.revenue_growth} type="growth" />%</td>
                       <td className="text-center"><HealthScoreBadge score={stock.f_score} /></td>
-                      <td className="text-center">
-                        <Link to={`/company/${stock.ticker}`} className="btn-ghost inline-flex p-2">
+                      <td className="text-center flex items-center justify-center gap-1">
+                        <button 
+                          onClick={() => setDetailModalStock(stock)} 
+                          className="btn-ghost rounded-md p-1.5 hover:bg-emerald-500/20 text-emerald-400 transition-colors" 
+                          title="Chi tiết so sánh YoY"
+                        >
+                          <SlidersHorizontal className="h-4 w-4" />
+                        </button>
+                        <Link to={`/company/${stock.ticker}`} className="btn-ghost rounded-md p-1.5 hover:bg-white/10 transition-colors" title="Hồ sơ công ty">
                           <Eye className="h-4 w-4" />
                         </Link>
                       </td>
@@ -631,6 +643,18 @@ export default function Screener() {
           <Legend color="text-red-300" text="Rủi ro / Đắt" />
         </div>
       </section>
+
+      <ResultDetailModal 
+        isOpen={!!detailModalStock}
+        onClose={() => setDetailModalStock(null)}
+        stock={detailModalStock}
+        activeMethodId={activeMethodId}
+        periodInfo={{
+          year: filters.period_year,
+          quarter: filters.period_quarter,
+          type: filters.period_quarter ? 'quarter' : 'year'
+        }}
+      />
     </div>
   )
 }

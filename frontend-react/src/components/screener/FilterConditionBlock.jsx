@@ -84,6 +84,18 @@ const METRIC_GUIDES = {
     weak: 'Lợi nhuận giảm trong khi doanh thu tăng có thể cho thấy biên lợi nhuận bị thu hẹp.',
     example: 'Ví dụ: lọc tăng trưởng lợi nhuận lớn hơn 20% trong 3 quý liên tiếp.',
   },
+  eps_growth: {
+    purpose: 'Tăng trưởng EPS (Lợi nhuận trên mỗi cổ phiếu) đánh giá lợi ích thực sự cổ đông nhận được. Đây là chìa khóa của các siêu cổ phiếu.',
+    good: 'Theo SEPA, EPS tăng trưởng YoY > 40% là dấu hiệu của siêu cổ phiếu bước vào giai đoạn bứt tốc.',
+    weak: 'EPS giảm hoặc pha loãng do phát hành thêm cổ phiếu quá nhiều dù tổng lợi nhuận có tăng.',
+    example: 'Ví dụ: lọc EPS tăng YoY lớn hơn 40%.',
+  },
+  gross_margin_growth: {
+    purpose: 'Biên lãi gộp tăng trưởng cho thấy doanh nghiệp đang bán được hàng giá cao hơn hoặc tối ưu được chi phí sản xuất.',
+    good: 'Biên gộp cải thiện so với cùng kỳ năm trước cho thấy lợi thế cạnh tranh cốt lõi đang mạnh lên.',
+    weak: 'Biên gộp giảm dù doanh thu tăng là dấu hiệu phải hạ giá bán để cạnh tranh.',
+    example: 'Ví dụ: lọc biên lãi gộp tăng trưởng lớn hơn 0.',
+  },
 }
 
 const METHOD_METRIC_MAP = {
@@ -99,7 +111,10 @@ const METHOD_METRIC_MAP = {
   quality_fscore: 'f_score',
   canslim_revenue_growth: 'revenue_growth',
   canslim_profit_growth: 'profit_growth',
-  garp_profit_growth: 'profit_growth',
+  sepa_revenue_growth: 'revenue_growth',
+  sepa_profit_growth: 'profit_growth',
+  sepa_eps_growth: 'eps_growth',
+  sepa_gross_margin_growth: 'gross_margin_growth',
 }
 
 const guideForMetric = (metricId) => METRIC_GUIDES[METHOD_METRIC_MAP[metricId] || metricId]
