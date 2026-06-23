@@ -20,6 +20,12 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
     }
   }
 
+  const getQHeader = (y, q) => {
+    if (!y) return '-'
+    if (q) return `Q${q} ${y}`
+    return `Năm ${y}`
+  }
+
   const formatBillion = (val) => {
     if (val === null || val === undefined) return '-'
     return (val / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })
@@ -123,51 +129,83 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
       <tr className="hover:bg-white/[0.02]">
         <td className="px-4 py-3 font-semibold text-sky-200 bg-sky-900/10">Lãi cơ bản trên cổ phiếu (EPS)</td>
         <td className="px-4 py-3 text-right font-mono text-slate-200">{formatNumber(stock.lm_eps)}</td>
-        <td className="px-4 py-3 text-right font-mono text-slate-200">{formatNumber(stock.pm_eps)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 border-r border-white/10">{formatNumber(stock.pm_eps)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatNumber(stock.t1_eps)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatNumber(stock.t2_eps)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatNumber(stock.t3_eps)}</td>
       </tr>
       <tr className="hover:bg-white/[0.02]">
         <td className="px-4 py-3 font-semibold text-sky-200 bg-sky-900/10">Doanh thu thuần (Tỷ)</td>
         <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.lm_revenue)}</td>
-        <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.pm_revenue)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 border-r border-white/10">{formatBillion(stock.pm_revenue)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t1_revenue)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t2_revenue)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t3_revenue)}</td>
       </tr>
       <tr className="hover:bg-white/[0.02]">
         <td className="px-4 py-3 font-semibold text-sky-200 bg-sky-900/10">Lợi nhuận gộp (Tỷ)</td>
         <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.lm_gross_profit)}</td>
-        <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.pm_gross_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 border-r border-white/10">{formatBillion(stock.pm_gross_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t1_gross_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t2_gross_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t3_gross_profit)}</td>
       </tr>
       <tr className="hover:bg-white/[0.02]">
         <td className="px-4 py-3 font-semibold text-sky-200 bg-sky-900/10">Lợi nhuận sau thuế (Tỷ)</td>
         <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.lm_net_profit)}</td>
-        <td className="px-4 py-3 text-right font-mono text-slate-200">{formatBillion(stock.pm_net_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 border-r border-white/10">{formatBillion(stock.pm_net_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t1_net_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t2_net_profit)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 opacity-70">{formatBillion(stock.t3_net_profit)}</td>
+      </tr>
+      <tr className="hover:bg-white/[0.02] border-b border-white/10">
+        <td className="px-4 py-3 font-semibold text-sky-200 bg-sky-900/10">Biên lãi gộp (%)</td>
+        <td className="px-4 py-3 text-right font-mono text-amber-300 font-bold">{formatPercent(stock.gross_margin)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-200 border-r border-white/10">{formatPercent(stock.pm_revenue ? (stock.pm_gross_profit*100/stock.pm_revenue) : 0)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-300 opacity-80">{formatPercent(stock.t1_gross_margin)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-300 opacity-80">{formatPercent(stock.t2_gross_margin)}</td>
+        <td className="px-4 py-3 text-right font-mono text-slate-300 opacity-80">{formatPercent(stock.t3_gross_margin)}</td>
       </tr>
       
       {/* Empty Row for spacing */}
-      <tr><td colSpan={3} className="h-4 bg-transparent border-0"></td></tr>
+      <tr><td colSpan={6} className="h-4 bg-transparent border-0"></td></tr>
 
       {/* Percentages */}
       <tr className="bg-emerald-900/10 border-t border-emerald-500/20">
-        <td className="px-4 py-3 font-bold text-emerald-400">Tốc độ Tăng trưởng EPS</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 font-bold text-emerald-400 border-r border-emerald-500/20">Tốc độ Tăng trưởng EPS</td>
+        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400 border-r border-emerald-500/20">
           {formatPercent(stock.eps_growth)}
         </td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t1_eps_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t2_eps_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80">{formatPercent(stock.t3_eps_growth)}</td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
-        <td className="px-4 py-3 font-bold text-emerald-400">Tốc độ Tăng Doanh thu</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 font-bold text-emerald-400 border-r border-emerald-500/20">Tốc độ Tăng Doanh thu</td>
+        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400 border-r border-emerald-500/20">
           {formatPercent(stock.revenue_growth)}
         </td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t1_revenue_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t2_revenue_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80">{formatPercent(stock.t3_revenue_growth)}</td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5">
-        <td className="px-4 py-3 font-bold text-emerald-400">Tốc độ Tăng LNST</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 font-bold text-emerald-400 border-r border-emerald-500/20">Tốc độ Tăng LNST</td>
+        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400 border-r border-emerald-500/20">
           {formatPercent(stock.profit_growth)}
         </td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t1_profit_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t2_profit_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80">{formatPercent(stock.t3_profit_growth)}</td>
       </tr>
       <tr className="bg-emerald-900/10 border-t border-white/5 border-b border-emerald-500/20">
-        <td className="px-4 py-3 font-bold text-emerald-400">Sự thay đổi BLNG (YoY)</td>
-        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400">
+        <td className="px-4 py-3 font-bold text-emerald-400 border-r border-emerald-500/20">Sự thay đổi BLNG (YoY)</td>
+        <td colSpan={2} className="px-4 py-3 text-center font-mono font-bold text-emerald-400 border-r border-emerald-500/20">
           {formatPercent(stock.gross_margin_growth)}
         </td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t1_gross_margin_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80 border-r border-white/5">{formatPercent(stock.t2_gross_margin_growth)}</td>
+        <td className="px-4 py-3 text-center font-mono font-bold text-emerald-400 opacity-80">{formatPercent(stock.t3_gross_margin_growth)}</td>
       </tr>
     </>
   )
@@ -212,7 +250,12 @@ export default function ResultDetailModal({ isOpen, onClose, stock, periodInfo, 
                     <th className="border-b border-white/5 px-4 py-3 bg-amber-500/10 text-amber-300">{getTableTitle()}</th>
                     <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300">{currentHeader}</th>
                     {activeMethodId === 'method_sepa' && (
-                      <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300">{prevHeader}</th>
+                      <>
+                        <th className="border-b border-white/5 px-4 py-3 text-right bg-blue-500/10 text-blue-300 border-r border-white/10">{prevHeader}</th>
+                        <th className="border-b border-white/5 px-4 py-3 text-right opacity-70">{getQHeader(stock.t1_year, stock.t1_quarter)}</th>
+                        <th className="border-b border-white/5 px-4 py-3 text-right opacity-70">{getQHeader(stock.t2_year, stock.t2_quarter)}</th>
+                        <th className="border-b border-white/5 px-4 py-3 text-right opacity-70">{getQHeader(stock.t3_year, stock.t3_quarter)}</th>
+                      </>
                     )}
                   </tr>
                 </thead>

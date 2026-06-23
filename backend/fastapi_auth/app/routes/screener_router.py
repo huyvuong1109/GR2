@@ -33,6 +33,7 @@ def advanced_screener(
     min_profit_growth: float = Query(None),
     min_eps_growth: float = Query(None),
     min_gross_margin_growth: float = Query(None),
+    min_gross_margin_vs_3q_avg: float = Query(None),
 ):
     """Screener nâng cao - dữ liệu thực từ database analytics(final).db"""
     db = get_db()
@@ -187,8 +188,81 @@ def advanced_screener(
             CASE WHEN (CASE WHEN lm.revenue>0 THEN lm.gross_profit*1.0/lm.revenue ELSE 0 END) >
                       (CASE WHEN pm.revenue>0 THEN pm.gross_profit*1.0/pm.revenue ELSE 0 END) THEN 1 ELSE 0 END +
             CASE WHEN (CASE WHEN lm.total_assets>0 THEN lm.revenue*1.0/lm.total_assets ELSE 0 END) >
-                      (CASE WHEN pm.total_assets>0 THEN pm.revenue*1.0/pm.total_assets ELSE 0 END) THEN 1 ELSE 0 END as f_score
+                      (CASE WHEN pm.total_assets>0 THEN pm.revenue*1.0/pm.total_assets ELSE 0 END) THEN 1 ELSE 0 END as f_score,
+            
+            i1.revenue as t1_revenue, i1.gross_profit as t1_gross_profit, i1.net_profit as t1_net_profit,
+            CASE WHEN lm.shares > 0 THEN i1.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t1_eps,
+            CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END as t1_gross_margin,
+            i1.period_year as t1_year, i1.period_quarter as t1_quarter,
+            
+            i2.revenue as t2_revenue, i2.gross_profit as t2_gross_profit, i2.net_profit as t2_net_profit,
+            CASE WHEN lm.shares > 0 THEN i2.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t2_eps,
+            CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END as t2_gross_margin,
+            i2.period_year as t2_year, i2.period_quarter as t2_quarter,
+            
+            i3.revenue as t3_revenue, i3.gross_profit as t3_gross_profit, i3.net_profit as t3_net_profit,
+            CASE WHEN lm.shares > 0 THEN i3.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t3_eps,
+            CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END as t3_gross_margin,
+            i3.period_year as t3_year, i3.period_quarter as t3_quarter,
+            
+            (
+                CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END +
+                CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END +
+                CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END
+            ) / 3.0 as avg_3q_gross_margin,
+            
+            CASE WHEN lm.revenue > 0 THEN lm.gross_profit * 100.0 / lm.revenue ELSE 0 END - 
+            (
+                (CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END +
+                 CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END +
+                 CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END) / 3.0
+            ) as gross_margin_vs_3q_avg,
+            CASE WHEN p1.revenue > 0 THEN (i1.revenue - p1.revenue) * 100.0 / p1.revenue ELSE NULL END as t1_revenue_growth,
+            CASE WHEN p1.net_profit > 0 THEN (i1.net_profit - p1.net_profit) * 100.0 / p1.net_profit ELSE NULL END as t1_profit_growth,
+            CASE WHEN p1.net_profit_to_shareholders IS NOT NULL AND ABS(p1.net_profit_to_shareholders) > 0 THEN
+                (i1.net_profit_to_shareholders - p1.net_profit_to_shareholders) * 100.0 / ABS(p1.net_profit_to_shareholders)
+            ELSE NULL END as t1_eps_growth,
+            CASE WHEN p1.revenue > 0 AND i1.revenue > 0 THEN (i1.gross_profit * 100.0 / i1.revenue) - (p1.gross_profit * 100.0 / p1.revenue) ELSE NULL END as t1_gross_margin_growth,
+            CASE WHEN p2.revenue > 0 THEN (i2.revenue - p2.revenue) * 100.0 / p2.revenue ELSE NULL END as t2_revenue_growth,
+            CASE WHEN p2.net_profit > 0 THEN (i2.net_profit - p2.net_profit) * 100.0 / p2.net_profit ELSE NULL END as t2_profit_growth,
+            CASE WHEN p2.net_profit_to_shareholders IS NOT NULL AND ABS(p2.net_profit_to_shareholders) > 0 THEN
+                (i2.net_profit_to_shareholders - p2.net_profit_to_shareholders) * 100.0 / ABS(p2.net_profit_to_shareholders)
+            ELSE NULL END as t2_eps_growth,
+            CASE WHEN p2.revenue > 0 AND i2.revenue > 0 THEN (i2.gross_profit * 100.0 / i2.revenue) - (p2.gross_profit * 100.0 / p2.revenue) ELSE NULL END as t2_gross_margin_growth,
+            CASE WHEN p3.revenue > 0 THEN (i3.revenue - p3.revenue) * 100.0 / p3.revenue ELSE NULL END as t3_revenue_growth,
+            CASE WHEN p3.net_profit > 0 THEN (i3.net_profit - p3.net_profit) * 100.0 / p3.net_profit ELSE NULL END as t3_profit_growth,
+            CASE WHEN p3.net_profit_to_shareholders IS NOT NULL AND ABS(p3.net_profit_to_shareholders) > 0 THEN
+                (i3.net_profit_to_shareholders - p3.net_profit_to_shareholders) * 100.0 / ABS(p3.net_profit_to_shareholders)
+            ELSE NULL END as t3_eps_growth,
+            CASE WHEN p3.revenue > 0 AND i3.revenue > 0 THEN (i3.gross_profit * 100.0 / i3.revenue) - (p3.gross_profit * 100.0 / p3.revenue) ELSE NULL END as t3_gross_margin_growth
+
+            
         FROM lm LEFT JOIN pm ON lm.ticker = pm.ticker
+        LEFT JOIN income_statements i1 ON i1.company_id = lm.id 
+            AND i1.period_type = 'quarterly'
+            AND i1.period_year = CASE WHEN lm.period_quarter = 1 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i1.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 4 ELSE lm.period_quarter - 1 END
+        LEFT JOIN income_statements i2 ON i2.company_id = lm.id
+            AND i2.period_type = 'quarterly'
+            AND i2.period_year = CASE WHEN lm.period_quarter <= 2 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i2.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 3 WHEN lm.period_quarter = 2 THEN 4 ELSE lm.period_quarter - 2 END
+        LEFT JOIN income_statements i3 ON i3.company_id = lm.id
+            AND i3.period_type = 'quarterly'
+            AND i3.period_year = CASE WHEN lm.period_quarter <= 3 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i3.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 2 WHEN lm.period_quarter = 2 THEN 3 WHEN lm.period_quarter = 3 THEN 4 ELSE lm.period_quarter - 3 END
+        LEFT JOIN income_statements p1 ON p1.company_id = lm.id
+            AND p1.period_type = 'quarterly'
+            AND p1.period_year = (CASE WHEN lm.period_quarter = 1 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p1.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 4 ELSE lm.period_quarter - 1 END
+        LEFT JOIN income_statements p2 ON p2.company_id = lm.id
+            AND p2.period_type = 'quarterly'
+            AND p2.period_year = (CASE WHEN lm.period_quarter <= 2 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p2.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 3 WHEN lm.period_quarter = 2 THEN 4 ELSE lm.period_quarter - 2 END
+        LEFT JOIN income_statements p3 ON p3.company_id = lm.id
+            AND p3.period_type = 'quarterly'
+            AND p3.period_year = (CASE WHEN lm.period_quarter <= 3 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p3.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 2 WHEN lm.period_quarter = 2 THEN 3 WHEN lm.period_quarter = 3 THEN 4 ELSE lm.period_quarter - 3 END
+
         """
     else:
         # ---- Query kỳ cụ thể (year hoặc year+quarter) ----
@@ -273,8 +347,81 @@ def advanced_screener(
             CASE WHEN (CASE WHEN lm.revenue>0 THEN lm.gross_profit*1.0/lm.revenue ELSE 0 END) >
                       (CASE WHEN pm.revenue>0 THEN pm.gross_profit*1.0/pm.revenue ELSE 0 END) THEN 1 ELSE 0 END +
             CASE WHEN (CASE WHEN lm.total_assets>0 THEN lm.revenue*1.0/lm.total_assets ELSE 0 END) >
-                      (CASE WHEN pm.total_assets>0 THEN pm.revenue*1.0/pm.total_assets ELSE 0 END) THEN 1 ELSE 0 END as f_score
+                      (CASE WHEN pm.total_assets>0 THEN pm.revenue*1.0/pm.total_assets ELSE 0 END) THEN 1 ELSE 0 END as f_score,
+            
+            i1.revenue as t1_revenue, i1.gross_profit as t1_gross_profit, i1.net_profit as t1_net_profit,
+            CASE WHEN lm.shares > 0 THEN i1.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t1_eps,
+            CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END as t1_gross_margin,
+            i1.period_year as t1_year, i1.period_quarter as t1_quarter,
+            
+            i2.revenue as t2_revenue, i2.gross_profit as t2_gross_profit, i2.net_profit as t2_net_profit,
+            CASE WHEN lm.shares > 0 THEN i2.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t2_eps,
+            CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END as t2_gross_margin,
+            i2.period_year as t2_year, i2.period_quarter as t2_quarter,
+            
+            i3.revenue as t3_revenue, i3.gross_profit as t3_gross_profit, i3.net_profit as t3_net_profit,
+            CASE WHEN lm.shares > 0 THEN i3.net_profit_to_shareholders * 1.0 / lm.shares ELSE 0 END as t3_eps,
+            CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END as t3_gross_margin,
+            i3.period_year as t3_year, i3.period_quarter as t3_quarter,
+            
+            (
+                CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END +
+                CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END +
+                CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END
+            ) / 3.0 as avg_3q_gross_margin,
+            
+            CASE WHEN lm.revenue > 0 THEN lm.gross_profit * 100.0 / lm.revenue ELSE 0 END - 
+            (
+                (CASE WHEN i1.revenue > 0 THEN i1.gross_profit * 100.0 / i1.revenue ELSE 0 END +
+                 CASE WHEN i2.revenue > 0 THEN i2.gross_profit * 100.0 / i2.revenue ELSE 0 END +
+                 CASE WHEN i3.revenue > 0 THEN i3.gross_profit * 100.0 / i3.revenue ELSE 0 END) / 3.0
+            ) as gross_margin_vs_3q_avg,
+            CASE WHEN p1.revenue > 0 THEN (i1.revenue - p1.revenue) * 100.0 / p1.revenue ELSE NULL END as t1_revenue_growth,
+            CASE WHEN p1.net_profit > 0 THEN (i1.net_profit - p1.net_profit) * 100.0 / p1.net_profit ELSE NULL END as t1_profit_growth,
+            CASE WHEN p1.net_profit_to_shareholders IS NOT NULL AND ABS(p1.net_profit_to_shareholders) > 0 THEN
+                (i1.net_profit_to_shareholders - p1.net_profit_to_shareholders) * 100.0 / ABS(p1.net_profit_to_shareholders)
+            ELSE NULL END as t1_eps_growth,
+            CASE WHEN p1.revenue > 0 AND i1.revenue > 0 THEN (i1.gross_profit * 100.0 / i1.revenue) - (p1.gross_profit * 100.0 / p1.revenue) ELSE NULL END as t1_gross_margin_growth,
+            CASE WHEN p2.revenue > 0 THEN (i2.revenue - p2.revenue) * 100.0 / p2.revenue ELSE NULL END as t2_revenue_growth,
+            CASE WHEN p2.net_profit > 0 THEN (i2.net_profit - p2.net_profit) * 100.0 / p2.net_profit ELSE NULL END as t2_profit_growth,
+            CASE WHEN p2.net_profit_to_shareholders IS NOT NULL AND ABS(p2.net_profit_to_shareholders) > 0 THEN
+                (i2.net_profit_to_shareholders - p2.net_profit_to_shareholders) * 100.0 / ABS(p2.net_profit_to_shareholders)
+            ELSE NULL END as t2_eps_growth,
+            CASE WHEN p2.revenue > 0 AND i2.revenue > 0 THEN (i2.gross_profit * 100.0 / i2.revenue) - (p2.gross_profit * 100.0 / p2.revenue) ELSE NULL END as t2_gross_margin_growth,
+            CASE WHEN p3.revenue > 0 THEN (i3.revenue - p3.revenue) * 100.0 / p3.revenue ELSE NULL END as t3_revenue_growth,
+            CASE WHEN p3.net_profit > 0 THEN (i3.net_profit - p3.net_profit) * 100.0 / p3.net_profit ELSE NULL END as t3_profit_growth,
+            CASE WHEN p3.net_profit_to_shareholders IS NOT NULL AND ABS(p3.net_profit_to_shareholders) > 0 THEN
+                (i3.net_profit_to_shareholders - p3.net_profit_to_shareholders) * 100.0 / ABS(p3.net_profit_to_shareholders)
+            ELSE NULL END as t3_eps_growth,
+            CASE WHEN p3.revenue > 0 AND i3.revenue > 0 THEN (i3.gross_profit * 100.0 / i3.revenue) - (p3.gross_profit * 100.0 / p3.revenue) ELSE NULL END as t3_gross_margin_growth
+
+            
         FROM lm LEFT JOIN pm ON lm.ticker = pm.ticker
+        LEFT JOIN income_statements i1 ON i1.company_id = lm.id 
+            AND i1.period_type = 'quarterly'
+            AND i1.period_year = CASE WHEN lm.period_quarter = 1 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i1.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 4 ELSE lm.period_quarter - 1 END
+        LEFT JOIN income_statements i2 ON i2.company_id = lm.id
+            AND i2.period_type = 'quarterly'
+            AND i2.period_year = CASE WHEN lm.period_quarter <= 2 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i2.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 3 WHEN lm.period_quarter = 2 THEN 4 ELSE lm.period_quarter - 2 END
+        LEFT JOIN income_statements i3 ON i3.company_id = lm.id
+            AND i3.period_type = 'quarterly'
+            AND i3.period_year = CASE WHEN lm.period_quarter <= 3 THEN lm.period_year - 1 ELSE lm.period_year END
+            AND i3.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 2 WHEN lm.period_quarter = 2 THEN 3 WHEN lm.period_quarter = 3 THEN 4 ELSE lm.period_quarter - 3 END
+        LEFT JOIN income_statements p1 ON p1.company_id = lm.id
+            AND p1.period_type = 'quarterly'
+            AND p1.period_year = (CASE WHEN lm.period_quarter = 1 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p1.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 4 ELSE lm.period_quarter - 1 END
+        LEFT JOIN income_statements p2 ON p2.company_id = lm.id
+            AND p2.period_type = 'quarterly'
+            AND p2.period_year = (CASE WHEN lm.period_quarter <= 2 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p2.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 3 WHEN lm.period_quarter = 2 THEN 4 ELSE lm.period_quarter - 2 END
+        LEFT JOIN income_statements p3 ON p3.company_id = lm.id
+            AND p3.period_type = 'quarterly'
+            AND p3.period_year = (CASE WHEN lm.period_quarter <= 3 THEN lm.period_year - 1 ELSE lm.period_year END) - 1
+            AND p3.period_quarter = CASE WHEN lm.period_quarter = 1 THEN 2 WHEN lm.period_quarter = 2 THEN 3 WHEN lm.period_quarter = 3 THEN 4 ELSE lm.period_quarter - 3 END
+
         """
 
     try:
@@ -296,7 +443,14 @@ def advanced_screener(
             'revenue_growth': -9999, 'profit_growth': -9999,
             'eps_growth': -9999, 'gross_margin_growth': -9999,
             'lm_revenue': 0, 'pm_revenue': 0, 'lm_gross_profit': 0, 'pm_gross_profit': 0,
-            'lm_net_profit': 0, 'pm_net_profit': 0, 'lm_eps': 0, 'pm_eps': 0
+            'lm_net_profit': 0, 'pm_net_profit': 0, 'lm_eps': 0, 'pm_eps': 0,
+            'avg_3q_gross_margin': 0, 'gross_margin_vs_3q_avg': -9999,
+            't1_revenue': 0, 't1_gross_profit': 0, 't1_net_profit': 0, 't1_eps': 0, 't1_gross_margin': 0,
+            't2_revenue': 0, 't2_gross_profit': 0, 't2_net_profit': 0, 't2_eps': 0, 't2_gross_margin': 0,
+            't3_revenue': 0, 't3_gross_profit': 0, 't3_net_profit': 0, 't3_eps': 0, 't3_gross_margin': 0,
+            't1_revenue_growth': -9999, 't1_profit_growth': -9999, 't1_eps_growth': -9999, 't1_gross_margin_growth': -9999,
+            't2_revenue_growth': -9999, 't2_profit_growth': -9999, 't2_eps_growth': -9999, 't2_gross_margin_growth': -9999,
+            't3_revenue_growth': -9999, 't3_profit_growth': -9999, 't3_eps_growth': -9999, 't3_gross_margin_growth': -9999
         })
 
         # Áp dụng filter — bỏ qua P/E, P/B nếu kỳ quá khứ (không có giá)
@@ -318,6 +472,7 @@ def advanced_screener(
         if min_profit_growth is not None: df = df[df['profit_growth'] >= min_profit_growth]
         if min_eps_growth is not None: df = df[df['eps_growth'] >= min_eps_growth]
         if min_gross_margin_growth is not None: df = df[df['gross_margin_growth'] >= min_gross_margin_growth]
+        if min_gross_margin_vs_3q_avg is not None: df = df[df['gross_margin_vs_3q_avg'] >= min_gross_margin_vs_3q_avg]
 
         # Convert sentinel → None
         df = df.replace([-9999, 9999], [None, None])

@@ -37,3 +37,5 @@ system/pdf/
 # Temp/scratch files
 fill_industry.py
 test_kbs.py
+
+Database/master_db/analytics(final).db

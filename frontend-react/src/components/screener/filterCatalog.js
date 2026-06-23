@@ -273,6 +273,14 @@ export const FILTER_GROUPS = [
             defaultCondition: { operator: 'gt', value: '0' },
           },
           {
+            id: 'sepa_stable_gross_margin',
+            label: 'BLG duy trì ổn định',
+            unit: '',
+            description: 'Biên lãi gộp quý này >= Trung bình BLG 3 quý gần nhất',
+            apiMinKey: 'min_gross_margin_vs_3q_avg',
+            defaultCondition: { operator: 'gt', value: '0' },
+          },
+          {
             id: 'sepa_profit_growth',
             label: 'Tăng trưởng LNST',
             unit: '%',
