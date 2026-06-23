@@ -35,6 +35,7 @@ system/pdf/
 .price_update.lock
 
 # Temp/scratch files
+scratch/
 fill_industry.py
 test_kbs.py
 
