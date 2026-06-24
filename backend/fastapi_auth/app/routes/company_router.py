@@ -21,17 +21,28 @@ def get_company_from_db(ticker: str):
         (ticker.upper(),)
     )
     row = cur.fetchone()
-    conn.close()
     
-    if row:
-        company = dict(row)
-        company["industry"] = _resolve_industry(
-            company.get("ticker"),
-            company.get("industry"),
-            company.get("company_type"),
-        )
-        return company
-    return None
+    if not row:
+        conn.close()
+        return None
+        
+    company = dict(row)
+    company["industry"] = _resolve_industry(
+        company.get("ticker"),
+        company.get("industry"),
+        company.get("company_type"),
+    )
+    
+    # Fetch officers
+    cur.execute(
+        "SELECT name, position, position_en, from_date FROM company_officers WHERE UPPER(ticker)=?",
+        (ticker.upper(),)
+    )
+    officers = [dict(o) for o in cur.fetchall()]
+    company["officers"] = officers
+    
+    conn.close()
+    return company
 
 @router.get('')
 def list_companies(limit: int = 100):
@@ -97,6 +108,39 @@ def search_companies(q: str = Query(..., min_length=1, description="Search query
         "count": len(results),
         "results": results,
     }
+
+@router.get('/batch')
+def get_companies_batch(tickers: str = Query(...)):
+    """Lấy danh sách công ty theo tickers (cách nhau bằng dấu phẩy)"""
+    if not ANALYTICS_DB.exists():
+        raise HTTPException(500, 'Analytics DB không tồn tại')
+
+    ticker_list = [t.strip().upper() for t in tickers.split(',') if t.strip()]
+    if not ticker_list:
+        return []
+
+    placeholders = ','.join('?' * len(ticker_list))
+    conn = sqlite3.connect(str(ANALYTICS_DB))
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT id, ticker, name, company_type, industry, current_price, market_cap, shares_outstanding FROM companies WHERE UPPER(ticker) IN ({placeholders})",
+        ticker_list
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    results = []
+    for row in rows:
+        company = dict(row)
+        company["industry"] = _resolve_industry(
+            company.get("ticker"),
+            company.get("industry"),
+            company.get("company_type"),
+        )
+        results.append(company)
+
+    return results
 
 @router.get('/{ticker}')
 def get_company(ticker: str):
