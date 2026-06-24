@@ -610,19 +610,21 @@ export default function Screener() {
 
                       <td className="text-center"><RatioValue value={stock.revenue_growth} type="growth" />%</td>
                       <td className="text-center"><HealthScoreBadge score={stock.f_score} /></td>
-                      <td className="text-center flex items-center justify-center gap-1">
-                        {activeMethodId && (
-                          <button 
-                            onClick={() => setDetailModalStock(stock)} 
-                            className="btn-ghost rounded-md p-1.5 hover:bg-emerald-500/20 text-emerald-400 transition-colors" 
-                            title="Chi tiết bộ lọc"
-                          >
-                            <SlidersHorizontal className="h-4 w-4" />
-                          </button>
-                        )}
-                        <Link to={`/company/${stock.ticker}`} className="btn-ghost rounded-md p-1.5 hover:bg-white/10 transition-colors" title="Hồ sơ công ty">
-                          <Eye className="h-4 w-4" />
-                        </Link>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {activeMethodId && (
+                            <button 
+                              onClick={() => setDetailModalStock(stock)} 
+                              className="btn-ghost rounded-md p-1.5 hover:bg-emerald-500/20 text-emerald-400 transition-colors" 
+                              title="Chi tiết bộ lọc"
+                            >
+                              <SlidersHorizontal className="h-4 w-4" />
+                            </button>
+                          )}
+                          <Link to={`/company/${stock.ticker}`} className="btn-ghost rounded-md p-1.5 hover:bg-white/10 transition-colors" title="Hồ sơ công ty">
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
