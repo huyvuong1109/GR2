@@ -255,12 +255,10 @@ export default function Screener() {
   }
 
   const pushDynamicPayloadToApi = async (payload, queryParams) => {
-    if (!payload || payload.length === 0) return
-    try {
-      await api.post('/screener', { dynamic_filters: payload, mapped_filters: queryParams })
-    } catch (postError) {
-      console.warn('Dynamic payload endpoint chưa xử lý đầy đủ:', postError)
-    }
+    // The backend uses GET /api/screener/advanced with mapped_filters (queryParams).
+    // The dynamic_filters JSON is sent in GET but currently ignored by backend in favor of mapped_filters.
+    // There's no POST /api/screener endpoint required.
+    return Promise.resolve()
   }
 
   const handleDynamicApply = async ({ payload, queryParams, selectedMethodId }) => {
