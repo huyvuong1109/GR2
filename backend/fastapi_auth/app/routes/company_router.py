@@ -168,20 +168,20 @@ def get_company_cash_flows(ticker: str):
     """Lấy danh sách báo cáo lưu chuyển tiền tệ đã map theo loại công ty"""
     return db.get_company_cash_flows_mapped(ticker.upper())
 
-@router.get('/{ticker}/health-score')
-def get_health_score(ticker: str):
-    """Lấy health score của công ty"""
-    company = get_company_from_db(ticker)
-    if not company:
-        raise HTTPException(404, f'Không tìm thấy công ty {ticker}')
-    
-    # Mock health score - có thể upgrade lấy từ financial data
-    company_type = company.get('company_type', '').lower()
-    scores = {
-        'bank': {'score': 8.0, 'rating': 'Very Good', 'trend': 'up'},
-        'securities': {'score': 7.5, 'rating': 'Good', 'trend': 'stable'},
-        'insurance': {'score': 7.8, 'rating': 'Good', 'trend': 'up'},
-        'corporate': {'score': 6.8, 'rating': 'Fair', 'trend': 'stable'}
-    }
-    
-    return scores.get(company_type, {'score': 6.5, 'rating': 'Fair', 'trend': 'stable'})
+# @router.get('/{ticker}/health-score')
+# def get_health_score(ticker: str):
+#     """Lấy health score của công ty"""
+#     company = get_company_from_db(ticker)
+#     if not company:
+#         raise HTTPException(404, f'Không tìm thấy công ty {ticker}')
+#     
+#     # Mock health score - có thể upgrade lấy từ financial data
+#     company_type = company.get('company_type', '').lower()
+#     scores = {
+#         'bank': {'score': 8.0, 'rating': 'Very Good', 'trend': 'up'},
+#         'securities': {'score': 7.5, 'rating': 'Good', 'trend': 'stable'},
+#         'insurance': {'score': 7.8, 'rating': 'Good', 'trend': 'up'},
+#         'corporate': {'score': 6.8, 'rating': 'Fair', 'trend': 'stable'}
+#     }
+#     
+#     return scores.get(company_type, {'score': 6.5, 'rating': 'Fair', 'trend': 'stable'})

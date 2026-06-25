@@ -901,17 +901,17 @@ class DatabaseManager:
         )
         return _apply_industry_fallback(pd.read_sql(text(query), self.engine, params=params))
 
-    def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
-        """Lấy lịch sử giá gần nhất theo mã"""
-        query = """
-        SELECT trade_date, close_price, updated_at
-        FROM price_history
-        WHERE UPPER(ticker) = :ticker
-        ORDER BY trade_date DESC, id DESC
-        LIMIT :limit
-        """
-        return pd.read_sql(text(query), self.engine, params={"ticker": ticker.upper(), "limit": limit})
-
+#     def get_price_history(self, ticker: str, limit: int = 7) -> pd.DataFrame:
+#         """Lấy lịch sử giá gần nhất theo mã"""
+#         query = """
+#         SELECT trade_date, close_price, updated_at
+#         FROM price_history
+#         WHERE UPPER(ticker) = :ticker
+#         ORDER BY trade_date DESC, id DESC
+#         LIMIT :limit
+#         """
+#         return pd.read_sql(text(query), self.engine, params={"ticker": ticker.upper(), "limit": limit})
+# 
     def get_long_term_metrics(self, ticker: str, years: int = 10) -> pd.DataFrame:
         """Lấy dữ liệu dài hạn (5-10 năm) phục vụ phân tích value investing."""
         query = """
@@ -952,100 +952,100 @@ class DatabaseManager:
 
         return df
 
-    def get_top_movers(self, limit: int = 10, direction: str = "gainers") -> pd.DataFrame:
-        """Lấy top tăng/giảm theo biến động 2 phiên gần nhất."""
-        query = """
-        WITH latest_dates AS (
-            SELECT DISTINCT trade_date
-            FROM price_history
-            ORDER BY trade_date DESC
-            LIMIT 2
-        ),
-        ranked AS (
-            SELECT ph.ticker, ph.trade_date, ph.close_price
-            FROM price_history ph
-            WHERE ph.trade_date IN (SELECT trade_date FROM latest_dates)
-        ),
-        piv AS (
-            SELECT
-                ticker,
-                MAX(CASE WHEN trade_date = (SELECT MIN(trade_date) FROM latest_dates) THEN close_price END) AS prev_price,
-                MAX(CASE WHEN trade_date = (SELECT MAX(trade_date) FROM latest_dates) THEN close_price END) AS last_price
-            FROM ranked
-            GROUP BY ticker
-        )
-        SELECT
-            c.ticker,
-            c.name,
-            c.industry,
-            c.market_cap,
-            CASE
-                WHEN piv.prev_price > 0 THEN ROUND((piv.last_price - piv.prev_price) * 100.0 / piv.prev_price, 2)
-                ELSE NULL
-            END AS change_percent
-        FROM piv
-        JOIN companies c ON UPPER(c.ticker) = UPPER(piv.ticker)
-        WHERE piv.last_price IS NOT NULL
-        ORDER BY change_percent {order}
-        LIMIT :limit
-        """.format(order="DESC" if direction == "gainers" else "ASC")
-
-        return pd.read_sql(text(query), self.engine, params={"limit": limit})
-    
-    def get_company_by_ticker(self, ticker: str) -> dict:
-        """Lấy thông tin công ty theo mã CK"""
-        query = text(
-            """
-            SELECT
-                id,
-                ticker,
-                name,
-                description,
-                industry,
-                company_type,
-                market_cap,
-                shares_outstanding,
-                current_price,
-                price_updated_at
-            FROM companies
-            WHERE UPPER(ticker) = :ticker
-            LIMIT 1
-            """
-        )
-        with self.engine.connect() as conn:
-            row = conn.execute(query, {"ticker": ticker.upper()}).mappings().first()
-
-        if not row:
-            return None
-
-        company = dict(row)
-        company["industry"] = _resolve_industry(company.get("ticker"), company.get("industry"), company.get("company_type"))
-        company["officers"] = self.get_company_officers(ticker)
-        return company
-
-    def get_company_officers(self, ticker: str) -> list[dict[str, Any]]:
-        """Lay danh sach ban lanh dao cong ty."""
-        query = text(
-            """
-            SELECT
-                name,
-                position,
-                position_en,
-                from_date,
-                owner_code,
-                officer_own_percent,
-                quantity,
-                update_date,
-                source
-            FROM company_officers
-            WHERE UPPER(ticker) = :ticker
-            ORDER BY COALESCE(display_order, 999999), name
-            """
-        )
-        with self.engine.connect() as conn:
-            rows = conn.execute(query, {"ticker": ticker.upper()}).mappings().all()
-        return [dict(row) for row in rows]
-
+#     def get_top_movers(self, limit: int = 10, direction: str = "gainers") -> pd.DataFrame:
+#         """Lấy top tăng/giảm theo biến động 2 phiên gần nhất."""
+#         query = """
+#         WITH latest_dates AS (
+#             SELECT DISTINCT trade_date
+#             FROM price_history
+#             ORDER BY trade_date DESC
+#             LIMIT 2
+#         ),
+#         ranked AS (
+#             SELECT ph.ticker, ph.trade_date, ph.close_price
+#             FROM price_history ph
+#             WHERE ph.trade_date IN (SELECT trade_date FROM latest_dates)
+#         ),
+#         piv AS (
+#             SELECT
+#                 ticker,
+#                 MAX(CASE WHEN trade_date = (SELECT MIN(trade_date) FROM latest_dates) THEN close_price END) AS prev_price,
+#                 MAX(CASE WHEN trade_date = (SELECT MAX(trade_date) FROM latest_dates) THEN close_price END) AS last_price
+#             FROM ranked
+#             GROUP BY ticker
+#         )
+#         SELECT
+#             c.ticker,
+#             c.name,
+#             c.industry,
+#             c.market_cap,
+#             CASE
+#                 WHEN piv.prev_price > 0 THEN ROUND((piv.last_price - piv.prev_price) * 100.0 / piv.prev_price, 2)
+#                 ELSE NULL
+#             END AS change_percent
+#         FROM piv
+#         JOIN companies c ON UPPER(c.ticker) = UPPER(piv.ticker)
+#         WHERE piv.last_price IS NOT NULL
+#         ORDER BY change_percent {order}
+#         LIMIT :limit
+#         """.format(order="DESC" if direction == "gainers" else "ASC")
+# 
+#         return pd.read_sql(text(query), self.engine, params={"limit": limit})
+#     
+#     def get_company_by_ticker(self, ticker: str) -> dict:
+#         """Lấy thông tin công ty theo mã CK"""
+#         query = text(
+#             """
+#             SELECT
+#                 id,
+#                 ticker,
+#                 name,
+#                 description,
+#                 industry,
+#                 company_type,
+#                 market_cap,
+#                 shares_outstanding,
+#                 current_price,
+#                 price_updated_at
+#             FROM companies
+#             WHERE UPPER(ticker) = :ticker
+#             LIMIT 1
+#             """
+#         )
+#         with self.engine.connect() as conn:
+#             row = conn.execute(query, {"ticker": ticker.upper()}).mappings().first()
+# 
+#         if not row:
+#             return None
+# 
+#         company = dict(row)
+#         company["industry"] = _resolve_industry(company.get("ticker"), company.get("industry"), company.get("company_type"))
+#         company["officers"] = self.get_company_officers(ticker)
+#         return company
+# 
+#     def get_company_officers(self, ticker: str) -> list[dict[str, Any]]:
+#         """Lay danh sach ban lanh dao cong ty."""
+#         query = text(
+#             """
+#             SELECT
+#                 name,
+#                 position,
+#                 position_en,
+#                 from_date,
+#                 owner_code,
+#                 officer_own_percent,
+#                 quantity,
+#                 update_date,
+#                 source
+#             FROM company_officers
+#             WHERE UPPER(ticker) = :ticker
+#             ORDER BY COALESCE(display_order, 999999), name
+#             """
+#         )
+#         with self.engine.connect() as conn:
+#             rows = conn.execute(query, {"ticker": ticker.upper()}).mappings().all()
+#         return [dict(row) for row in rows]
+# 
     def _get_company_profile(self, ticker: str) -> dict[str, Any] | None:
         """Lấy metadata công ty từ bảng companies (bao gồm company_type)."""
         query = text(
@@ -1186,365 +1186,365 @@ class DatabaseManager:
         """LCTT đã map theo loại công ty cho frontend."""
         return self._get_company_statement_data(ticker, "cash_flows")
     
-    def get_financial_summary(self, ticker: str) -> pd.DataFrame:
-        """
-        Lấy tổng hợp dữ liệu tài chính theo năm
-        Bao gồm: Doanh thu, Lợi nhuận, EPS, BVPS, các chỉ số tài chính
-        """
-        query = """
-        SELECT 
-            i.period_year as year,
-            i.revenue,
-            i.gross_profit,
-            i.operating_income,
-            i.net_profit,
-            i.net_profit_to_shareholders,
-            b.total_assets,
-            b.total_liabilities,
-            b.total_equity,
-            b.current_assets,
-            b.current_liabilities,
-            b.cash_and_equivalents,
-            b.inventories,
-            b.short_term_debt,
-            b.long_term_debt,
-            c.shares_outstanding,
-            c.current_price,
-            cf.operating_cash_flow,
-            cf.capex,
-            cf.investing_cash_flow,
-            cf.financing_cash_flow
-        FROM companies c
-        JOIN income_statements i ON c.id = i.company_id
-        JOIN balance_sheets b ON c.id = b.company_id 
-            AND i.period_year = b.period_year 
-            AND i.period_type = b.period_type
-            AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
-        JOIN cash_flows cf ON c.id = cf.company_id 
-            AND i.period_year = cf.period_year 
-            AND i.period_type = cf.period_type
-            AND COALESCE(i.period_quarter, 0) = COALESCE(cf.period_quarter, 0)
-        WHERE c.ticker = :ticker
-            AND i.period_type IN ('annual', 'quarterly')
-        ORDER BY i.period_year, COALESCE(i.period_quarter, 0)
-        """
-        df = pd.read_sql(text(query), self.engine, params={"ticker": ticker})
-        
-        if df.empty:
-            return df
-            
-        # Tính toán các chỉ số tài chính
-        df['eps'] = df['net_profit_to_shareholders'] / df['shares_outstanding']
-        df['bvps'] = df['total_equity'] / df['shares_outstanding']
-        
-        # Chi so thi truong (dung gia hien tai)
-        current_price = df['current_price'].iloc[-1] if not df.empty else 0
-        df['pe_ratio'] = current_price / df['eps'].replace(0, float('nan'))
-        df['pb_ratio'] = current_price / df['bvps'].replace(0, float('nan'))
-        # Note: dividend_per_share chưa có trong database, set default = 0
-        df['dividend_yield'] = 0
-        
-        # Chỉ số sức khỏe tài chính
-        df['de_ratio'] = df['total_liabilities'] / df['total_equity'].replace(0, float('nan'))
-        df['quick_ratio'] = (df['current_assets'] - df['inventories']) / df['current_liabilities'].replace(0, float('nan'))
-        df['current_ratio'] = df['current_assets'] / df['current_liabilities'].replace(0, float('nan'))
-        
-        # Chỉ số hiệu quả hoạt động
-        df['roe'] = (df['net_profit'] / df['total_equity'].replace(0, float('nan')) * 100).round(2)
-        df['roa'] = (df['net_profit'] / df['total_assets'].replace(0, float('nan')) * 100).round(2)
-        df['gross_margin'] = (df['gross_profit'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
-        df['net_margin'] = (df['net_profit'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
-        df['operating_margin'] = (df['operating_income'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
-        
-        # ROIC = NOPAT / Invested Capital
-        # NOPAT ≈ Operating Income * (1 - Tax Rate), Tax Rate ≈ 20%
-        df['nopat'] = df['operating_income'] * 0.8
-        df['invested_capital'] = df['total_equity'] + df['short_term_debt'] + df['long_term_debt'] - df['cash_and_equivalents']
-        df['roic'] = (df['nopat'] / df['invested_capital'].replace(0, float('nan')) * 100).round(2)
-        
-        # Tăng trưởng YoY
-        df['revenue_growth'] = df['revenue'].pct_change() * 100
-        df['profit_growth'] = df['net_profit'].pct_change() * 100
-        
-        return df
-    
-    def get_company_financials_detailed(self, ticker: str) -> dict:
-        """Lấy dữ liệu tài chính chi tiết theo format frontend cần"""
-        company = self._get_company_profile(ticker)
-        if not company:
-            return None
-
-        income_df = pd.DataFrame(self.get_company_income_statements_mapped(ticker))
-        balance_df = pd.DataFrame(self.get_company_balance_sheets_mapped(ticker))
-        cashflow_df = pd.DataFrame(self.get_company_cash_flows_mapped(ticker))
-
-        # Calculate ratio columns used by analysis screens.
-        if not balance_df.empty and not income_df.empty:
-            merge_keys = ["fiscal_year"]
-            if "quarter" in income_df.columns and "quarter" in balance_df.columns:
-                merge_keys.append("quarter")
-
-            merged = income_df.merge(
-                balance_df[merge_keys + ["total_equity", "total_assets"]],
-                on=merge_keys,
-                how="left",
-            )
-
-            for col in ["revenue", "net_income", "gross_profit", "total_equity", "total_assets"]:
-                merged[col] = pd.to_numeric(merged[col], errors="coerce")
-
-            merged["roe"] = (
-                merged["net_income"] / merged["total_equity"].replace(0, float("nan")) * 100
-            ).fillna(0).round(2)
-            merged["roa"] = (
-                merged["net_income"] / merged["total_assets"].replace(0, float("nan")) * 100
-            ).fillna(0).round(2)
-            merged["gross_margin"] = (
-                merged["gross_profit"] / merged["revenue"].replace(0, float("nan")) * 100
-            ).fillna(0).round(2)
-            merged["net_margin"] = (
-                merged["net_income"] / merged["revenue"].replace(0, float("nan")) * 100
-            ).fillna(0).round(2)
-
-            income_df = income_df.merge(
-                merged[merge_keys + ["roe", "roa", "gross_margin", "net_margin"]],
-                on=merge_keys,
-                how="left",
-            )
-
-        return {
-            "income_statements": income_df.where(pd.notnull(income_df), 0).to_dict("records"),
-            "balance_sheets": balance_df.where(pd.notnull(balance_df), 0).to_dict("records"),
-            "cash_flows": cashflow_df.where(pd.notnull(cashflow_df), 0).to_dict("records"),
-        }
-
-    def get_balance_sheet_structure(self, ticker: str) -> pd.DataFrame:
-        """Lấy cơ cấu Bảng cân đối kế toán để vẽ biểu đồ"""
-        query = """
-        SELECT 
-            b.period_year as year,
-            b.cash_and_equivalents,
-            b.short_term_investments,
-            b.accounts_receivable,
-            b.inventories,
-            b.other_current_assets,
-            b.fixed_assets,
-            b.long_term_investments,
-            (b.non_current_assets - b.fixed_assets - b.long_term_investments) as other_non_current,
-            b.short_term_debt,
-            b.accounts_payable,
-            (b.current_liabilities - b.short_term_debt - b.accounts_payable) as other_current_liab,
-            b.long_term_debt,
-            (b.non_current_liabilities - b.long_term_debt) as other_non_current_liab,
-            b.share_capital,
-            b.retained_earnings,
-            (b.total_equity - b.share_capital - b.retained_earnings) as other_equity
-        FROM companies c
-        JOIN balance_sheets b ON c.id = b.company_id
-        WHERE c.ticker = :ticker
-            AND b.period_type IN ('annual', 'quarterly')
-        ORDER BY b.period_year, COALESCE(b.period_quarter, 0)
-        """
-        return pd.read_sql(text(query), self.engine, params={"ticker": ticker})
-    
-    def get_cash_flow_data(self, ticker: str) -> pd.DataFrame:
-        """Lấy dữ liệu dòng tiền"""
-        query = """
-        SELECT 
-            cf.period_year as year,
-            cf.operating_cash_flow,
-            cf.investing_cash_flow,
-            cf.financing_cash_flow,
-            cf.capex,
-            cf.dividends_paid,
-            cf.net_change_in_cash,
-            i.net_profit
-        FROM companies c
-        JOIN cash_flows cf ON c.id = cf.company_id
-        JOIN income_statements i ON c.id = i.company_id 
-            AND cf.period_year = i.period_year
-            AND cf.period_type = i.period_type
-            AND COALESCE(cf.period_quarter, 0) = COALESCE(i.period_quarter, 0)
-        WHERE c.ticker = :ticker
-            AND cf.period_type IN ('annual', 'quarterly')
-        ORDER BY cf.period_year, COALESCE(cf.period_quarter, 0)
-        """
-        return pd.read_sql(text(query), self.engine, params={"ticker": ticker})
-    
-    def screen_stocks(self, filters: dict) -> pd.DataFrame:
-        """
-        Bộ lọc cổ phiếu thông minh
-        
-        filters có thể bao gồm:
-        - min_roe: ROE tối thiểu (%)
-        - max_de: D/E tối đa
-        - min_profit_growth: Tăng trưởng LN tối thiểu (%)
-        - max_pe: P/E tối đa
-        - min_pe: P/E tối thiểu
-        - max_pb: P/B tối đa
-        - min_dividend_yield: Dividend Yield tối thiểu (%)
-        - consecutive_roe_years: Số năm liên tiếp ROE đạt min_roe
-        - industry: Lọc theo ngành
-        """
-        # Query cơ bản với các chỉ số tài chính
-        query = """
-        WITH yearly_metrics AS (
-            SELECT 
-                c.id,
-                c.ticker,
-                c.name,
-                c.industry,
-                c.current_price,
-                c.shares_outstanding,
-                c.market_cap,
-                i.period_year,
-                i.period_quarter,
-                i.period_type,
-                i.revenue,
-                i.net_profit,
-                i.net_profit_to_shareholders,
-                0 as dividend_per_share,  -- Not available in current schema
-                b.total_assets,
-                b.total_liabilities,
-                b.total_equity,
-                b.current_assets,
-                b.current_liabilities,
-                b.inventories,
-                -- Calculated metrics
-                CASE WHEN b.total_equity > 0 THEN 
-                    ROUND(i.net_profit * 100.0 / b.total_equity, 2) 
-                ELSE 0 END as roe,
-                CASE WHEN b.total_equity > 0 THEN 
-                    ROUND(b.total_liabilities * 1.0 / b.total_equity, 2) 
-                ELSE 0 END as de_ratio,
-                CASE WHEN b.total_assets > 0 THEN 
-                    ROUND(i.net_profit * 100.0 / b.total_assets, 2) 
-                ELSE 0 END as roa
-            FROM companies c
-            JOIN income_statements i ON c.id = i.company_id
-            JOIN balance_sheets b ON c.id = b.company_id 
-                AND i.period_year = b.period_year 
-                AND i.period_type = b.period_type
-                AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
-        ),
-        latest_period AS (
-            SELECT
-                period_year,
-                MAX(COALESCE(period_quarter, 0)) AS period_quarter
-            FROM yearly_metrics
-            WHERE period_year = (SELECT MAX(period_year) FROM yearly_metrics)
-            GROUP BY period_year
-        ),
-        latest_metrics AS (
-            SELECT 
-                ym.*,
-                CASE WHEN ym.shares_outstanding > 0 THEN 
-                    ROUND(ym.net_profit_to_shareholders * 1.0 / ym.shares_outstanding, 2) 
-                ELSE 0 END as eps,
-                CASE WHEN ym.shares_outstanding > 0 THEN 
-                    ROUND(ym.total_equity * 1.0 / ym.shares_outstanding, 2) 
-                ELSE 0 END as bvps
-            FROM yearly_metrics ym
-            JOIN latest_period lp
-                ON ym.period_year = lp.period_year
-               AND COALESCE(ym.period_quarter, 0) = lp.period_quarter
-        ),
-        growth_calc AS (
-            SELECT 
-                ym1.id,
-                CASE WHEN ym0.net_profit > 0 THEN 
-                    ROUND((ym1.net_profit - ym0.net_profit) * 100.0 / ym0.net_profit, 2)
-                ELSE 0 END as profit_growth,
-                CASE WHEN ym0.revenue > 0 THEN 
-                    ROUND((ym1.revenue - ym0.revenue) * 100.0 / ym0.revenue, 2)
-                ELSE 0 END as revenue_growth
-            FROM yearly_metrics ym1
-            JOIN yearly_metrics ym0
-                ON ym1.id = ym0.id
-               AND ym1.period_year = ym0.period_year + 1
-               AND COALESCE(ym1.period_quarter, 0) = COALESCE(ym0.period_quarter, 0)
-            JOIN latest_period lp
-                ON ym1.period_year = lp.period_year
-               AND COALESCE(ym1.period_quarter, 0) = lp.period_quarter
-        )
-        SELECT 
-            lm.ticker,
-            lm.name,
-            lm.industry,
-            lm.period_year,
-            lm.period_quarter,
-            lm.current_price,
-            lm.current_price as price,
-            lm.market_cap,
-            lm.revenue,
-            lm.net_profit,
-            lm.eps,
-            lm.bvps,
-            lm.roe,
-            lm.roa,
-            lm.de_ratio,
-            CASE WHEN lm.eps > 0 THEN ROUND(lm.current_price / lm.eps, 2) ELSE 0 END as pe_ratio,
-            CASE WHEN lm.bvps > 0 THEN ROUND(lm.current_price / lm.bvps, 2) ELSE 0 END as pb_ratio,
-            0 as dividend_yield,  -- dividend_per_share not available in current schema
-            COALESCE(gc.profit_growth, 0) as profit_growth,
-            COALESCE(gc.revenue_growth, 0) as revenue_growth,
-            ROUND((lm.current_assets - lm.inventories) * 1.0 / NULLIF(lm.current_liabilities, 0), 2) as quick_ratio
-        FROM latest_metrics lm
-        LEFT JOIN growth_calc gc ON lm.id = gc.id
-        WHERE 1=1
-        """
-        
-        params = {}
-        
-        # Apply filters
-        if filters.get('min_roe'):
-            query += " AND lm.roe >= :min_roe"
-            params['min_roe'] = filters['min_roe']
-            
-        if filters.get('max_de'):
-            query += " AND lm.de_ratio <= :max_de"
-            params['max_de'] = filters['max_de']
-            
-        if filters.get('max_pe'):
-            query += " AND (lm.eps <= 0 OR lm.current_price / lm.eps <= :max_pe)"
-            params['max_pe'] = filters['max_pe']
-            
-        if filters.get('min_pe'):
-            query += " AND lm.eps > 0 AND lm.current_price / lm.eps >= :min_pe"
-            params['min_pe'] = filters['min_pe']
-            
-        if filters.get('max_pb'):
-            query += " AND (lm.bvps <= 0 OR lm.current_price / lm.bvps <= :max_pb)"
-            params['max_pb'] = filters['max_pb']
-            
-        if filters.get('min_dividend_yield'):
-            # Note: dividend_per_share not available in current schema
-            # query += " AND lm.current_price > 0 AND (lm.dividend_per_share * 100.0 / lm.current_price) >= :min_div"
-            # params['min_div'] = filters['min_dividend_yield']
-            pass
-            
-        if filters.get('industry'):
-            query += " AND lm.industry = :industry"
-            params['industry'] = filters['industry']
-        
-        query += " ORDER BY lm.roe DESC"
-        
-        df = pd.read_sql(text(query), self.engine, params=params)
-        
-        # Filter for consecutive ROE years if specified
-        if filters.get('consecutive_roe_years') and filters.get('min_roe'):
-            valid_tickers = self._check_consecutive_roe(
-                filters['min_roe'], 
-                filters['consecutive_roe_years']
-            )
-            df = df[df['ticker'].isin(valid_tickers)]
-        
-        # Filter for minimum profit growth if specified
-        if filters.get('min_profit_growth'):
-            df = df[df['profit_growth'] >= filters['min_profit_growth']]
-        
-        return df
-    
+#     def get_financial_summary(self, ticker: str) -> pd.DataFrame:
+#         """
+#         Lấy tổng hợp dữ liệu tài chính theo năm
+#         Bao gồm: Doanh thu, Lợi nhuận, EPS, BVPS, các chỉ số tài chính
+#         """
+#         query = """
+#         SELECT 
+#             i.period_year as year,
+#             i.revenue,
+#             i.gross_profit,
+#             i.operating_income,
+#             i.net_profit,
+#             i.net_profit_to_shareholders,
+#             b.total_assets,
+#             b.total_liabilities,
+#             b.total_equity,
+#             b.current_assets,
+#             b.current_liabilities,
+#             b.cash_and_equivalents,
+#             b.inventories,
+#             b.short_term_debt,
+#             b.long_term_debt,
+#             c.shares_outstanding,
+#             c.current_price,
+#             cf.operating_cash_flow,
+#             cf.capex,
+#             cf.investing_cash_flow,
+#             cf.financing_cash_flow
+#         FROM companies c
+#         JOIN income_statements i ON c.id = i.company_id
+#         JOIN balance_sheets b ON c.id = b.company_id 
+#             AND i.period_year = b.period_year 
+#             AND i.period_type = b.period_type
+#             AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
+#         JOIN cash_flows cf ON c.id = cf.company_id 
+#             AND i.period_year = cf.period_year 
+#             AND i.period_type = cf.period_type
+#             AND COALESCE(i.period_quarter, 0) = COALESCE(cf.period_quarter, 0)
+#         WHERE c.ticker = :ticker
+#             AND i.period_type IN ('annual', 'quarterly')
+#         ORDER BY i.period_year, COALESCE(i.period_quarter, 0)
+#         """
+#         df = pd.read_sql(text(query), self.engine, params={"ticker": ticker})
+#         
+#         if df.empty:
+#             return df
+#             
+#         # Tính toán các chỉ số tài chính
+#         df['eps'] = df['net_profit_to_shareholders'] / df['shares_outstanding']
+#         df['bvps'] = df['total_equity'] / df['shares_outstanding']
+#         
+#         # Chi so thi truong (dung gia hien tai)
+#         current_price = df['current_price'].iloc[-1] if not df.empty else 0
+#         df['pe_ratio'] = current_price / df['eps'].replace(0, float('nan'))
+#         df['pb_ratio'] = current_price / df['bvps'].replace(0, float('nan'))
+#         # Note: dividend_per_share chưa có trong database, set default = 0
+#         df['dividend_yield'] = 0
+#         
+#         # Chỉ số sức khỏe tài chính
+#         df['de_ratio'] = df['total_liabilities'] / df['total_equity'].replace(0, float('nan'))
+#         df['quick_ratio'] = (df['current_assets'] - df['inventories']) / df['current_liabilities'].replace(0, float('nan'))
+#         df['current_ratio'] = df['current_assets'] / df['current_liabilities'].replace(0, float('nan'))
+#         
+#         # Chỉ số hiệu quả hoạt động
+#         df['roe'] = (df['net_profit'] / df['total_equity'].replace(0, float('nan')) * 100).round(2)
+#         df['roa'] = (df['net_profit'] / df['total_assets'].replace(0, float('nan')) * 100).round(2)
+#         df['gross_margin'] = (df['gross_profit'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
+#         df['net_margin'] = (df['net_profit'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
+#         df['operating_margin'] = (df['operating_income'] / df['revenue'].replace(0, float('nan')) * 100).round(2)
+#         
+#         # ROIC = NOPAT / Invested Capital
+#         # NOPAT ≈ Operating Income * (1 - Tax Rate), Tax Rate ≈ 20%
+#         df['nopat'] = df['operating_income'] * 0.8
+#         df['invested_capital'] = df['total_equity'] + df['short_term_debt'] + df['long_term_debt'] - df['cash_and_equivalents']
+#         df['roic'] = (df['nopat'] / df['invested_capital'].replace(0, float('nan')) * 100).round(2)
+#         
+#         # Tăng trưởng YoY
+#         df['revenue_growth'] = df['revenue'].pct_change() * 100
+#         df['profit_growth'] = df['net_profit'].pct_change() * 100
+#         
+#         return df
+#     
+#     def get_company_financials_detailed(self, ticker: str) -> dict:
+#         """Lấy dữ liệu tài chính chi tiết theo format frontend cần"""
+#         company = self._get_company_profile(ticker)
+#         if not company:
+#             return None
+# 
+#         income_df = pd.DataFrame(self.get_company_income_statements_mapped(ticker))
+#         balance_df = pd.DataFrame(self.get_company_balance_sheets_mapped(ticker))
+#         cashflow_df = pd.DataFrame(self.get_company_cash_flows_mapped(ticker))
+# 
+#         # Calculate ratio columns used by analysis screens.
+#         if not balance_df.empty and not income_df.empty:
+#             merge_keys = ["fiscal_year"]
+#             if "quarter" in income_df.columns and "quarter" in balance_df.columns:
+#                 merge_keys.append("quarter")
+# 
+#             merged = income_df.merge(
+#                 balance_df[merge_keys + ["total_equity", "total_assets"]],
+#                 on=merge_keys,
+#                 how="left",
+#             )
+# 
+#             for col in ["revenue", "net_income", "gross_profit", "total_equity", "total_assets"]:
+#                 merged[col] = pd.to_numeric(merged[col], errors="coerce")
+# 
+#             merged["roe"] = (
+#                 merged["net_income"] / merged["total_equity"].replace(0, float("nan")) * 100
+#             ).fillna(0).round(2)
+#             merged["roa"] = (
+#                 merged["net_income"] / merged["total_assets"].replace(0, float("nan")) * 100
+#             ).fillna(0).round(2)
+#             merged["gross_margin"] = (
+#                 merged["gross_profit"] / merged["revenue"].replace(0, float("nan")) * 100
+#             ).fillna(0).round(2)
+#             merged["net_margin"] = (
+#                 merged["net_income"] / merged["revenue"].replace(0, float("nan")) * 100
+#             ).fillna(0).round(2)
+# 
+#             income_df = income_df.merge(
+#                 merged[merge_keys + ["roe", "roa", "gross_margin", "net_margin"]],
+#                 on=merge_keys,
+#                 how="left",
+#             )
+# 
+#         return {
+#             "income_statements": income_df.where(pd.notnull(income_df), 0).to_dict("records"),
+#             "balance_sheets": balance_df.where(pd.notnull(balance_df), 0).to_dict("records"),
+#             "cash_flows": cashflow_df.where(pd.notnull(cashflow_df), 0).to_dict("records"),
+#         }
+# 
+#     def get_balance_sheet_structure(self, ticker: str) -> pd.DataFrame:
+#         """Lấy cơ cấu Bảng cân đối kế toán để vẽ biểu đồ"""
+#         query = """
+#         SELECT 
+#             b.period_year as year,
+#             b.cash_and_equivalents,
+#             b.short_term_investments,
+#             b.accounts_receivable,
+#             b.inventories,
+#             b.other_current_assets,
+#             b.fixed_assets,
+#             b.long_term_investments,
+#             (b.non_current_assets - b.fixed_assets - b.long_term_investments) as other_non_current,
+#             b.short_term_debt,
+#             b.accounts_payable,
+#             (b.current_liabilities - b.short_term_debt - b.accounts_payable) as other_current_liab,
+#             b.long_term_debt,
+#             (b.non_current_liabilities - b.long_term_debt) as other_non_current_liab,
+#             b.share_capital,
+#             b.retained_earnings,
+#             (b.total_equity - b.share_capital - b.retained_earnings) as other_equity
+#         FROM companies c
+#         JOIN balance_sheets b ON c.id = b.company_id
+#         WHERE c.ticker = :ticker
+#             AND b.period_type IN ('annual', 'quarterly')
+#         ORDER BY b.period_year, COALESCE(b.period_quarter, 0)
+#         """
+#         return pd.read_sql(text(query), self.engine, params={"ticker": ticker})
+#     
+#     def get_cash_flow_data(self, ticker: str) -> pd.DataFrame:
+#         """Lấy dữ liệu dòng tiền"""
+#         query = """
+#         SELECT 
+#             cf.period_year as year,
+#             cf.operating_cash_flow,
+#             cf.investing_cash_flow,
+#             cf.financing_cash_flow,
+#             cf.capex,
+#             cf.dividends_paid,
+#             cf.net_change_in_cash,
+#             i.net_profit
+#         FROM companies c
+#         JOIN cash_flows cf ON c.id = cf.company_id
+#         JOIN income_statements i ON c.id = i.company_id 
+#             AND cf.period_year = i.period_year
+#             AND cf.period_type = i.period_type
+#             AND COALESCE(cf.period_quarter, 0) = COALESCE(i.period_quarter, 0)
+#         WHERE c.ticker = :ticker
+#             AND cf.period_type IN ('annual', 'quarterly')
+#         ORDER BY cf.period_year, COALESCE(cf.period_quarter, 0)
+#         """
+#         return pd.read_sql(text(query), self.engine, params={"ticker": ticker})
+#     
+#     def screen_stocks(self, filters: dict) -> pd.DataFrame:
+#         """
+#         Bộ lọc cổ phiếu thông minh
+#         
+#         filters có thể bao gồm:
+#         - min_roe: ROE tối thiểu (%)
+#         - max_de: D/E tối đa
+#         - min_profit_growth: Tăng trưởng LN tối thiểu (%)
+#         - max_pe: P/E tối đa
+#         - min_pe: P/E tối thiểu
+#         - max_pb: P/B tối đa
+#         - min_dividend_yield: Dividend Yield tối thiểu (%)
+#         - consecutive_roe_years: Số năm liên tiếp ROE đạt min_roe
+#         - industry: Lọc theo ngành
+#         """
+#         # Query cơ bản với các chỉ số tài chính
+#         query = """
+#         WITH yearly_metrics AS (
+#             SELECT 
+#                 c.id,
+#                 c.ticker,
+#                 c.name,
+#                 c.industry,
+#                 c.current_price,
+#                 c.shares_outstanding,
+#                 c.market_cap,
+#                 i.period_year,
+#                 i.period_quarter,
+#                 i.period_type,
+#                 i.revenue,
+#                 i.net_profit,
+#                 i.net_profit_to_shareholders,
+#                 0 as dividend_per_share,  -- Not available in current schema
+#                 b.total_assets,
+#                 b.total_liabilities,
+#                 b.total_equity,
+#                 b.current_assets,
+#                 b.current_liabilities,
+#                 b.inventories,
+#                 -- Calculated metrics
+#                 CASE WHEN b.total_equity > 0 THEN 
+#                     ROUND(i.net_profit * 100.0 / b.total_equity, 2) 
+#                 ELSE 0 END as roe,
+#                 CASE WHEN b.total_equity > 0 THEN 
+#                     ROUND(b.total_liabilities * 1.0 / b.total_equity, 2) 
+#                 ELSE 0 END as de_ratio,
+#                 CASE WHEN b.total_assets > 0 THEN 
+#                     ROUND(i.net_profit * 100.0 / b.total_assets, 2) 
+#                 ELSE 0 END as roa
+#             FROM companies c
+#             JOIN income_statements i ON c.id = i.company_id
+#             JOIN balance_sheets b ON c.id = b.company_id 
+#                 AND i.period_year = b.period_year 
+#                 AND i.period_type = b.period_type
+#                 AND COALESCE(i.period_quarter, 0) = COALESCE(b.period_quarter, 0)
+#         ),
+#         latest_period AS (
+#             SELECT
+#                 period_year,
+#                 MAX(COALESCE(period_quarter, 0)) AS period_quarter
+#             FROM yearly_metrics
+#             WHERE period_year = (SELECT MAX(period_year) FROM yearly_metrics)
+#             GROUP BY period_year
+#         ),
+#         latest_metrics AS (
+#             SELECT 
+#                 ym.*,
+#                 CASE WHEN ym.shares_outstanding > 0 THEN 
+#                     ROUND(ym.net_profit_to_shareholders * 1.0 / ym.shares_outstanding, 2) 
+#                 ELSE 0 END as eps,
+#                 CASE WHEN ym.shares_outstanding > 0 THEN 
+#                     ROUND(ym.total_equity * 1.0 / ym.shares_outstanding, 2) 
+#                 ELSE 0 END as bvps
+#             FROM yearly_metrics ym
+#             JOIN latest_period lp
+#                 ON ym.period_year = lp.period_year
+#                AND COALESCE(ym.period_quarter, 0) = lp.period_quarter
+#         ),
+#         growth_calc AS (
+#             SELECT 
+#                 ym1.id,
+#                 CASE WHEN ym0.net_profit > 0 THEN 
+#                     ROUND((ym1.net_profit - ym0.net_profit) * 100.0 / ym0.net_profit, 2)
+#                 ELSE 0 END as profit_growth,
+#                 CASE WHEN ym0.revenue > 0 THEN 
+#                     ROUND((ym1.revenue - ym0.revenue) * 100.0 / ym0.revenue, 2)
+#                 ELSE 0 END as revenue_growth
+#             FROM yearly_metrics ym1
+#             JOIN yearly_metrics ym0
+#                 ON ym1.id = ym0.id
+#                AND ym1.period_year = ym0.period_year + 1
+#                AND COALESCE(ym1.period_quarter, 0) = COALESCE(ym0.period_quarter, 0)
+#             JOIN latest_period lp
+#                 ON ym1.period_year = lp.period_year
+#                AND COALESCE(ym1.period_quarter, 0) = lp.period_quarter
+#         )
+#         SELECT 
+#             lm.ticker,
+#             lm.name,
+#             lm.industry,
+#             lm.period_year,
+#             lm.period_quarter,
+#             lm.current_price,
+#             lm.current_price as price,
+#             lm.market_cap,
+#             lm.revenue,
+#             lm.net_profit,
+#             lm.eps,
+#             lm.bvps,
+#             lm.roe,
+#             lm.roa,
+#             lm.de_ratio,
+#             CASE WHEN lm.eps > 0 THEN ROUND(lm.current_price / lm.eps, 2) ELSE 0 END as pe_ratio,
+#             CASE WHEN lm.bvps > 0 THEN ROUND(lm.current_price / lm.bvps, 2) ELSE 0 END as pb_ratio,
+#             0 as dividend_yield,  -- dividend_per_share not available in current schema
+#             COALESCE(gc.profit_growth, 0) as profit_growth,
+#             COALESCE(gc.revenue_growth, 0) as revenue_growth,
+#             ROUND((lm.current_assets - lm.inventories) * 1.0 / NULLIF(lm.current_liabilities, 0), 2) as quick_ratio
+#         FROM latest_metrics lm
+#         LEFT JOIN growth_calc gc ON lm.id = gc.id
+#         WHERE 1=1
+#         """
+#         
+#         params = {}
+#         
+#         # Apply filters
+#         if filters.get('min_roe'):
+#             query += " AND lm.roe >= :min_roe"
+#             params['min_roe'] = filters['min_roe']
+#             
+#         if filters.get('max_de'):
+#             query += " AND lm.de_ratio <= :max_de"
+#             params['max_de'] = filters['max_de']
+#             
+#         if filters.get('max_pe'):
+#             query += " AND (lm.eps <= 0 OR lm.current_price / lm.eps <= :max_pe)"
+#             params['max_pe'] = filters['max_pe']
+#             
+#         if filters.get('min_pe'):
+#             query += " AND lm.eps > 0 AND lm.current_price / lm.eps >= :min_pe"
+#             params['min_pe'] = filters['min_pe']
+#             
+#         if filters.get('max_pb'):
+#             query += " AND (lm.bvps <= 0 OR lm.current_price / lm.bvps <= :max_pb)"
+#             params['max_pb'] = filters['max_pb']
+#             
+#         if filters.get('min_dividend_yield'):
+#             # Note: dividend_per_share not available in current schema
+#             # query += " AND lm.current_price > 0 AND (lm.dividend_per_share * 100.0 / lm.current_price) >= :min_div"
+#             # params['min_div'] = filters['min_dividend_yield']
+#             pass
+#             
+#         if filters.get('industry'):
+#             query += " AND lm.industry = :industry"
+#             params['industry'] = filters['industry']
+#         
+#         query += " ORDER BY lm.roe DESC"
+#         
+#         df = pd.read_sql(text(query), self.engine, params=params)
+#         
+#         # Filter for consecutive ROE years if specified
+#         if filters.get('consecutive_roe_years') and filters.get('min_roe'):
+#             valid_tickers = self._check_consecutive_roe(
+#                 filters['min_roe'], 
+#                 filters['consecutive_roe_years']
+#             )
+#             df = df[df['ticker'].isin(valid_tickers)]
+#         
+#         # Filter for minimum profit growth if specified
+#         if filters.get('min_profit_growth'):
+#             df = df[df['profit_growth'] >= filters['min_profit_growth']]
+#         
+#         return df
+#     
     def _check_consecutive_roe(self, min_roe: float, years: int) -> list:
         """Kiểm tra ROE đạt ngưỡng trong n năm liên tiếp"""
         query = """

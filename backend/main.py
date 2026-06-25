@@ -55,7 +55,7 @@ from backend.fastapi_auth.app.routes.auth_router import router as auth_router
 from backend.fastapi_auth.app.routes.user_router import router as user_router
 from backend.fastapi_auth.app.routes.watchlist_router import router as watchlist_router
 from backend.fastapi_auth.app.routes.notifications_router import router as notifications_router
-from backend.fastapi_auth.app.routes.value_router import router as value_router
+# from backend.fastapi_auth.app.routes.value_router import router as value_router
 from backend.fastapi_auth.app.routes.saved_filter_router import router as saved_filter_router
 from backend.fastapi_auth.app.routes.screener_router import router as screener_router
 from backend.fastapi_auth.app.routes.company_router import router as company_router
@@ -427,7 +427,7 @@ async def lifespan(app: FastAPI):
     """Quản lý vòng đời ứng dụng - khởi động và dừng background tasks"""
     global price_update_task
     
-    print("🚀 Khởi động background task cập nhật giá cổ phiếu...")
+    print(" Khởi động background task cập nhật giá cổ phiếu...")
     # Khởi động task cập nhật giá
     price_update_task = asyncio.create_task(market_aware_price_update_scheduler())
     
@@ -470,7 +470,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(watchlist_router)
 app.include_router(notifications_router)
-app.include_router(value_router)
+# app.include_router(value_router)
 app.include_router(saved_filter_router)
 app.include_router(screener_router)
 app.include_router(company_router)
@@ -548,159 +548,159 @@ async def root():
     }
 
 
-@app.post("/api/prices/refresh")
-async def refresh_prices():
-    """Trigger cập nhật giá cổ phiếu thủ công"""
-    from fastapi import BackgroundTasks
+# @app.post("/api/prices/refresh")
+# async def refresh_prices():
+#     """Trigger cập nhật giá cổ phiếu thủ công"""
+#     from fastapi import BackgroundTasks
     
-    # Chạy cập nhật trong background
-    asyncio.create_task(update_stock_prices_async())
+#     # Chạy cập nhật trong background
+#     asyncio.create_task(update_stock_prices_async())
     
-    return {
-        "status": "started",
-        "message": "Đang cập nhật giá cổ phiếu trong nền..."
-    }
+#     return {
+#         "status": "started",
+#         "message": "Đang cập nhật giá cổ phiếu trong nền..."
+#     }
 
 
-@app.get("/api/prices/status")
-async def get_price_status():
-    """Kiểm tra trạng thái cập nhật giá"""
-    try:
-        return {
-            **price_update_state,
-            "status": price_update_state.get("scheduler_status", "unknown"),
-            "auto_update_enabled": AUTO_PRICE_UPDATE_ENABLED,
-            "auto_update_interval_seconds": PRICE_UPDATE_INTERVAL_SECONDS,
-            "market_check_interval_seconds": MARKET_STATUS_CHECK_INTERVAL_SECONDS,
-            "message": (
-                "Gia co phieu chi duoc cap nhat tu dong khi thi truong mo cua."
-                if AUTO_PRICE_UPDATE_ENABLED
-                else "Auto price update is disabled."
-            ),
-        }
-    except Exception as e:
-        return {"status": "unknown", "error": str(e)}
+# @app.get("/api/prices/status")
+# async def get_price_status():
+#     """Kiểm tra trạng thái cập nhật giá"""
+#     try:
+#         return {
+#             **price_update_state,
+#             "status": price_update_state.get("scheduler_status", "unknown"),
+#             "auto_update_enabled": AUTO_PRICE_UPDATE_ENABLED,
+#             "auto_update_interval_seconds": PRICE_UPDATE_INTERVAL_SECONDS,
+#             "market_check_interval_seconds": MARKET_STATUS_CHECK_INTERVAL_SECONDS,
+#             "message": (
+#                 "Gia co phieu chi duoc cap nhat tu dong khi thi truong mo cua."
+#                 if AUTO_PRICE_UPDATE_ENABLED
+#                 else "Auto price update is disabled."
+#             ),
+#         }
+#     except Exception as e:
+#         return {"status": "unknown", "error": str(e)}
 
 
 # ============ Advanced Analysis APIs ============
 
-@app.get("/api/analysis/{ticker}/ratios")
-async def get_financial_ratios(ticker: str, year: Optional[int] = None):
-    """
-    Lấy tất cả chỉ số tài chính của một công ty
-    Bao gồm: ROE, ROA, P/E, P/B, D/E, margins, growth rates, EPS, BVPS...
-    """
-    from backend.financial_analysis import calculate_financial_ratios
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
+# @app.get("/api/analysis/{ticker}/ratios")
+# async def get_financial_ratios(ticker: str, year: Optional[int] = None):
+#     """
+#     Lấy tất cả chỉ số tài chính của một công ty
+#     Bao gồm: ROE, ROA, P/E, P/B, D/E, margins, growth rates, EPS, BVPS...
+#     """
+#     from backend.financial_analysis import calculate_financial_ratios
+#     from sqlalchemy import create_engine
+#     from sqlalchemy.orm import sessionmaker
+#     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+#     engine = create_engine(DATABASE_URL)
+#     Session = sessionmaker(bind=engine)
+#     session = Session()
     
-    try:
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
+#     try:
+#         company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
+#         if not company:
+#             raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
         
-        # Get latest financial data
-        balance_query = session.query(BalanceSheet).filter(
-            BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc())
+#         # Get latest financial data
+#         balance_query = session.query(BalanceSheet).filter(
+#             BalanceSheet.company_id == company.id
+#         ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc())
         
-        income_query = session.query(IncomeStatement).filter(
-            IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc())
+#         income_query = session.query(IncomeStatement).filter(
+#             IncomeStatement.company_id == company.id
+#         ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc())
         
-        if year:
-            balance_query = balance_query.filter(BalanceSheet.period_year == year)
-            income_query = income_query.filter(IncomeStatement.period_year == year)
+#         if year:
+#             balance_query = balance_query.filter(BalanceSheet.period_year == year)
+#             income_query = income_query.filter(IncomeStatement.period_year == year)
         
-        balance_sheet = balance_query.first()
-        income_statement = income_query.first()
+#         balance_sheet = balance_query.first()
+#         income_statement = income_query.first()
         
-        # Get previous period for growth calculation
-        prev_income = session.query(IncomeStatement).filter(
-            IncomeStatement.company_id == company.id,
-            IncomeStatement.period_year == (balance_sheet.period_year - 1 if balance_sheet else 2024)
-        ).first()
+#         # Get previous period for growth calculation
+#         prev_income = session.query(IncomeStatement).filter(
+#             IncomeStatement.company_id == company.id,
+#             IncomeStatement.period_year == (balance_sheet.period_year - 1 if balance_sheet else 2024)
+#         ).first()
         
-        prev_balance = session.query(BalanceSheet).filter(
-            BalanceSheet.company_id == company.id,
-            BalanceSheet.period_year == (balance_sheet.period_year - 1 if balance_sheet else 2024)
-        ).first()
+#         prev_balance = session.query(BalanceSheet).filter(
+#             BalanceSheet.company_id == company.id,
+#             BalanceSheet.period_year == (balance_sheet.period_year - 1 if balance_sheet else 2024)
+#         ).first()
         
-        ratios = calculate_financial_ratios(
-            company, balance_sheet, income_statement, prev_income, prev_balance
-        )
+#         ratios = calculate_financial_ratios(
+#             company, balance_sheet, income_statement, prev_income, prev_balance
+#         )
         
-        return {
-            "ticker": ticker.upper(),
-            "company_name": company.name,
-            "company_type": company.company_type,
-            "industry": company.industry,
-            "period": {
-                "year": balance_sheet.period_year if balance_sheet else None,
-                "quarter": balance_sheet.period_quarter if balance_sheet else None
-            },
-            "ratios": ratios
-        }
-    finally:
-        session.close()
+#         return {
+#             "ticker": ticker.upper(),
+#             "company_name": company.name,
+#             "company_type": company.company_type,
+#             "industry": company.industry,
+#             "period": {
+#                 "year": balance_sheet.period_year if balance_sheet else None,
+#                 "quarter": balance_sheet.period_quarter if balance_sheet else None
+#             },
+#             "ratios": ratios
+#         }
+#     finally:
+#         session.close()
 
 
-@app.get("/api/analysis/{ticker}/f-score")
-async def get_f_score(ticker: str):
-    """
-    Tính Piotroski F-Score (0-9) cho một công ty
-    Đánh giá sức khỏe tài chính theo 9 tiêu chí
-    """
-    from backend.financial_analysis import calculate_piotroski_f_score
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
+# @app.get("/api/analysis/{ticker}/f-score")
+# async def get_f_score(ticker: str):
+#     """
+#     Tính Piotroski F-Score (0-9) cho một công ty
+#     Đánh giá sức khỏe tài chính theo 9 tiêu chí
+#     """
+#     from backend.financial_analysis import calculate_piotroski_f_score
+#     from sqlalchemy import create_engine
+#     from sqlalchemy.orm import sessionmaker
+#     from Database.models import Company, BalanceSheet, IncomeStatement, CashFlow
     
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+#     engine = create_engine(DATABASE_URL)
+#     Session = sessionmaker(bind=engine)
+#     session = Session()
     
-    try:
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
+#     try:
+#         company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
+#         if not company:
+#             raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
         
-        # Get latest and previous year data
-        balance_sheets = session.query(BalanceSheet).filter(
-            BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
+#         # Get latest and previous year data
+#         balance_sheets = session.query(BalanceSheet).filter(
+#             BalanceSheet.company_id == company.id
+#         ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).limit(2).all()
         
-        income_statements = session.query(IncomeStatement).filter(
-            IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
+#         income_statements = session.query(IncomeStatement).filter(
+#             IncomeStatement.company_id == company.id
+#         ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).limit(2).all()
         
-        cash_flows = session.query(CashFlow).filter(
-            CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(1).all()
+#         cash_flows = session.query(CashFlow).filter(
+#             CashFlow.company_id == company.id
+#         ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).limit(1).all()
         
-        balance = balance_sheets[0] if balance_sheets else None
-        prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
-        income = income_statements[0] if income_statements else None
-        prev_income = income_statements[1] if len(income_statements) > 1 else None
-        cash_flow = cash_flows[0] if cash_flows else None
+#         balance = balance_sheets[0] if balance_sheets else None
+#         prev_balance = balance_sheets[1] if len(balance_sheets) > 1 else None
+#         income = income_statements[0] if income_statements else None
+#         prev_income = income_statements[1] if len(income_statements) > 1 else None
+#         cash_flow = cash_flows[0] if cash_flows else None
         
-        f_score = calculate_piotroski_f_score(
-            balance, prev_balance, income, prev_income, cash_flow,
-            company.shares_outstanding or 0
-        )
+#         f_score = calculate_piotroski_f_score(
+#             balance, prev_balance, income, prev_income, cash_flow,
+#             company.shares_outstanding or 0
+#         )
         
-        return {
-            "ticker": ticker.upper(),
-            "company_name": company.name,
-            "f_score": f_score
-        }
-    finally:
-        session.close()
+#         return {
+#             "ticker": ticker.upper(),
+#             "company_name": company.name,
+#             "f_score": f_score
+#         }
+#     finally:
+#         session.close()
 
 
 @app.get("/api/analysis/{ticker}/health-score")
@@ -875,45 +875,45 @@ def _compute_intrinsic_value(fcf: float, growth_rate: float, discount_rate: floa
     return intrinsic
 
 
-@app.get("/api/value/companies/{ticker}/analysis")
-async def value_analysis(ticker: str, years: int = Query(10, ge=5, le=15)):
-    df = db.get_long_term_metrics(ticker.upper(), years)
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+# @app.get("/api/value/companies/{ticker}/analysis")
+# async def value_analysis(ticker: str, years: int = Query(10, ge=5, le=15)):
+#     df = db.get_long_term_metrics(ticker.upper(), years)
+#     if df.empty:
+#         raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
 
-    revenue_trend = _trend_label(df["revenue"].tolist())
-    profit_trend = _trend_label(df["net_profit"].tolist())
-    revenue_consistency = _consistency_label(df["revenue_growth"].tolist())
-    profit_consistency = _consistency_label(df["profit_growth"].tolist())
+#     revenue_trend = _trend_label(df["revenue"].tolist())
+#     profit_trend = _trend_label(df["net_profit"].tolist())
+#     revenue_consistency = _consistency_label(df["revenue_growth"].tolist())
+#     profit_consistency = _consistency_label(df["profit_growth"].tolist())
 
-    latest = df.iloc[-1]
-    debt_to_equity = None
-    if latest.get("total_equity") and latest.get("total_equity") != 0:
-        debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
+#     latest = df.iloc[-1]
+#     debt_to_equity = None
+#     if latest.get("total_equity") and latest.get("total_equity") != 0:
+#         debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
 
-    summary = []
-    if revenue_consistency == "consistent" and profit_consistency == "consistent":
-        summary.append("Consistent growth over 5 years")
-    if profit_trend == "decreasing":
-        summary.append("Declining profitability")
-    if debt_to_equity and debt_to_equity > 1.5:
-        summary.append("High debt relative to equity")
-    if revenue_trend == "flat" and profit_trend == "flat":
-        summary.append("Flat growth trend")
+#     summary = []
+#     if revenue_consistency == "consistent" and profit_consistency == "consistent":
+#         summary.append("Consistent growth over 5 years")
+#     if profit_trend == "decreasing":
+#         summary.append("Declining profitability")
+#     if debt_to_equity and debt_to_equity > 1.5:
+#         summary.append("High debt relative to equity")
+#     if revenue_trend == "flat" and profit_trend == "flat":
+#         summary.append("Flat growth trend")
 
-    return {
-        "ticker": ticker.upper(),
-        "time_series": df.where(pd.notnull(df), None).to_dict(orient="records"),
-        "summary": summary,
-        "trends": {
-            "revenue": revenue_trend,
-            "profit": profit_trend,
-        },
-        "consistency": {
-            "revenue_growth": revenue_consistency,
-            "profit_growth": profit_consistency,
-        },
-    }
+#     return {
+#         "ticker": ticker.upper(),
+#         "time_series": df.where(pd.notnull(df), None).to_dict(orient="records"),
+#         "summary": summary,
+#         "trends": {
+#             "revenue": revenue_trend,
+#             "profit": profit_trend,
+#         },
+#         "consistency": {
+#             "revenue_growth": revenue_consistency,
+#             "profit_growth": profit_consistency,
+#         },
+#     }
 
 
 class IntrinsicValueRequest(BaseModel):
@@ -922,263 +922,263 @@ class IntrinsicValueRequest(BaseModel):
     years: int = 5
 
 
-@app.post("/api/value/companies/{ticker}/intrinsic-value")
-async def intrinsic_value(ticker: str, payload: IntrinsicValueRequest):
-    df = db.get_long_term_metrics(ticker.upper(), max(payload.years, 5))
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+# @app.post("/api/value/companies/{ticker}/intrinsic-value")
+# async def intrinsic_value(ticker: str, payload: IntrinsicValueRequest):
+#     df = db.get_long_term_metrics(ticker.upper(), max(payload.years, 5))
+#     if df.empty:
+#         raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
 
-    latest = df.iloc[-1]
-    fcf = latest.get("free_cash_flow")
-    intrinsic_total = _compute_intrinsic_value(fcf, payload.growth_rate, payload.discount_rate, payload.years)
-    shares = latest.get("shares_outstanding")
-    intrinsic_per_share = None
-    if intrinsic_total is not None and shares and shares > 0:
-        intrinsic_per_share = intrinsic_total / shares
+#     latest = df.iloc[-1]
+#     fcf = latest.get("free_cash_flow")
+#     intrinsic_total = _compute_intrinsic_value(fcf, payload.growth_rate, payload.discount_rate, payload.years)
+#     shares = latest.get("shares_outstanding")
+#     intrinsic_per_share = None
+#     if intrinsic_total is not None and shares and shares > 0:
+#         intrinsic_per_share = intrinsic_total / shares
 
-    return {
-        "ticker": ticker.upper(),
-        "intrinsic_value": intrinsic_per_share,
-        "assumptions": {
-            "growth_rate": payload.growth_rate,
-            "discount_rate": payload.discount_rate,
-            "years": payload.years,
-            "base_free_cash_flow": fcf,
-        },
-    }
-
-
-@app.get("/api/value/companies/{ticker}/margin-of-safety")
-async def margin_of_safety(
-    ticker: str,
-    growth_rate: float = Query(8.0),
-    discount_rate: float = Query(12.0),
-    years: int = Query(5, ge=3, le=10),
-):
-    df = db.get_long_term_metrics(ticker.upper(), max(years, 5))
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
-
-    latest = df.iloc[-1]
-    fcf = latest.get("free_cash_flow")
-    intrinsic_total = _compute_intrinsic_value(fcf, growth_rate, discount_rate, years)
-    shares = latest.get("shares_outstanding")
-    intrinsic_per_share = None
-    if intrinsic_total is not None and shares and shares > 0:
-        intrinsic_per_share = intrinsic_total / shares
-
-    market_price = latest.get("current_price")
-    margin = None
-    label = None
-    if intrinsic_per_share and market_price:
-        margin = (intrinsic_per_share - market_price) / intrinsic_per_share
-        if margin > 0.15:
-            label = "Undervalued"
-        elif margin < -0.15:
-            label = "Overvalued"
-        else:
-            label = "Fairly valued"
-
-    return {
-        "ticker": ticker.upper(),
-        "market_price": market_price,
-        "intrinsic_value": intrinsic_per_share,
-        "margin_of_safety": margin,
-        "label": label,
-        "assumptions": {
-            "growth_rate": growth_rate,
-            "discount_rate": discount_rate,
-            "years": years,
-        },
-    }
+#     return {
+#         "ticker": ticker.upper(),
+#         "intrinsic_value": intrinsic_per_share,
+#         "assumptions": {
+#             "growth_rate": payload.growth_rate,
+#             "discount_rate": payload.discount_rate,
+#             "years": payload.years,
+#             "base_free_cash_flow": fcf,
+#         },
+#     }
 
 
-@app.get("/api/value/companies/{ticker}/insights")
-async def investment_insights(ticker: str):
-    df = db.get_long_term_metrics(ticker.upper(), 10)
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+# @app.get("/api/value/companies/{ticker}/margin-of-safety")
+# async def margin_of_safety(
+#     ticker: str,
+#     growth_rate: float = Query(8.0),
+#     discount_rate: float = Query(12.0),
+#     years: int = Query(5, ge=3, le=10),
+# ):
+#     df = db.get_long_term_metrics(ticker.upper(), max(years, 5))
+#     if df.empty:
+#         raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
 
-    insights = []
-    if (df["roe"].tail(5) >= 20).all():
-        insights.append("Company has maintained ROE above 20% for 5 years")
+#     latest = df.iloc[-1]
+#     fcf = latest.get("free_cash_flow")
+#     intrinsic_total = _compute_intrinsic_value(fcf, growth_rate, discount_rate, years)
+#     shares = latest.get("shares_outstanding")
+#     intrinsic_per_share = None
+#     if intrinsic_total is not None and shares and shares > 0:
+#         intrinsic_per_share = intrinsic_total / shares
 
-    revenue_growth = df["revenue_growth"].dropna().tail(3).tolist()
-    if len(revenue_growth) == 3 and revenue_growth[2] < revenue_growth[0]:
-        insights.append("Revenue growth is slowing down")
+#     market_price = latest.get("current_price")
+#     margin = None
+#     label = None
+#     if intrinsic_per_share and market_price:
+#         margin = (intrinsic_per_share - market_price) / intrinsic_per_share
+#         if margin > 0.15:
+#             label = "Undervalued"
+#         elif margin < -0.15:
+#             label = "Overvalued"
+#         else:
+#             label = "Fairly valued"
 
-    debt_series = df["debt"].dropna().tolist()
-    if _trend_label(debt_series) == "increasing":
-        insights.append("Debt level is increasing significantly")
-
-    if not insights:
-        insights.append("No major long-term red flags detected")
-
-    return {
-        "ticker": ticker.upper(),
-        "insights": insights,
-    }
-
-
-@app.get("/api/value/companies/{ticker}/health-score")
-async def value_health_score(ticker: str):
-    df = db.get_long_term_metrics(ticker.upper(), 10)
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
-
-    latest = df.iloc[-1]
-    roe = latest.get("roe") or 0
-    revenue_growth = latest.get("revenue_growth") or 0
-    profit_growth = latest.get("profit_growth") or 0
-    debt_to_equity = None
-    if latest.get("total_equity") and latest.get("total_equity") != 0:
-        debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
-    fcf = latest.get("free_cash_flow") or 0
-
-    profitability = min(10, max(0, roe / 2))
-    growth = min(10, max(0, (revenue_growth + profit_growth) / 4))
-    debt_score = 10 if debt_to_equity is None else max(0, 10 - (debt_to_equity * 4))
-    efficiency = 10 if fcf > 0 else 4
-
-    overall = round((profitability + growth + debt_score + efficiency) / 4, 2)
-
-    return {
-        "ticker": ticker.upper(),
-        "overall": overall,
-        "breakdown": {
-            "profitability": round(profitability, 2),
-            "growth": round(growth, 2),
-            "debt": round(debt_score, 2),
-            "efficiency": round(efficiency, 2),
-        },
-    }
+#     return {
+#         "ticker": ticker.upper(),
+#         "market_price": market_price,
+#         "intrinsic_value": intrinsic_per_share,
+#         "margin_of_safety": margin,
+#         "label": label,
+#         "assumptions": {
+#             "growth_rate": growth_rate,
+#             "discount_rate": discount_rate,
+#             "years": years,
+#         },
+#     }
 
 
+# @app.get("/api/value/companies/{ticker}/insights")
+# async def investment_insights(ticker: str):
+#     df = db.get_long_term_metrics(ticker.upper(), 10)
+#     if df.empty:
+#         raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
 
-# ============ Value Investing APIs ============
+#     insights = []
+#     if (df["roe"].tail(5) >= 20).all():
+#         insights.append("Company has maintained ROE above 20% for 5 years")
+
+#     revenue_growth = df["revenue_growth"].dropna().tail(3).tolist()
+#     if len(revenue_growth) == 3 and revenue_growth[2] < revenue_growth[0]:
+#         insights.append("Revenue growth is slowing down")
+
+#     debt_series = df["debt"].dropna().tolist()
+#     if _trend_label(debt_series) == "increasing":
+#         insights.append("Debt level is increasing significantly")
+
+#     if not insights:
+#         insights.append("No major long-term red flags detected")
+
+#     return {
+#         "ticker": ticker.upper(),
+#         "insights": insights,
+#     }
+
+
+# @app.get("/api/value/companies/{ticker}/health-score")
+# async def value_health_score(ticker: str):
+#     df = db.get_long_term_metrics(ticker.upper(), 10)
+#     if df.empty:
+#         raise HTTPException(status_code=404, detail=f"Không có dữ liệu dài hạn cho mã {ticker}")
+
+#     latest = df.iloc[-1]
+#     roe = latest.get("roe") or 0
+#     revenue_growth = latest.get("revenue_growth") or 0
+#     profit_growth = latest.get("profit_growth") or 0
+#     debt_to_equity = None
+#     if latest.get("total_equity") and latest.get("total_equity") != 0:
+#         debt_to_equity = latest.get("total_liabilities") / latest.get("total_equity")
+#     fcf = latest.get("free_cash_flow") or 0
+
+#     profitability = min(10, max(0, roe / 2))
+#     growth = min(10, max(0, (revenue_growth + profit_growth) / 4))
+#     debt_score = 10 if debt_to_equity is None else max(0, 10 - (debt_to_equity * 4))
+#     efficiency = 10 if fcf > 0 else 4
+
+#     overall = round((profitability + growth + debt_score + efficiency) / 4, 2)
+
+#     return {
+#         "ticker": ticker.upper(),
+#         "overall": overall,
+#         "breakdown": {
+#             "profitability": round(profitability, 2),
+#             "growth": round(growth, 2),
+#             "debt": round(debt_score, 2),
+#             "efficiency": round(efficiency, 2),
+#         },
+#     }
 
 
 
+# # ============ Value Investing APIs ============
 
-# ============ Financial Statements (served by company_router) ============
-# These endpoints are now handled by company_router.py
+
+
+
+# # ============ Financial Statements (served by company_router) ============
+# # These endpoints are now handled by company_router.py
 
 
     
-    try:
-        company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
-        if not company:
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
+#     try:
+#         company = session.query(Company).filter(Company.ticker == ticker.upper()).first()
+#         if not company:
+#             raise HTTPException(status_code=404, detail=f"Không tìm thấy mã {ticker}")
         
-        # Get all financial data
-        balance_sheets = session.query(BalanceSheet).filter(
-            BalanceSheet.company_id == company.id
-        ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).all()
+#         # Get all financial data
+#         balance_sheets = session.query(BalanceSheet).filter(
+#             BalanceSheet.company_id == company.id
+#         ).order_by(BalanceSheet.period_year.desc(), BalanceSheet.period_quarter.desc()).all()
         
-        income_statements = session.query(IncomeStatement).filter(
-            IncomeStatement.company_id == company.id
-        ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).all()
+#         income_statements = session.query(IncomeStatement).filter(
+#             IncomeStatement.company_id == company.id
+#         ).order_by(IncomeStatement.period_year.desc(), IncomeStatement.period_quarter.desc()).all()
         
-        cash_flows = session.query(CashFlow).filter(
-            CashFlow.company_id == company.id
-        ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).all()
+#         cash_flows = session.query(CashFlow).filter(
+#             CashFlow.company_id == company.id
+#         ).order_by(CashFlow.period_year.desc(), CashFlow.period_quarter.desc()).all()
         
-        if format.lower() == "csv":
-            # Create CSV
-            output = io.StringIO()
+#         if format.lower() == "csv":
+#             # Create CSV
+#             output = io.StringIO()
             
-            # Company info
-            output.write(f"# {company.ticker} - {company.name}\n")
-            output.write(f"# Industry: {company.industry}\n")
-            output.write(f"# Export Date: {pd.Timestamp.now().strftime('%Y-%m-%d')}\n\n")
+#             # Company info
+#             output.write(f"# {company.ticker} - {company.name}\n")
+#             output.write(f"# Industry: {company.industry}\n")
+#             output.write(f"# Export Date: {pd.Timestamp.now().strftime('%Y-%m-%d')}\n\n")
             
-            # Income Statement
-            output.write("=== INCOME STATEMENT ===\n")
-            output.write("Year,Quarter,Revenue,Gross Profit,Operating Income,Net Profit\n")
-            for is_ in income_statements:
-                output.write(f"{is_.period_year},{is_.period_quarter or 'Annual'},{is_.revenue or 0},{is_.gross_profit or 0},{is_.operating_income or 0},{is_.net_profit or 0}\n")
+#             # Income Statement
+#             output.write("=== INCOME STATEMENT ===\n")
+#             output.write("Year,Quarter,Revenue,Gross Profit,Operating Income,Net Profit\n")
+#             for is_ in income_statements:
+#                 output.write(f"{is_.period_year},{is_.period_quarter or 'Annual'},{is_.revenue or 0},{is_.gross_profit or 0},{is_.operating_income or 0},{is_.net_profit or 0}\n")
             
-            output.write("\n=== BALANCE SHEET ===\n")
-            output.write("Year,Quarter,Total Assets,Total Liabilities,Total Equity,Cash,Inventories\n")
-            for bs in balance_sheets:
-                output.write(f"{bs.period_year},{bs.period_quarter or 'Annual'},{bs.total_assets or 0},{bs.total_liabilities or 0},{bs.total_equity or 0},{bs.cash_and_equivalents or 0},{bs.inventories or 0}\n")
+#             output.write("\n=== BALANCE SHEET ===\n")
+#             output.write("Year,Quarter,Total Assets,Total Liabilities,Total Equity,Cash,Inventories\n")
+#             for bs in balance_sheets:
+#                 output.write(f"{bs.period_year},{bs.period_quarter or 'Annual'},{bs.total_assets or 0},{bs.total_liabilities or 0},{bs.total_equity or 0},{bs.cash_and_equivalents or 0},{bs.inventories or 0}\n")
             
-            output.write("\n=== CASH FLOW ===\n")
-            output.write("Year,Quarter,Operating CF,Investing CF,Financing CF,Net Change\n")
-            for cf in cash_flows:
-                output.write(f"{cf.period_year},{cf.period_quarter or 'Annual'},{cf.operating_cash_flow or 0},{cf.investing_cash_flow or 0},{cf.financing_cash_flow or 0},{cf.net_change_in_cash or 0}\n")
+#             output.write("\n=== CASH FLOW ===\n")
+#             output.write("Year,Quarter,Operating CF,Investing CF,Financing CF,Net Change\n")
+#             for cf in cash_flows:
+#                 output.write(f"{cf.period_year},{cf.period_quarter or 'Annual'},{cf.operating_cash_flow or 0},{cf.investing_cash_flow or 0},{cf.financing_cash_flow or 0},{cf.net_change_in_cash or 0}\n")
             
-            return Response(
-                content=output.getvalue(),
-                media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename={ticker}_financial_data.csv"}
-            )
+#             return Response(
+#                 content=output.getvalue(),
+#                 media_type="text/csv",
+#                 headers={"Content-Disposition": f"attachment; filename={ticker}_financial_data.csv"}
+#             )
         
-        # JSON format
-        return {
-            "company": {
-                "ticker": company.ticker,
-                "name": company.name,
-                "industry": company.industry,
-                "current_price": company.current_price,
-                "market_cap": company.market_cap,
-                "shares_outstanding": company.shares_outstanding
-            },
-            "income_statements": [
-                {
-                    "year": is_.period_year,
-                    "quarter": is_.period_quarter,
-                    "revenue": is_.revenue,
-                    "gross_profit": is_.gross_profit,
-                    "operating_income": is_.operating_income,
-                    "net_profit": is_.net_profit
-                }
-                for is_ in income_statements
-            ],
-            "balance_sheets": [
-                {
-                    "year": bs.period_year,
-                    "quarter": bs.period_quarter,
-                    "total_assets": bs.total_assets,
-                    "total_liabilities": bs.total_liabilities,
-                    "total_equity": bs.total_equity,
-                    "cash_and_equivalents": bs.cash_and_equivalents,
-                    "inventories": bs.inventories,
-                    "current_assets": bs.current_assets,
-                    "current_liabilities": bs.current_liabilities
-                }
-                for bs in balance_sheets
-            ],
-            "cash_flows": [
-                {
-                    "year": cf.period_year,
-                    "quarter": cf.period_quarter,
-                    "operating_cash_flow": cf.operating_cash_flow,
-                    "investing_cash_flow": cf.investing_cash_flow,
-                    "financing_cash_flow": cf.financing_cash_flow,
-                    "net_change_in_cash": cf.net_change_in_cash,
-                    "capex": cf.capex
-                }
-                for cf in cash_flows
-            ],
-            "export_date": pd.Timestamp.now().isoformat()
-        }
-    finally:
-        session.close()
+#         # JSON format
+#         return {
+#             "company": {
+#                 "ticker": company.ticker,
+#                 "name": company.name,
+#                 "industry": company.industry,
+#                 "current_price": company.current_price,
+#                 "market_cap": company.market_cap,
+#                 "shares_outstanding": company.shares_outstanding
+#             },
+#             "income_statements": [
+#                 {
+#                     "year": is_.period_year,
+#                     "quarter": is_.period_quarter,
+#                     "revenue": is_.revenue,
+#                     "gross_profit": is_.gross_profit,
+#                     "operating_income": is_.operating_income,
+#                     "net_profit": is_.net_profit
+#                 }
+#                 for is_ in income_statements
+#             ],
+#             "balance_sheets": [
+#                 {
+#                     "year": bs.period_year,
+#                     "quarter": bs.period_quarter,
+#                     "total_assets": bs.total_assets,
+#                     "total_liabilities": bs.total_liabilities,
+#                     "total_equity": bs.total_equity,
+#                     "cash_and_equivalents": bs.cash_and_equivalents,
+#                     "inventories": bs.inventories,
+#                     "current_assets": bs.current_assets,
+#                     "current_liabilities": bs.current_liabilities
+#                 }
+#                 for bs in balance_sheets
+#             ],
+#             "cash_flows": [
+#                 {
+#                     "year": cf.period_year,
+#                     "quarter": cf.period_quarter,
+#                     "operating_cash_flow": cf.operating_cash_flow,
+#                     "investing_cash_flow": cf.investing_cash_flow,
+#                     "financing_cash_flow": cf.financing_cash_flow,
+#                     "net_change_in_cash": cf.net_change_in_cash,
+#                     "capex": cf.capex
+#                 }
+#                 for cf in cash_flows
+#             ],
+#             "export_date": pd.Timestamp.now().isoformat()
+#         }
+#     finally:
+#         session.close()
 
 
 
 
-@app.post("/api/update-prices")
-async def trigger_price_update():
-    """Trigger a manual price update through the shared lock-protected updater."""
-    result = await update_stock_prices_async()
-    return {
-        "success": bool(result and result.get("success")),
-        "started": bool(result and result.get("started")),
-        "message": result.get("message") if result else "Price update did not start",
-        "state": price_update_state,
-    }
+# @app.post("/api/update-prices")
+# async def trigger_price_update():
+#     """Trigger a manual price update through the shared lock-protected updater."""
+#     result = await update_stock_prices_async()
+#     return {
+#         "success": bool(result and result.get("success")),
+#         "started": bool(result and result.get("started")),
+#         "message": result.get("message") if result else "Price update did not start",
+#         "state": price_update_state,
+#     }
 
 
 # ============ Run Server ============

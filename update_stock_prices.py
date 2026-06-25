@@ -81,10 +81,10 @@ def get_prices_from_ssi():
                         if price:
                             # SSI giá đơn vị 1000đ
                             prices[ticker.upper()] = price
-            print(f"✅ SSI: Lấy được {len(prices)} mã")
+            print(f" SSI: Lấy được {len(prices)} mã")
             return prices
     except Exception as e:
-        print(f"❌ SSI API lỗi: {e}")
+        print(f" SSI API lỗi: {e}")
     return {}
 
 
@@ -114,7 +114,7 @@ def get_prices_from_tcbs(tickers: list):
         except Exception as e:
             print(f"  ✗ {ticker}: {e}")
     
-    print(f"✅ TCBS: Lấy được {len(prices)} mã")
+    print(f" TCBS: Lấy được {len(prices)} mã")
     return prices
 
 
@@ -143,10 +143,10 @@ def get_prices_from_vps(tickers: list):
                     if ticker and price:
                         prices[ticker] = price
             
-            print(f"✅ VPS: Lấy được {len(prices)} mã")
+            print(f" VPS: Lấy được {len(prices)} mã")
             return prices
     except Exception as e:
-        print(f"❌ VPS API lỗi: {e}")
+        print(f" VPS API lỗi: {e}")
     return {}
 
 
@@ -173,11 +173,11 @@ def get_prices_from_cafef(ticker: str):
 def update_database(prices: dict):
     """Cập nhật giá vào database"""
     if not prices:
-        print("⚠️  Không có dữ liệu giá để cập nhật")
+        print("  Không có dữ liệu giá để cập nhật")
         return 0
     
     if not os.path.exists(DB_PATH):
-        print(f"❌ Không tìm thấy database: {DB_PATH}")
+        print(f" Không tìm thấy database: {DB_PATH}")
         return 0
     
     engine = create_db_engine()
@@ -189,7 +189,7 @@ def update_database(prices: dict):
         result = conn.execute(text("SELECT ticker FROM companies")).fetchall()
         db_tickers = [str(row[0]).strip().upper() for row in result if row[0]]
         
-        print(f"\n📊 Đang cập nhật {len(db_tickers)} mã trong database...")
+        print(f"\n Đang cập nhật {len(db_tickers)} mã trong database...")
         
         for ticker in db_tickers:
             if ticker in prices:
@@ -257,7 +257,7 @@ def update_database(prices: dict):
 def ensure_price_columns():
     """Đảm bảo các cột giá tồn tại trong DB"""
     if not os.path.exists(DB_PATH):
-        print(f"❌ Không tìm thấy database: {DB_PATH}")
+        print(f" Không tìm thấy database: {DB_PATH}")
         return False
     
     engine = create_db_engine()
@@ -331,7 +331,7 @@ def ensure_price_history_table():
 
 def main():
     print("=" * 60)
-    print("🚀 CẬP NHẬT GIÁ CỔ PHIẾU REALTIME")
+    print(" CẬP NHẬT GIÁ CỔ PHIẾU REALTIME")
     print("=" * 60)
     print(f"📅 Thời gian: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"📁 Database: {DB_PATH}")
@@ -359,21 +359,21 @@ def main():
     # 2. Nếu SSI không có, thử VPS
     missing = [t for t in db_tickers if t not in prices]
     if missing:
-        print(f"\n⚠️  Còn thiếu {len(missing)} mã: {', '.join(missing)}")
+        print(f"\n  Còn thiếu {len(missing)} mã: {', '.join(missing)}")
         vps_prices = get_prices_from_vps(missing)
         prices.update(vps_prices)
     
     # 3. Nếu vẫn thiếu, thử TCBS
     missing = [t for t in db_tickers if t not in prices]
     if missing:
-        print(f"\n⚠️  Còn thiếu {len(missing)} mã: {', '.join(missing)}")
+        print(f"\n  Còn thiếu {len(missing)} mã: {', '.join(missing)}")
         tcbs_prices = get_prices_from_tcbs(missing)
         prices.update(tcbs_prices)
     
     # 4. Cuối cùng, thử CafeF cho các mã còn lại
     missing = [t for t in db_tickers if t not in prices]
     if missing:
-        print(f"\n⚠️  Thử CafeF cho {len(missing)} mã còn lại...")
+        print(f"\n  Thử CafeF cho {len(missing)} mã còn lại...")
         for ticker in missing:
             price = get_prices_from_cafef(ticker)
             if price:
@@ -386,11 +386,11 @@ def main():
     
     print()
     print("=" * 60)
-    print(f"✅ HOÀN TẤT! Đã cập nhật {updated}/{len(db_tickers)} mã")
+    print(f" HOÀN TẤT! Đã cập nhật {updated}/{len(db_tickers)} mã")
     print("=" * 60)
     
     # Hiển thị bảng giá
-    print("\n📊 BẢNG GIÁ HIỆN TẠI:")
+    print("\n BẢNG GIÁ HIỆN TẠI:")
     print("-" * 50)
     with engine.connect() as conn:
         result = conn.execute(text("""
