@@ -341,13 +341,13 @@ def run_price_update_sync_locked():
         price_update_lock.release()
 
 
+import concurrent.futures
+_price_update_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
 async def update_stock_prices_async():
     """Chạy script cập nhật giá cổ phiếu trong thread pool"""
-    import concurrent.futures
-    
     loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return await loop.run_in_executor(pool, run_price_update_sync_locked)
+    return await loop.run_in_executor(_price_update_executor, run_price_update_sync_locked)
 
 
 
@@ -372,54 +372,53 @@ async def market_aware_price_update_scheduler():
     print("[Price Scheduler] Startup price update completed.")
 
     # --- After initial update, follow market-aware schedule ---
-    next_market_check = 0.0
-    market_snapshot = None
-
     while True:
-        now = time.monotonic()
-
-        if market_snapshot is None or now >= next_market_check:
+        try:
             market_snapshot = _market_session()
-            next_market_check = now + MARKET_STATUS_CHECK_INTERVAL_SECONDS
+            
             _set_price_update_state(
                 scheduler_status="market_open" if market_snapshot.get("is_open") else "market_closed",
                 market_status=market_snapshot.get("status"),
                 market_is_open=bool(market_snapshot.get("is_open")),
                 last_market_check=_now_iso(),
                 next_market_check=datetime.fromtimestamp(
-                    time.time() + MARKET_STATUS_CHECK_INTERVAL_SECONDS
+                    time.time() + (PRICE_UPDATE_INTERVAL_SECONDS if market_snapshot.get("is_open") else MARKET_STATUS_CHECK_INTERVAL_SECONDS)
                 ).isoformat(timespec="seconds"),
                 skipped_reason=None if market_snapshot.get("is_open") else market_snapshot.get("message"),
             )
+            
             print(
-                "[Price Scheduler] Market status:",
-                market_snapshot.get("status"),
-                "-",
-                market_snapshot.get("message"),
+                f"[Price Scheduler] Market status: {market_snapshot.get('status')} - {market_snapshot.get('message')}"
             )
 
-        if not market_snapshot.get("is_open"):
+            if not market_snapshot.get("is_open"):
+                _set_price_update_state(
+                    scheduler_status="market_closed",
+                    next_price_update=None,
+                )
+                await asyncio.sleep(MARKET_STATUS_CHECK_INTERVAL_SECONDS)
+                continue
+
             _set_price_update_state(
-                scheduler_status="market_closed",
-                next_price_update=None,
+                scheduler_status="market_open",
+                next_price_update=datetime.fromtimestamp(
+                    time.time() + PRICE_UPDATE_INTERVAL_SECONDS
+                ).isoformat(timespec="seconds"),
             )
-            await asyncio.sleep(MARKET_STATUS_CHECK_INTERVAL_SECONDS)
-            continue
-
-        _set_price_update_state(
-            scheduler_status="market_open",
-            next_price_update=datetime.fromtimestamp(
-                time.time() + PRICE_UPDATE_INTERVAL_SECONDS
-            ).isoformat(timespec="seconds"),
-        )
-        await update_stock_prices_async()
-        _set_price_update_state(
-            scheduler_status="market_open",
-            next_price_update=datetime.fromtimestamp(
-                time.time() + PRICE_UPDATE_INTERVAL_SECONDS
-            ).isoformat(timespec="seconds"),
-        )
-        await asyncio.sleep(PRICE_UPDATE_INTERVAL_SECONDS)
+            
+            await update_stock_prices_async()
+            
+            _set_price_update_state(
+                scheduler_status="market_open",
+                next_price_update=datetime.fromtimestamp(
+                    time.time() + PRICE_UPDATE_INTERVAL_SECONDS
+                ).isoformat(timespec="seconds"),
+            )
+            await asyncio.sleep(PRICE_UPDATE_INTERVAL_SECONDS)
+            
+        except Exception as e:
+            print(f"[Price Scheduler] Error in scheduler loop: {e}")
+            await asyncio.sleep(60)
 
 
 @asynccontextmanager
