@@ -132,8 +132,8 @@ def _fetch_index(symbol: str = "VNINDEX") -> dict | None:
 
     if symbol in _index_cache:
         cached_data, timestamp = _index_cache[symbol]
-        # Nếu thị trường đóng cửa, HOẶC cache chưa quá 15 phút, trả về cache
-        if not is_market_open or (now - timestamp < CACHE_TTL_SECONDS):
+        # Chỉ dùng cache nếu chưa quá 15 phút (bất kể đóng hay mở cửa)
+        if now - timestamp < CACHE_TTL_SECONDS:
             return cached_data
 
     try:
